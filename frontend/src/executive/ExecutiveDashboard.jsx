@@ -5,6 +5,7 @@ import CountUp from "react-countup";
 import KPICards from "./components/KPICards";
 import AttackGraph from "./components/AttackGraph";
 import "./ExecutiveDashboard.css";
+import ComplianceAuditLog from "./components/ComplianceAuditLog";
 import ExecutivePosture from "./components/ExecutivePosture";
 import ExecutiveWarRoom from "./components/ExecutiveWarRoom";
 import ExecutiveSummary from "./components/ExecutiveSummary";
@@ -17,6 +18,7 @@ import MitreAttackMatrix from "./components/MitreAttackMatrix";
 import ThreatHeatMap from "./components/ThreatHeatMap";
 import EnterpriseDigitalTwin from "./components/EnterpriseDigitalTwin";
 import CommandCenter from "./components/CommandCenter";
+import ComplianceDashboard from "./components/ComplianceDashboard";
 import AttackSurfaceMap from "./components/AttackSurfaceMap";
 import {
   ResponsiveContainer,
@@ -56,11 +58,13 @@ const [securityPosture, setSecurityPosture] = useState({
   assets: 0,
   prediction: "Low"
 });
+const [executiveReport, setExecutiveReport] = useState(null);
 const [threatMatrix, setThreatMatrix] = useState({
   threats: [],
   categories: [],
   matrix: []
 });
+const [auditLogs, setAuditLogs] = useState([]);
 const [attackPaths, setAttackPaths] = useState([]);
 const [digitalTwin, setDigitalTwin] = useState({});
 const [alerts, setAlerts] = useState([]);
@@ -334,7 +338,7 @@ if (data.type === "new_threat") {
 const loadExecutivePosture = async () => {
     try {
         const posture = await axios.get(
-            `${API_BASE}/executive/posture`
+            `${API}/executive/posture`
         );
 
         setExecutivePosture(posture.data);
@@ -483,19 +487,78 @@ async function generateExecutiveReport() {
   setWarRoomLoading(true);
 
   try {
-    const res = await axios.post(`${API}/executive/generate-report`);
+    const res = await axios.get(
+      `${API}/executive/report`
+    );
 
-    setWarRoomMessage(res.data.message);
+    console.log("EXECUTIVE REPORT:", res.data);
 
-  } catch {
+    setExecutiveReport(res.data);
+    console.log("EXECUTIVE REPORT:", res.data);
 
-    setWarRoomMessage("Unable to generate report.");
+    setWarRoomMessage(
+      "📄 Executive Security Report Generated"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "REPORT ERROR:",
+      error
+    );
+
+    setWarRoomMessage(
+      "Unable to generate report."
+    );
 
   }
 
   setWarRoomLoading(false);
 }
+async function downloadBoardReport() {
 
+  try {
+
+    const response = await axios.get(
+      `${API}/executive/board-report`,
+      {
+        responseType: "blob"
+      }
+    );
+
+    const url = window.URL.createObjectURL(
+      new Blob([response.data])
+    );
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.setAttribute(
+      "download",
+      "Executive_Security_Report.pdf"
+    );
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+  } catch(error) {
+
+    console.error(
+      "PDF REPORT ERROR:",
+      error
+    );
+
+    setWarRoomMessage(
+      "Unable to download board report."
+    );
+
+  }
+
+}
   async function loadData() {
   try {
     const kpi = await axios.get(`${API}/executive/dashboard`);
@@ -626,6 +689,16 @@ setRiskForecast({
     const graphRes = await axios.get(
   `${API}/attack-graph`
 );
+
+const dashboardRes = await axios.get(
+    `${API}/executive/dashboard`
+);
+
+setActiveIncidents(
+    dashboardRes.data.active_incidents || 0
+);
+
+setActiveIncidents(dashboardRes.data.active || 0);
 const recommendationRes = await axios.get(
     `${API}/executive/recommendations`
 );
@@ -716,12 +789,17 @@ const commander = await axios.get(
 );
 
 setIncidentCommander(commander.data.incidents);
+const auditRes = await axios.get(
+    `${API}/compliance-summary`
+);
+
+setAuditLogs(
+    auditRes.data.audit_logs || []
+);
 
 const count = await axios.get(
   `${API}/executive/active-count`
 );
-
-setActiveIncidents(count.data.active);
 
 setWarRoom({
   attacks: graph.nodes.length,
@@ -1543,65 +1621,7 @@ value={scorecard.high_risk_events}
 </div>
 
 )}
-{compliance && (
 
-<div
-style={{
-marginTop:25,
-background:"#111827",
-borderRadius:16,
-padding:20,
-border:"1px solid #334155"
-}}
->
-
-<h2 style={{color:"#00ffc8"}}>
-📋 Compliance & Governance Center
-</h2>
-
-<div
-style={{
-display:"grid",
-gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",
-gap:15
-}}
->
-
-<Card
-title="Compliance Score"
-value={`${compliance.compliance_score}%`}
-/>
-
-<Card
-title="Governance Status"
-value={compliance.status}
-/>
-
-<Card
-title="Open Incidents"
-value={compliance.open_incidents}
-/>
-<Card
-title="Total Alerts"
-value={compliance.total_alerts}
-/>
-</div>
-
-<h3
-style={{
-marginTop:20,
-color:"#facc15"
-}}
->
-Audit Recommendation
-</h3>
-
-<p>
-{compliance.recommendation}
-</p>
-
-</div>
-)}
 {selectedIncident && (
 
 <div
@@ -2566,6 +2586,7 @@ Recommended Actions
         </div>
       )}
 <KPICards kpis={kpis} />
+
 <ExecutiveWarRoom
     summary={summary}
     decision={decision}
@@ -2578,6 +2599,98 @@ Recommended Actions
     onNotifyBoard={notifyBoard}
     onGenerateReport={generateExecutiveReport}
 />
+
+<ComplianceDashboard compliance={compliance} />
+
+<ComplianceAuditLog logs={auditLogs} />
+
+{compliance && (
+  <div
+    style={{
+      background: "#111827",
+      color: "white",
+      padding: 20,
+      borderRadius: 12,
+      marginTop: 20
+    }}
+  >
+    <h3>Compliance Center</h3>
+
+    <p><strong>Status:</strong> {compliance.status}</p>
+
+    <p><strong>Compliance Score:</strong> {compliance.score}%</p>
+
+    <p>
+      <strong>Implemented Controls:</strong>{" "}
+      {compliance?.controls?.implemented ?? 0}
+    </p>
+
+    <p>
+      <strong>Pending Controls:</strong>{" "}
+      {compliance?.controls?.pending ?? 0}
+    </p>
+  </div>
+)}
+{executiveReport && (
+  <div
+    style={{
+      marginTop:30,
+      background:"#111827",
+      color:"white",
+      padding:20,
+      borderRadius:12
+    }}
+  >
+
+    <h3>📄 Executive Security Report</h3>
+
+    <p>
+      <b>Security Score:</b>{" "}
+      {executiveReport.summary?.security_score}
+    </p>
+
+    <p>
+      <b>Risk Posture:</b>{" "}
+      {executiveReport.summary?.posture}
+    </p>
+
+    <p>
+      <b>Critical Threats:</b>{" "}
+      {executiveReport.summary?.critical_threats}
+    </p>
+
+    <p>
+      <b>Compliance:</b>{" "}
+      {executiveReport.compliance?.score}%
+    </p>
+
+    <h4>Recommendations</h4>
+
+    {executiveReport.recommendations?.recommendations?.map(
+      (item,index)=>(
+        <p key={index}>
+          • {item.title || item}
+        </p>
+      )
+    )}
+
+  </div>
+)}
+<button
+  onClick={downloadBoardReport}
+  style={{
+    marginTop:20,
+    background:"#2563eb",
+    color:"white",
+    padding:"12px 20px",
+    borderRadius:8,
+    border:"none",
+    cursor:"pointer",
+    fontWeight:"bold"
+  }}
+>
+📥 Download Board Report
+</button>
 
       <div
         style={{

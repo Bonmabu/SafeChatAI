@@ -13,6 +13,7 @@ from correlation import correlate_event, get_campaigns
 from passlib.context import CryptContext
 from ai.soc_brain import executive_reasoning
 from io import BytesIO
+from compliance import compliance_summary
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
@@ -6693,22 +6694,26 @@ async def generate_report():
 
 
     report = {
+    "generated": datetime.utcnow().isoformat(),
 
-        "generated":
-            datetime.utcnow().isoformat(),
+    "security_score":
+        decision.get("security_score", 0),
 
-        "security_score":
-            summary.get("security_score"),
+    "critical_threats":
+        decision.get("critical_threats", 0),
 
-        "critical_threats":
-            summary.get("critical_threats"),
+    "enterprise_risk":
+        decision.get(
+            "enterprise_risk",
+            get_executive_kpis().get("enterprise_risk", 0)
+        ),
 
-        "enterprise_risk":
-            decision.get("enterprise_risk"),
-
-        "recommendation":
-            decision.get("recommendation")
-    }
+    "recommendation":
+        decision.get(
+            "recommendation",
+            executive_recommendations().get("recommendations", [])
+        )
+}
 
 
     event = add_executive_event(
@@ -6740,3 +6745,65 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
+@app.get("/compliance-summary")
+def get_compliance_summary():
+    return compliance_summary()
+@app.get("/executive/audit-log")
+def executive_audit_log():
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            SELECT
+                timestamp,
+                category,
+                status,
+                severity
+            FROM incidents
+            ORDER BY id DESC
+            LIMIT 20
+        """)
+
+        rows = cur.fetchall()
+
+        logs = []
+
+        for r in rows:
+            logs.append({
+                "time": r["timestamp"],
+                "user": "SOC AI",
+                "action": f'{r["category"]} ({r["severity"]})',
+                "status": r["status"]
+            })
+
+        return logs
+
+    finally:
+        conn.close()
+@app.get("/executive/report")
+def executive_report():
+
+    return {
+        "title": "Executive Security Report",
+        "generated": datetime.utcnow().isoformat(),
+        "risk_score": executive_risk_trend(),
+        "compliance": {
+            "score": 87,
+            "status": "Compliant",
+            "frameworks": [
+                "ISO 27001",
+                "NIST CSF",
+                "SOC 2",
+                "PCI DSS"
+            ],
+            "controls": {
+                "implemented": 87,
+                "pending": 13
+            }
+        },
+        "summary": executive_summary(),
+        "recommendations": executive_recommendations()
+    }
