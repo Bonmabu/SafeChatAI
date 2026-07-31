@@ -1,0 +1,83 @@
+.security-posture-panel {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 20px;
+  color: #e2e8f0;
+  height: 100%;
+  box-shadow: 0 0 20px rgba(0,0,0,0.25);
+}
+
+.security-posture-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.security-posture-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #f8fafc;
+}
+
+.posture-score {
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.posture-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+}
+
+.posture-card {
+  background: #1e293b;
+  border-radius: 10px;
+  padding: 15px;
+  border: 1px solid #334155;
+}
+
+.posture-card h4 {
+  margin: 0 0 8px;
+  color: #94a3b8;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.posture-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.risk-critical {
+  color: #ef4444;
+}
+
+.risk-high {
+  color: #f97316;
+}
+
+.risk-medium {
+  color: #eab308;
+}
+
+.risk-low {
+  color: #22c55e;
+}
+
+.posture-bar {
+  margin-top: 20px;
+  background: #1e293b;
+  height: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.posture-progress {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.5s ease;
+}

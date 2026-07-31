@@ -1,0 +1,31 @@
+.ai-recommendations{
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:16px;
+    padding:20px;
+}
+
+.ai-recommendations h2{
+    color:#00ffc8;
+    margin-bottom:20px;
+}
+
+.recommendation{
+    border-left:5px solid #38bdf8;
+    background:#0f172a;
+    padding:15px;
+    margin-bottom:15px;
+    border-radius:10px;
+}
+
+.recommendation.critical{
+    border-left-color:#ef4444;
+}
+
+.recommendation.high{
+    border-left-color:#f97316;
+}
+
+.recommendation.low{
+    border-left-color:#22c55e;
+}

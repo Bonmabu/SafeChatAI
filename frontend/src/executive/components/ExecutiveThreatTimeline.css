@@ -1,0 +1,134 @@
+.timeline-panel{
+    margin-top:30px;
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:18px;
+    padding:25px;
+    overflow:hidden;
+}
+
+.timeline-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+}
+
+.timeline-header h2{
+    margin:0;
+    color:#00ffc8;
+    font-size:26px;
+    font-weight:700;
+}
+
+.timeline-live{
+    background:#052e16;
+    color:#22c55e;
+    padding:8px 16px;
+    border-radius:20px;
+    font-weight:bold;
+    border:1px solid #22c55e;
+    animation:timelinePulse 2s infinite;
+}
+
+.timeline-row{
+    display:flex;
+    position:relative;
+    padding-left:30px;
+    margin-bottom:20px;
+}
+
+.timeline-dot{
+    width:14px;
+    height:14px;
+    border-radius:50%;
+    background:#ef4444;
+    position:absolute;
+    left:0;
+    top:12px;
+    box-shadow:0 0 12px rgba(239,68,68,.45);
+}
+
+.timeline-line{
+    position:absolute;
+    left:6px;
+    top:26px;
+    bottom:-20px;
+    width:2px;
+    background:#334155;
+}
+
+.timeline-row:last-child .timeline-line{
+    display:none;
+}
+
+.timeline-card{
+    flex:1;
+    background:#020617;
+    padding:15px;
+    border-radius:12px;
+    border:1px solid #334155;
+    transition:.3s ease;
+}
+
+.timeline-card:hover{
+    border-color:#00ffc8;
+    transform:translateY(-2px);
+    box-shadow:0 0 18px rgba(0,255,200,.18);
+}
+
+.timeline-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+    color:#ffffff;
+    gap:10px;
+}
+
+.timeline-top span{
+    color:#00ffc8;
+    font-weight:bold;
+}
+
+.timeline-bottom{
+    color:#94a3b8;
+    line-height:1.5;
+}
+
+.timeline-empty{
+    color:#94a3b8;
+    text-align:center;
+    padding:30px;
+}
+
+@keyframes timelinePulse{
+
+    0%{
+        box-shadow:0 0 8px rgba(34,197,94,.20);
+    }
+
+    50%{
+        box-shadow:0 0 18px rgba(34,197,94,.55);
+    }
+
+    100%{
+        box-shadow:0 0 8px rgba(34,197,94,.20);
+    }
+
+}
+
+@media(max-width:900px){
+
+    .timeline-header{
+        flex-direction:column;
+        align-items:flex-start;
+        gap:15px;
+    }
+
+    .timeline-top{
+        flex-direction:column;
+        align-items:flex-start;
+    }
+
+}

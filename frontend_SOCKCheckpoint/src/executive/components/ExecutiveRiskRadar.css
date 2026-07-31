@@ -1,0 +1,93 @@
+.risk-radar{
+    margin-top:30px;
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:18px;
+    padding:25px;
+    overflow:hidden;
+}
+
+.risk-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:25px;
+}
+
+.risk-header h2{
+    margin:0;
+    color:#00ffc8;
+    font-size:26px;
+    font-weight:700;
+}
+
+.risk-score{
+    width:70px;
+    height:70px;
+    border-radius:50%;
+    background:#020617;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:22px;
+    font-weight:bold;
+    color:#00ffc8;
+    border:2px solid #00ffc8;
+    box-shadow:0 0 18px rgba(0,255,200,.20);
+}
+
+.risk-row{
+    display:grid;
+    grid-template-columns:110px 1fr 60px;
+    gap:15px;
+    align-items:center;
+    margin-bottom:15px;
+    color:#ffffff;
+}
+
+.risk-track{
+    height:16px;
+    background:#1e293b;
+    border-radius:20px;
+    overflow:hidden;
+    border:1px solid #334155;
+}
+
+.risk-fill{
+    height:100%;
+    transition:width .8s ease;
+    border-radius:20px;
+}
+
+.risk-row strong{
+    text-align:right;
+    font-weight:700;
+}
+
+.risk-footer{
+    margin-top:20px;
+    background:#020617;
+    padding:15px;
+    border-radius:12px;
+    text-align:center;
+    font-weight:bold;
+    color:#22c55e;
+    border:1px solid #334155;
+}
+
+@media(max-width:900px){
+
+    .risk-header{
+        flex-direction:column;
+        align-items:flex-start;
+        gap:15px;
+    }
+
+    .risk-row{
+        grid-template-columns:1fr;
+    }
+
+    .risk-row strong{
+        text-align:left;
+    }
+}

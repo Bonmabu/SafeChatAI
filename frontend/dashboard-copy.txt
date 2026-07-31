@@ -1,0 +1,243 @@
+import { useEffect, useState, useRef } from "react";
+import axios from "axios";
+import ForceGraph2D from "react-force-graph-2d";
+import CustomerNav from "./CustomerNav";
+
+const API = "http://127.0.0.1:8000";
+
+export default function CustomerDashboard() {
+  const tenantId = "demo";
+
+  const [summary, setSummary] = useState({
+    total_scans: 0,
+    total_alerts: 0,
+    total_incidents: 0,
+    security_score: 100
+  });
+
+  const [incidents, setIncidents] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+
+  const [selectedIncident, setSelectedIncident] = useState(null);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState("");
+  const [liveAlerts, setLiveAlerts] = useState([]);
+  const graphRef = useRef();
+const panel = {
+  background: "rgba(17, 24, 39, 0.65)",
+  border: "1px solid rgba(0, 255, 225, 0.08)",
+  borderRadius: 14,
+  padding: 15,
+  backdropFilter: "blur(12px)",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.4)"
+};
+
+const alertCard = (alert) => ({
+  padding: 10,
+  marginBottom: 8,
+  borderRadius: 10,
+  background: "rgba(255,255,255,0.03)",
+  borderLeft:
+    alert.level === "High Risk"
+      ? "4px solid #ff3b3b"
+      : alert.level === "Medium"
+      ? "4px solid #facc15"
+      : "4px solid #22c55e"
+});
+
+  useEffect(() => {
+    loadDashboard();
+
+    const interval = setInterval(async () => {
+      try {
+        await Promise.all([
+          axios.get(`${API}/customer/dashboard`, {
+            params: { tenant_id: tenantId }
+          }),
+          axios.get(`${API}/customer/incidents`, {
+            params: { tenant_id: tenantId }
+          }),
+          axios.get(`${API}/attack-graph`)
+        ]);
+
+        try {
+          await axios.get(`${API}/customer/alerts`, {
+            params: { tenant_id: tenantId }
+          });
+        } catch {}
+      } catch (err) {
+        console.error(err);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+useEffect(() => {
+  const ws = new WebSocket("ws://127.0.0.1:8000/ws/alerts");
+
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    setLiveAlerts((prev) => [data, ...prev.slice(0, 19)]);
+  };
+
+  ws.onerror = (err) => console.error("WS error:", err);
+
+  return () => ws.close();
+}, []);
+
+  const loadDashboard = async () => {
+    try {
+      const [summaryRes, incidentsRes, graphRes] = await Promise.all([
+        axios.get(`${API}/customer/dashboard`, {
+          params: { tenant_id: tenantId }
+        }),
+        axios.get(`${API}/customer/incidents`, {
+          params: { tenant_id: tenantId }
+        }),
+        axios.get(`${API}/attack-graph`)
+      ]);
+
+      let alertsRes = { data: [] };
+
+      try {
+        alertsRes = await axios.get(`${API}/customer/alerts`, {
+          params: { tenant_id: tenantId }
+        });
+      } catch {}
+
+      setSummary(summaryRes.data);
+      setIncidents(incidentsRes.data);
+      setAlerts(alertsRes.data);
+
+      setGraphData({
+        nodes: graphRes.data.nodes || [],
+        links: graphRes.data.links || []
+      });
+
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error(err);
+    } finally {
+      if (loading) setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <div style={{ padding: 30 }}>Loading Customer Dashboard...</div>;
+  }
+
+  return (
+    <div
+  style={{
+    padding: 25,
+    background:
+      "radial-gradient(circle at top, #111827 0%, #0b1220 40%, #070b14 100%)",
+    minHeight: "100vh",
+    color: "white",
+  }}
+>
+      <CustomerNav />
+
+      <h1 style={{ textAlign: "center", marginBottom: 25 }}>
+        🛡 Customer Security Dashboard
+      </h1>
+
+      {/* SUMMARY */}
+      <div
+        style={{
+          display: "grid",
+gridTemplateColumns: "repeat(4, 1fr)",
+gap: 16,
+marginBottom: 25
+        }}
+      >
+        <Card title="Total Scans" value={summary.total_scans || 0} />
+        <Card title="Alerts" value={summary.total_alerts || 0} />
+        <Card title="Incidents" value={summary.total_incidents || 0} />
+        <Card title="Security Score" value={`${summary.security_score ?? 0}%`} />
+      </div>
+
+      {/* STATUS */}
+      <div style={{ background: "rgba(17, 24, 39, 0.75)",
+backdropFilter: "blur(12px)",
+border: "1px solid rgba(255,255,255,0.08)",
+borderRadius: 16,
+padding: 20,
+marginBottom: 25,
+boxShadow: "0 10px 30px rgba(0,0,0,0.35)"}}>
+        <h2>🛡 Security Status</h2>
+        <p>Current Security Score: <b>{summary.security_score ?? 0}%</b></p>
+        <p style={{ color: "#9ca3af" }}>Last Updated: {lastUpdated}</p>
+      </div>
+
+      {/* INCIDENTS */}
+      <div style={{ marginTop: 25 }}>
+        <h2>📋 Recent Incidents</h2>
+
+        {incidents.length === 0 ? (
+          <p>No incidents found.</p>
+        ) : (
+          <table style={{ width: "100%" }}>
+            <tbody>
+              {incidents.map((incident) => (
+                <tr
+                  key={incident.id}
+                  onClick={() => setSelectedIncident(incident)}
+                  style={{ cursor: "pointer",background: "rgba(255,255,255,0.02)",
+transition: "0.2s" }}
+onMouseOver={(e) =>
+  (e.currentTarget.style.background = "rgba(255,255,255,0.05)")
+}
+onMouseOut={(e) =>
+  (e.currentTarget.style.background = "rgba(255,255,255,0.02)")
+}
+                >
+                  <td>{incident.id}</td>
+                  <td>{incident.type}</td>
+                  <td>{incident.severity}</td>
+                  <td>{incident.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* LIVE SOC FEED */}
+<div style={panel}>
+  <h3>🚨 LIVE SOC FEED</h3>
+
+  <div style={{ maxHeight: 400, overflowY: "auto" }}>
+    {liveAlerts.map((alert, i) => (
+      <div key={i} style={alertCard(alert)}>
+        <b>{alert.message}</b>
+
+        <div style={{ fontSize: 12, opacity: 0.7 }}>
+          {alert.level} •{" "}
+          {new Date(alert.created_at).toLocaleTimeString()}
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+  );
+}
+
+function Card({ title, value }) {
+  return (
+    <div style={{
+      background: "rgba(17, 24, 39, 0.75)",
+      backdropFilter: "blur(10px)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: 16,
+      padding: 20,
+      boxShadow: "0 10px 30px rgba(0,0,0,0.35)"
+    }}>
+      <h3>{title}</h3>
+      <h1 style={{ color: "#00ffcc" }}>{value}</h1>
+    </div>
+  );
+}

@@ -1,0 +1,38 @@
+.threat-heatmap{
+margin-top:30px;
+padding:25px;
+background:#111827;
+border:1px solid #334155;
+border-radius:18px;
+}
+
+.threat-heatmap h2{
+color:#00ffc8;
+margin-bottom:25px;
+}
+
+.heat-row{
+display:grid;
+grid-template-columns:150px 1fr 60px;
+align-items:center;
+gap:15px;
+margin-bottom:15px;
+color:white;
+}
+
+.heat-bar{
+height:18px;
+background:#1e293b;
+border-radius:20px;
+overflow:hidden;
+}
+
+.heat-fill{
+height:100%;
+background:linear-gradient(90deg,#22c55e,#facc15,#ef4444);
+transition:.8s;
+}
+
+.heat-row strong{
+color:#00ffc8;
+}

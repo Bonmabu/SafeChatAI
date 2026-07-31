@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SafeChatAI</title>
+</head>
+<body>
+    <h2>SafeChatAI</h2>
+
+    <textarea id="input" placeholder="Type message..."></textarea><br>
+    <button onclick="send()">Check</button>
+
+    <pre id="result"></pre>
+
+    <script>
+        // ✅ Production-ready API base (ADDED, nothing removed)
+        const API_BASE = "http://127.0.0.1:8001";
+
+        async function send() {
+            let text = document.getElementById("input").value;
+
+            // keep original logic (unchanged behavior)
+            let res = await fetch(`${API_BASE}/analyze`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ text: text })
+            });
+
+            let data = await res.json();
+
+            document.getElementById("result").innerText =
+                JSON.stringify(data, null, 2);
+        }
+    </script>
+</body>
+</html>

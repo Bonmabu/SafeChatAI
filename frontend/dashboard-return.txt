@@ -1,0 +1,95 @@
+    <div
+  style={{
+    padding: 25,
+    background:
+      "radial-gradient(circle at top, #111827 0%, #0b1220 40%, #070b14 100%)",
+    minHeight: "100vh",
+    color: "white",
+  }}
+>
+      <CustomerNav />
+
+      <h1 style={{ textAlign: "center", marginBottom: 25 }}>
+        🛡 Customer Security Dashboard
+      </h1>
+
+      {/* SUMMARY */}
+      <div
+        style={{
+          display: "grid",
+gridTemplateColumns: "repeat(4, 1fr)",
+gap: 16,
+marginBottom: 25
+        }}
+      >
+        <Card title="Total Scans" value={summary.total_scans || 0} />
+        <Card title="Alerts" value={summary.total_alerts || 0} />
+        <Card title="Incidents" value={summary.total_incidents || 0} />
+        <Card title="Security Score" value={`${summary.security_score ?? 0}%`} />
+      </div>
+
+      {/* STATUS */}
+      <div style={{ background: "rgba(17, 24, 39, 0.75)",
+backdropFilter: "blur(12px)",
+border: "1px solid rgba(255,255,255,0.08)",
+borderRadius: 16,
+padding: 20,
+marginBottom: 25,
+boxShadow: "0 10px 30px rgba(0,0,0,0.35)"}}>
+        <h2>🛡 Security Status</h2>
+        <p>Current Security Score: <b>{summary.security_score ?? 0}%</b></p>
+        <p style={{ color: "#9ca3af" }}>Last Updated: {lastUpdated}</p>
+      </div>
+
+      {/* INCIDENTS */}
+      <div style={{ marginTop: 25 }}>
+        <h2>📋 Recent Incidents</h2>
+
+        {incidents.length === 0 ? (
+          <p>No incidents found.</p>
+        ) : (
+          <table style={{ width: "100%" }}>
+            <tbody>
+              {incidents.map((incident) => (
+                <tr
+                  key={incident.id}
+                  onClick={() => setSelectedIncident(incident)}
+                  style={{ cursor: "pointer",background: "rgba(255,255,255,0.02)",
+transition: "0.2s" }}
+onMouseOver={(e) =>
+  (e.currentTarget.style.background = "rgba(255,255,255,0.05)")
+}
+onMouseOut={(e) =>
+  (e.currentTarget.style.background = "rgba(255,255,255,0.02)")
+}
+                >
+                  <td>{incident.id}</td>
+                  <td>{incident.type}</td>
+                  <td>{incident.severity}</td>
+                  <td>{incident.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* LIVE SOC FEED */}
+<div style={panel}>
+  <h3>🚨 LIVE SOC FEED</h3>
+
+  <div style={{ maxHeight: 400, overflowY: "auto" }}>
+    {liveAlerts.map((alert, i) => (
+      <div key={i} style={alertCard(alert)}>
+        <b>{alert.message}</b>
+
+        <div style={{ fontSize: 12, opacity: 0.7 }}>
+          {alert.level} •{" "}
+          {new Date(alert.created_at).toLocaleTimeString()}
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+  );
+}

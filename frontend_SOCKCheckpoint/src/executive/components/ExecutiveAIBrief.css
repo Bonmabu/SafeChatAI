@@ -1,0 +1,29 @@
+.executive-ai-brief{
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:16px;
+    padding:20px;
+    color:white;
+}
+
+.executive-ai-brief h2{
+    color:#00ffc8;
+    margin-bottom:15px;
+}
+
+.executive-ai-brief h3{
+    color:#facc15;
+    margin-top:20px;
+}
+
+.brief-risk{
+    font-size:18px;
+    margin-bottom:15px;
+}
+
+.prediction{
+    margin-top:20px;
+    padding:15px;
+    background:#0f172a;
+    border-radius:10px;
+}
