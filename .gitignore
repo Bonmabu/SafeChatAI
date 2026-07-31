@@ -46,3 +46,4 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+Releases/Beta_v1/*.zip
