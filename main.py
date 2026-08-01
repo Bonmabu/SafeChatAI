@@ -6856,3 +6856,10 @@ def executive_report():
         "summary": executive_summary(),
         "recommendations": executive_recommendations()
     }
+@app.get("/")
+def root():
+    return {
+        "service": "SafeChatAI SOC",
+        "status": "online",
+        "version": "production"
+    }
