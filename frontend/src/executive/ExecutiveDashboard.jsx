@@ -3,8 +3,10 @@ import axios from "axios";
 import ForceGraph2D from "react-force-graph-2d";
 import CountUp from "react-countup";
 import KPICards from "./components/KPICards";
+import CampaignDashboard from "./components/CampaignDashboard";
 import AttackGraph from "./components/AttackGraph";
 import "./ExecutiveDashboard.css";
+import CampaignDetails from "./components/CampaignDetails";
 import ComplianceAuditLog from "./components/ComplianceAuditLog";
 import ExecutivePosture from "./components/ExecutivePosture";
 import ExecutiveWarRoom from "./components/ExecutiveWarRoom";
@@ -285,21 +287,19 @@ if (data.type === "attack_graph_live") {
   setAttackGraph(prev => {
 
     const safeNodes = (prev?.nodes || []).filter(
-      n => n && n.id
-    );
+  n => n && n.id
+);
 
-    const exists = safeNodes.some(
-      n => n.id === data.node.id
-    );
+const exists = safeNodes.some(n => n.id === data.node.id);
 
     return {
-      nodes: exists
-        ? safeNodes
-        : [...safeNodes, data.node],
-      links: Array.isArray(data.links)
-        ? data.links
-        : (prev?.links || [])
-    };
+  nodes: exists
+    ? safeNodes
+    : [...safeNodes, data.node],
+  links: Array.isArray(data.links)
+    ? data.links
+    : (prev?.links || [])
+};
 
   });
 
@@ -706,6 +706,14 @@ const recommendationRes = await axios.get(
 setRecommendations(
     recommendationRes.data.recommendations || []
 );
+console.log("GRAPH RESPONSE");
+console.log(graphRes.data);
+
+console.log("NODES");
+console.table(graphRes.data.nodes);
+
+console.log("LINKS");
+console.table(graphRes.data.links);
 
 const graph = {
   nodes: graphRes.data.nodes || [],
@@ -713,6 +721,14 @@ const graph = {
 };
 
 setAttackGraph(graph);
+console.log("GRAPH PASSED TO FORCE GRAPH");
+console.log(graph);
+
+console.log("NODE IDS");
+console.log(graph.nodes.map(n => n.id));
+
+console.log("LINKS");
+console.log(graph.links);
 
 setAttackStats({
   totalNodes: graph.nodes.length,
@@ -987,18 +1003,10 @@ function calculateRiskForecast(graph) {
   });
 }
 
-  return (
+    return (
   <div className="executive-dashboard">
-return (
-  <div className="executive-dashboard">
-
-    
 
     {/* existing dashboard */}
-
-    
-
-  
       <h2
   style={{
     color: "#00ffc8",
@@ -1102,15 +1110,28 @@ style={{
     }}
   >
     <ForceGraph2D
-  graphData={{
-    nodes: Array.isArray(attackGraph?.nodes)
-      ? attackGraph.nodes
-      : Object.values(attackGraph?.nodes || {}),
+  graphData={(() => {
+  const nodes = Array.isArray(attackGraph?.nodes)
+    ? attackGraph.nodes
+    : Object.values(attackGraph?.nodes || {});
 
-    links: Array.isArray(attackGraph?.links)
+  const nodeIds = new Set(nodes.map(n => n.id));
+
+  const links = (
+    Array.isArray(attackGraph?.links)
       ? attackGraph.links
       : (attackGraph?.edges || [])
-  }}
+  ).filter(
+    l =>
+      nodeIds.has(l.source) &&
+      nodeIds.has(l.target)
+  );
+
+  return {
+    nodes,
+    links
+  };
+})()}
   width={window.innerWidth * 0.85}
   height={500}
   nodeAutoColorBy="category"
@@ -1122,8 +1143,7 @@ style={{
 />
   </div>
 </div>
-
- 
+<CampaignDetails />
 
 <p
   style={{
@@ -1868,8 +1888,7 @@ Waiting for live security events...
 
   );
 
-})}
-
+ })}
 
 </div>
 {prediction && (
@@ -2601,6 +2620,7 @@ Recommended Actions
 />
 
 <ComplianceDashboard compliance={compliance} />
+<CampaignDashboard />
 
 <ComplianceAuditLog logs={auditLogs} />
 
@@ -2995,78 +3015,63 @@ Recommendation:
 </div>
 
   {liveExecutiveAlerts.length === 0 ? (
-
-  <p style={{ color:"#94a3b8" }}>
+  <p style={{ color: "#94a3b8" }}>
     Waiting for live SOC events...
   </p>
-
 ) : (
+  <>
+    {liveExecutiveAlerts.map((alert, index) => {
+      const risk =
+        alert.node?.max_score ??
+        alert.node?.score ??
+        alert.data?.soc_core?.avg_risk ??
+        0;
 
-liveExecutiveAlerts.map((alert,index)=>{
+      const eventType =
+        alert.node?.category ??
+        alert.event_type ??
+        alert.type ??
+        "Security Event";
 
-const risk =
-  alert.node?.max_score ??
-  alert.node?.score ??
-  alert.data?.soc_core?.avg_risk ??
-  0;
+      return (
+        <div
+          key={index}
+          style={{
+            marginTop: 15,
+            padding: 15,
+            background: "#0f172a",
+            borderRadius: 10,
+            borderLeft:
+              risk >= 90
+                ? "5px solid #ef4444"
+                : risk >= 70
+                ? "5px solid #f97316"
+                : "5px solid #22c55e"
+          }}
+        >
+          <h3>{eventType}</h3>
 
-const eventType =
-  alert.node?.category ??
-  alert.event_type ??
-  alert.type ??
-  "Security Event";
+          <p><b>Risk Score:</b> {Number(risk).toFixed(1)}</p>
 
+          <p>
+            <b>SOC Status:</b>{" "}
+            {alert.data?.soc_core?.status ?? "UNKNOWN"}
+          </p>
 
-return (
+          <p>
+            <b>Critical Threats:</b>{" "}
+            {alert.data?.soc_core?.critical_threats ?? 0}
+          </p>
 
-<div
-key={index}
-style={{
-marginTop:15,
-padding:15,
-background:"#0f172a",
-borderRadius:10,
-borderLeft:
-risk >= 90
-? "5px solid #ef4444"
-: risk >= 70
-? "5px solid #f97316"
-: "5px solid #22c55e"
-}}
->
-
-<h3>
-{eventType}
-</h3>
-
-<p>
-<b>Risk Score:</b> {Number(risk).toFixed(1)}
-</p>
-
-<p>
-<b>SOC Status:</b>{" "}
-{alert.data?.soc_core?.status ?? "UNKNOWN"}
-</p>
-
-<p>
-<b>Critical Threats:</b>{" "}
-{alert.data?.soc_core?.critical_threats ?? 0}
-</p>
-
-<p>
-<b>Threat Velocity:</b>{" "}
-{alert.data?.velocity?.status ?? "NORMAL"}
-</p>
-
-</div>
-
-);
-
-})
-
+          <p>
+            <b>Threat Velocity:</b>{" "}
+            {alert.data?.velocity?.status ?? "NORMAL"}
+          </p>
+        </div>
+      );
+    })}
+    </>
 )}
-
-</div>
 
 <div
   style={{

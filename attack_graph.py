@@ -12,51 +12,51 @@ def add_event(event):
     user = event.get("username", "Unknown User")
     host = event.get("hostname", "Unknown Host")
     category = event.get("category", "Unknown Threat")
+    stage = event.get("stage", "Initial Access")
+    campaign = event.get("campaign", "Unknown Campaign")
 
     for node_id, node_type in [
         (source, "ip"),
         (user, "user"),
         (host, "host"),
-        (category, "threat")
+        (category, "threat"),
+        (stage, "mitre_stage"),
+        (campaign, "campaign")
     ]:
 
         if node_id not in GRAPH["nodes"]:
-
             GRAPH["nodes"][node_id] = {
                 "id": node_id,
                 "type": node_type,
                 "count": 1
             }
-
         else:
-
             GRAPH["nodes"][node_id]["count"] += 1
 
     GRAPH["edges"].append({
-    "source": source,
-    "target": user
-})
+        "source": source,
+        "target": user
+    })
 
     GRAPH["edges"].append({
-    "source": user,
-    "target": host
-})
+        "source": user,
+        "target": host
+    })
 
     GRAPH["edges"].append({
-    "source": host,
-    "target": event["category"]
-})
+        "source": host,
+        "target": category
+    })
 
     GRAPH["edges"].append({
-    "source": event["category"],
-    "target": event["stage"]
-})
+        "source": category,
+        "target": stage
+    })
 
     GRAPH["edges"].append({
-    "source": event["stage"],
-    "target": event.get("campaign", "Unknown Campaign")
-})
-
+        "source": stage,
+        "target": campaign
+    })
 
 def get_graph():
 

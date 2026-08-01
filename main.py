@@ -2080,6 +2080,9 @@ def build_attack_clusters():
 
 class AnalyzeRequest(BaseModel):
     text: str
+    username: str | None = None
+    hostname: str | None = None
+    source_ip: str | None = None
 
 
 class ThreatHuntRequest(BaseModel):
@@ -2311,9 +2314,9 @@ async def analyze(payload: AnalyzeRequest):
     "mitre": mitre,
     "confidence": confidence,
     "matches": matches,
-    "username": getattr(payload, "username", ""),
-    "hostname": getattr(payload, "hostname", ""),
-    "source_ip": getattr(payload, "source_ip", "")
+    "username": payload.username or "",
+    "hostname": payload.hostname or "",
+    "source_ip": payload.source_ip or ""
 }
 
     campaign = engine_detect_campaign(event)
@@ -3778,8 +3781,11 @@ async def soc_ai_stream(payload: dict):
     print("🔥 SOC-AI-STREAM ENDPOINT HIT")
 
     request = AnalyzeRequest(
-        text=payload.get("text", "")
-    )
+    text=payload.get("text", ""),
+    username=payload.get("username"),
+    hostname=payload.get("hostname"),
+    source_ip=payload.get("source_ip")
+)
 
     result = await analyze(request)
 
@@ -4113,9 +4119,19 @@ def breach_forecast():
     }
 @app.get("/attack-graph")
 def attack_graph():
+    print("=" * 80)
+    print("ATTACK_GRAPH NODES =", ATTACK_GRAPH["nodes"])
+    print("ATTACK_GRAPH EDGES =", ATTACK_GRAPH["edges"])
+    print("=" * 80)
 
-    # Live graph built during analysis
-    graph = get_graph()
+    nodes = list(ATTACK_GRAPH["nodes"].values())
+
+    print("========== ATTACK GRAPH ENDPOINT ==========")
+    print("ATTACK_GRAPH id =", id(ATTACK_GRAPH))
+    print("Nodes =", len(ATTACK_GRAPH["nodes"]))
+    print("Edges =", len(ATTACK_GRAPH["edges"]))
+
+    links = list(ATTACK_GRAPH["edges"])   # make a copy
 
     conn = get_conn()
     cur = conn.cursor()
@@ -4130,25 +4146,54 @@ def attack_graph():
     rows = cur.fetchall()
     conn.close()
 
-    existing = {n["id"] for n in graph["nodes"]}
+    existing = {n["id"] for n in nodes}
+
+    previous_scan = None
 
     for row in rows:
 
+        category = row["category"] or "Unknown"
         scan_id = f"SCAN-{row['id']}"
 
-        if scan_id not in existing:
+        # Create category node if missing
+        if category not in existing:
+            nodes.append({
+                "id": category,
+                "type": "threat",
+                "category": category
+            })
+            existing.add(category)
 
-            graph["nodes"].append({
+        # Create scan node
+        if scan_id not in existing:
+            nodes.append({
                 "id": scan_id,
                 "type": "scan",
-                "category": row["category"],
+                "category": category,
                 "score": row["risk_score"] or 0
             })
+            existing.add(scan_id)
+
+        # Category → Scan
+        links.append({
+            "source": category,
+            "target": scan_id
+        })
+
+        # Timeline chain
+        if previous_scan:
+            links.append({
+                "source": previous_scan,
+                "target": scan_id
+            })
+
+        previous_scan = scan_id
 
     return {
-        "nodes": graph["nodes"],
-        "links": graph["edges"]
+        "nodes": nodes,
+        "links": links
     }
+
 @app.get("/ioc-intelligence")
 async def ioc_intelligence():
 
@@ -4167,7 +4212,11 @@ def live_incidents():
     return incidents[:20]
 @app.get("/graph-test")
 def graph_test():
-    soc_autonomous_orchestrator("Test", 90, "debug123")
+    soc_autonomous_orchestrator("Phishing", 90, "debug123")
+    print("========== GRAPH TEST ==========")
+    print("ATTACK_GRAPH id =", id(ATTACK_GRAPH))
+    print("Nodes =", len(ATTACK_GRAPH["nodes"]))
+    print("Edges =", len(ATTACK_GRAPH["edges"]))
     return ATTACK_GRAPH
 @app.get("/debug-threat-graph")
 def debug_threat_graph():
@@ -6440,7 +6489,7 @@ def health():
         "status": "healthy",
         "version": "1.0.0",
         "service": "SafeChat AI SOC",
-        "environment": os.getenv("ENVIRONMENT", "development"),
+        "environment": os.getenv("ENVIRONMENT", "production"),
         "database": "connected",
         "api": "running"
     }

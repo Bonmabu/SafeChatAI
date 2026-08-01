@@ -1,0 +1,39 @@
+.campaign-table{
+
+width:100%;
+
+border-collapse:collapse;
+
+margin-top:15px;
+
+font-size:13px;
+
+}
+
+.campaign-table th{
+
+background:#1f2937;
+
+color:white;
+
+padding:10px;
+
+text-align:left;
+
+}
+
+.campaign-table td{
+
+padding:10px;
+
+border-bottom:1px solid #ddd;
+
+}
+
+.campaign-table tr:hover{
+
+background:#f4f4f4;
+
+cursor:pointer;
+
+}

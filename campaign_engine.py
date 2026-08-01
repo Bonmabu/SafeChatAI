@@ -40,6 +40,10 @@ def detect_campaign(event):
     confidence = event.get("confidence", 0)
 
     source_ip = event.get("source_ip", "unknown")
+    print("CAMPAIGN EVENT =", event)
+    print("USERNAME =", event.get("username"))
+    print("HOSTNAME =", event.get("hostname"))
+    print("SOURCE_IP =", event.get("source_ip"))
     hostname = event.get("hostname", "unknown")
     username = event.get("username", "unknown")
 
@@ -114,12 +118,15 @@ def detect_campaign(event):
         "mitre": mitre
     })
 
-    return c
+    return enrich_campaign(c)
 
 
 def get_campaigns():
-    return list(CAMPAIGNS.values())
 
+    return [
+        enrich_campaign(campaign)
+        for campaign in CAMPAIGNS.values()
+    ]
 
 def get_campaign(campaign_id):
 
@@ -136,5 +143,39 @@ def close_campaign(campaign_id):
 
     if campaign:
         campaign["status"] = "Closed"
+
+    return campaign
+def calculate_campaign_confidence(campaign):
+
+    score = 0
+
+    score += min(len(campaign.get("events", [])) * 5, 30)
+
+    score += min(len(campaign.get("ips", [])) * 10, 20)
+
+    score += min(len(campaign.get("mitre", [])) * 10, 20)
+
+    score += min(campaign.get("severity", 0) / 2, 30)
+
+    return round(min(score, 100), 2)
+
+
+def enrich_campaign(campaign):
+
+    campaign["campaign_confidence"] = calculate_campaign_confidence(
+        campaign
+    )
+
+    campaign["actor_profile"] = {
+        "ip_count": len(campaign.get("ips", [])),
+        "host_count": len(campaign.get("hosts", [])),
+        "user_count": len(campaign.get("users", [])),
+        "technique_count": len(campaign.get("mitre", []))
+    }
+
+    campaign["timeline"] = sorted(
+        campaign.get("events", []),
+        key=lambda x: x["time"]
+    )
 
     return campaign
