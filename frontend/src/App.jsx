@@ -107,9 +107,11 @@ useEffect(() => {
   }
 }, [graphData]);
 useEffect(() => {
-  const ws = new WebSocket(
-  `${import.meta.env.VITE_WS_BASE}/ws/soc`
-);
+  const WS_URL =
+  import.meta.env.VITE_WS_URL ||
+  "ws://127.0.0.1:8000/ws/soc";
+
+const ws = new WebSocket(WS_URL);
   
 
   ws.onopen = () => {
