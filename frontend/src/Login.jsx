@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 
 
 const API = import.meta.env.VITE_API_BASE;
+console.log("MODE:", import.meta.env.MODE);
+console.log("API AT LOAD:", API);
 
 export default function Login({ onLogin }) {
 
@@ -12,11 +14,16 @@ export default function Login({ onLogin }) {
   const navigate = useNavigate();
 
   const login = async () => {
+  console.log("API:", API);
+  console.log("LOGIN URL:", `${API}/login`);
 
+  try {
     const res = await axios.post(`${API}/login`, {
       username,
-      password
+      password,
     });
+
+    console.log("LOGIN RESPONSE:", res.data);
 
     if (!res.data.success) {
       alert(res.data.message);
@@ -26,13 +33,22 @@ export default function Login({ onLogin }) {
     localStorage.setItem("token", res.data.token);
     localStorage.setItem("role", res.data.role);
 
-if (onLogin) {
-    onLogin(res.data.role);
-}
+    if (onLogin) {
+      onLogin(res.data.role);
+    }
 
-navigate("/");
-  };
+    navigate("/");
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
 
+    if (err.response) {
+      console.error("Status:", err.response.status);
+      console.error("Data:", err.response.data);
+    } else {
+      console.error("Request URL:", `${API}/login`);
+    }
+  }
+};
   return (
     <div
       style={{
@@ -96,29 +112,3 @@ navigate("/");
     </div>
   );
 }
-const login = async () => {
-  console.log("LOGIN CLICKED");
-
-  const res = await axios.post(`${API}/login`, {
-    username,
-    password
-  });
-
-  console.log("LOGIN RESPONSE:", res.data);
-
-  if (!res.data.success) {
-    alert(res.data.message);
-    return;
-  }
-
-  console.log("STORING TOKEN");
-
-  localStorage.setItem("token", res.data.token);
-  localStorage.setItem("role", res.data.role);
-
-  console.log("CALLING onLogin");
-
-  if (onLogin) {
-    onLogin(res.data.role);
-  }
-};
