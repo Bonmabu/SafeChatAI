@@ -177,14 +177,24 @@ setSocSummary(res.data);
 
   async function loadDashboard() {
     try {
-      const res = await axios.get(`${API}/customer/dashboard`, {
-        params: { tenant_id: tenantId }
-      });
+      const res = await axios.get(
+  `${API}/customer/dashboard`,
+  authConfig
+);
 
       console.log("Dashboard API Response:", res.data);
 setSummary(res.data);
-const incidents =
-    await axios.get(`${API}/incidents`);
+const incidents = await axios.get(
+  `${API}/incidents`,
+  authConfig
+);
+const token = localStorage.getItem("token");
+
+const authConfig = {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+};
 
 const stats = {
     Critical: 0,
@@ -228,11 +238,10 @@ async function loadAttackTrend() {
       `${API}/customer/attack-trend`
     );
 
-    const res = await axios.get(`${API}/customer/attack-trend`, {
-      params:{
-        tenant_id: tenantId
-      }
-    });
+    const res = await axios.get(
+  `${API}/customer/attack-trend`,
+  authConfig
+);
 
     console.log("TREND DATA =", res.data);
 
@@ -249,10 +258,19 @@ async function loadAttackTrend() {
 }
 async function loadIOCs() {
   try {
-    const res = await axios.get(`${API}/customer/iocs`);
+
+    const token = localStorage.getItem("token");
+
+    const res = await axios.get(`${API}/customer/iocs`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
     setIocs(res.data);
+
   } catch (err) {
-    console.error(err);
+    console.error("IOC LOAD ERROR:", err);
   }
 }
 async function generateIncidentSummary() {
@@ -321,11 +339,10 @@ function getMitreTechnique(node) {
 }
 async function loadGraph() {
   try {
-    const res = await axios.get(`${API}/incidents`, {
-  params: {
-    tenant_id: tenantId
-  }
-});
+    const res = await axios.get(
+  `${API}/incidents`,
+  authConfig
+);
 
     const incidents = res.data || [];
 console.log("INCIDENTS:", incidents);
