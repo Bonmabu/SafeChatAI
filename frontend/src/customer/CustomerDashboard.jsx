@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 const authConfig = {
   headers: {
-    Authorization: `Bearer ${token}`
+    Authorization: `Bearer ${localStorage.getItem("token")}`
   }
 };
 import CustomerNav from "./CustomerNav";
