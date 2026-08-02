@@ -1,5 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
+const authConfig = {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+};
 import CustomerNav from "./CustomerNav";
 import ForceGraph2D from "react-force-graph-2d";
 import AttackMap from "../components/AttackMap";
@@ -189,13 +194,6 @@ const incidents = await axios.get(
   authConfig
 );
 const token = localStorage.getItem("token");
-
-const authConfig = {
-  headers: {
-    Authorization: `Bearer ${token}`
-  }
-};
-
 const stats = {
     Critical: 0,
     High: 0,
