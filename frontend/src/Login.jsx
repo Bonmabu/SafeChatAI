@@ -37,7 +37,22 @@ export default function Login({ onLogin }) {
       onLogin(res.data.role);
     }
 
-    navigate("/");
+    switch (res.data.role) {
+      case "admin":
+        navigate("/");
+        break;
+
+      case "analyst":
+        navigate("/customer");
+        break;
+
+      case "viewer":
+        navigate("/executive");
+        break;
+
+      default:
+        navigate("/");
+    }
   } catch (err) {
     console.error("LOGIN ERROR:", err);
 
@@ -47,6 +62,8 @@ export default function Login({ onLogin }) {
     } else {
       console.error("Request URL:", `${API}/login`);
     }
+
+    alert("Unable to connect to the server.");
   }
 };
   return (
