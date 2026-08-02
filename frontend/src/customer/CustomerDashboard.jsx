@@ -19,6 +19,7 @@ import {
   CartesianGrid
 } from "recharts";
 const API = import.meta.env.VITE_API_BASE;
+const token = localStorage.getItem("token");
 function Card({ title, value }) {
   return (
     <div
@@ -236,10 +237,12 @@ async function loadAttackTrend() {
       `${API}/customer/attack-trend`
     );
 
-    const res = await axios.get(
-  `${API}/customer/attack-trend`,
-  authConfig
-);
+   const res = await axios.get(`${API}/customer/attack-trend`, {
+  params: {
+    tenant_id: tenantId
+  },
+  headers: authConfig.headers
+});
 
     console.log("TREND DATA =", res.data);
 
