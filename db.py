@@ -19,6 +19,7 @@ def get_conn():
 
 
 def init_db():
+    
     conn = get_conn()
     cursor = conn.cursor()
     
@@ -47,6 +48,15 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS tenants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id TEXT UNIQUE,
+    company_name TEXT,
+    industry TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+""")
         # threat IOC table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS threat_iocs (
@@ -117,7 +127,8 @@ def init_db():
     # threat intelligence
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS threat_intelligence (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id TEXT DEFAULT 'demo',
         indicator TEXT UNIQUE,
         category TEXT,
         score REAL DEFAULT 0,
@@ -143,22 +154,10 @@ def init_db():
         risk TEXT
     )
     """)
-
+    
     conn.commit()
     conn.close()
-def add_threat_intel_column():
-    conn = get_conn()
-    cursor = conn.cursor()
 
-    try:
-        cursor.execute(
-            "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS threat_intel TEXT"
-        )
-    except:
-        pass
-
-    conn.commit()
-    conn.close()
 def calculate_risk_score(category, base_score):
     conn = get_conn()
     cur = conn.cursor()
@@ -1214,16 +1213,43 @@ def add_threat_intel_column():
     conn = get_conn()
     cursor = conn.cursor()
 
+    # Add threat_intel to incidents if missing
     try:
         cursor.execute("""
-        ALTER TABLE incidents 
-        ADD COLUMN threat_intel TEXT
+            ALTER TABLE incidents
+            ADD COLUMN threat_intel TEXT
         """)
-        print("✅ threat_intel column added")
-    except Exception as e:
-        print("ℹ️ threat_intel column already exists:", e)
+        print("✅ threat_intel column added to incidents")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" in str(e).lower():
+            print("ℹ️ incidents.threat_intel already exists")
+        else:
+            print(f"⚠️ incidents migration: {e}")
+
+    # Add tenant_id to threat_intelligence if missing
+    try:
+        cursor.execute("""
+            ALTER TABLE threat_intelligence
+            ADD COLUMN tenant_id TEXT DEFAULT 'demo'
+        """)
+        print("✅ tenant_id column added to threat_intelligence")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" in str(e).lower():
+            print("ℹ️ threat_intelligence.tenant_id already exists")
+        else:
+            print(f"⚠️ threat_intelligence migration: {e}")
 
     conn.commit()
+
+    # Verify the column actually exists
+    cursor.execute("PRAGMA table_info(threat_intelligence)")
+    columns = [row[1] for row in cursor.fetchall()]
+
+    if "tenant_id" in columns:
+        print("✅ VERIFIED: threat_intelligence.tenant_id exists")
+    else:
+        print("❌ ERROR: threat_intelligence.tenant_id is missing")
+
     conn.close()
 def get_category_distribution(tenant_id="demo"):
 
@@ -1334,3 +1360,26 @@ def get_executive_risk_forecast():
             "risk": 43
         }
     ]
+def create_default_tenant():
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT OR IGNORE INTO tenants (
+            tenant_id,
+            company_name,
+            industry
+        )
+        VALUES (?, ?, ?)
+    """, (
+        "demo",
+        "SafeChat AI Demo",
+        "Cyber Security"
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+init_db()
+create_default_tenant()
