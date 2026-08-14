@@ -2121,6 +2121,11 @@ FAKE_USERS = {
         "password": hash_password(os.getenv("VIEWER_PASSWORD")),
         "role": "viewer",
         "tenant_id": "demo"
+    },
+    "customer": {
+        "password": hash_password(os.getenv("CUSTOMER_PASSWORD")),
+        "role": "customer",
+        "tenant_id": "demo"
     }
 }
 from fastapi import Header
