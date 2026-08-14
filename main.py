@@ -158,6 +158,8 @@ origins = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
     FRONTEND_URL,
 ]
 
@@ -1785,12 +1787,12 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-from fastapi import Depends, HTTPException
+
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
+from fastapi import Depends, HTTPException
 
 security = HTTPBearer()
-
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -1813,9 +1815,12 @@ def get_current_user(
                 detail="Invalid token"
             )
 
+        tenant_id = payload.get("tenant_id", "demo")
+
         return {
             "username": username,
-            "role": role
+            "role": role,
+            "tenant_id": tenant_id
         }
 
     except JWTError:
@@ -2104,18 +2109,20 @@ class LoginRequest(BaseModel):
 FAKE_USERS = {
     "admin": {
         "password": hash_password(os.getenv("ADMIN_PASSWORD")),
-        "role": "admin"
+        "role": "admin",
+        "tenant_id": "demo"
     },
     "analyst": {
         "password": hash_password(os.getenv("ANALYST_PASSWORD")),
-        "role": "analyst"
+        "role": "analyst",
+        "tenant_id": "demo"
     },
     "viewer": {
         "password": hash_password(os.getenv("VIEWER_PASSWORD")),
-        "role": "viewer"
+        "role": "viewer",
+        "tenant_id": "demo"
     }
 }
-
 from fastapi import Header
 
 
@@ -2154,17 +2161,19 @@ def login(request: LoginRequest):
         }
 
     token = create_access_token(
-        {
-            "sub": request.username,
-            "role": user["role"]
-        }
-    )
+    {
+        "sub": request.username,
+        "role": user["role"],
+        "tenant_id": user["tenant_id"]
+    }
+)
 
     return {
     "success": True,
     "message": "Login successful",
     "token": token,
-    "role": user["role"]
+    "role": user["role"],
+    "tenant_id": user["tenant_id"]
 }
 def block_source(incident_id):
     print(f"[SOC] Blocking source for incident {incident_id}")
@@ -4589,7 +4598,10 @@ def analytics():
         ]
     }
 @app.get("/customer/dashboard")
-def customer_dashboard(tenant_id: str = "demo"):
+def customer_dashboard(
+    user=Depends(get_current_user)
+):
+    tenant_id = user["tenant_id"]
     conn = get_conn()
     cursor = conn.cursor()
 
@@ -4794,7 +4806,10 @@ def executive_briefing():
         "recommendation": recommendation
     }
 @app.get("/customer/attack-trend")
-def customer_attack_trend(tenant_id: str):
+def customer_attack_trend(
+    user=Depends(get_current_user)
+):
+    tenant_id = user["tenant_id"]
     conn = get_conn()
     cursor = conn.cursor()
 
@@ -4825,8 +4840,12 @@ def customer_attack_trend(tenant_id: str):
         })
 
     return trend
+
 @app.get("/customer/incidents")
-def customer_incidents(tenant_id: str):
+def customer_incidents(
+    user=Depends(get_current_user)
+):
+    tenant_id = user["tenant_id"]
     return get_incidents(tenant_id)
 class CustomerIncidentUpdate(BaseModel):
     status: str
@@ -6276,26 +6295,30 @@ def seed_incidents():
 
     return {"status": "seeded"}
 @app.get("/customer/iocs")
-def customer_iocs():
+def customer_iocs(
+    user=Depends(get_current_user)
+):
+    tenant_id = user["tenant_id"]
 
     conn = get_conn()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT
-            id,
-            indicator,
-            category,
-            score,
-            confidence,
-            sightings,
-            campaign,
-            first_seen,
-            last_seen
-        FROM threat_intelligence
-        ORDER BY score DESC, confidence DESC
-        LIMIT 50
-    """)
+SELECT
+    id,
+    indicator,
+    category,
+    score,
+    confidence,
+    sightings,
+    campaign,
+    first_seen,
+    last_seen
+    FROM threat_intelligence
+    WHERE tenant_id = ?
+    ORDER BY score DESC, confidence DESC
+    LIMIT 50
+""", (tenant_id,))
 
     rows = cursor.fetchall()
     conn.close()
