@@ -187,7 +187,7 @@ const [strategy, setStrategy] = useState(null);
 }, 60000);
 
   const ws = new WebSocket(
-    `${import.meta.env.VITE_WS_BASE}/ws/soc`
+    import.meta.env.VITE_WS_URL || "ws://127.0.0.1:8000/ws/soc"
 );
 
   ws.onopen = () => {
