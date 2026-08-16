@@ -424,7 +424,7 @@ function getAttackStage(node) {
 }
 function startLiveStream() {
 const WS_URL =
-  `${import.meta.env.VITE_WS_BASE || "ws://127.0.0.1:8000"}/ws/soc`;
+  import.meta.env.VITE_WS_URL || "ws://127.0.0.1:8000/ws/soc";
   const ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
