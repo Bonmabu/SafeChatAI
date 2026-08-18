@@ -37,7 +37,13 @@ import {
   RadialBar
 } from "recharts";
 
-const API = import.meta.env.VITE_API_BASE;
+const API =
+  import.meta.env.VITE_API_BASE ||
+  "https://safechatai-backend.onrender.com";
+
+const WS_URL =
+  import.meta.env.VITE_WS_URL ||
+  "wss://safechatai-backend.onrender.com/ws/soc";
 
 const COLORS = [
   "#ef4444",
@@ -186,9 +192,7 @@ const [strategy, setStrategy] = useState(null);
   loadData();
 }, 60000);
 
-  const ws = new WebSocket(
-    import.meta.env.VITE_WS_URL || "ws://127.0.0.1:8000/ws/soc"
-);
+  const ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
     console.log("Executive Dashboard WebSocket Connected");
