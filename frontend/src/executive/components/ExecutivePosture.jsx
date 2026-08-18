@@ -13,7 +13,7 @@ export default function ExecutivePosture(){
 
             const res =
             await axios.get(
-            "http://127.0.0.1:8000/executive/posture"
+            `${import.meta.env.VITE_API_BASE || "https://safechatai-backend.onrender.com"}/executive/posture`
             );
 
             setStatus(res.data);
