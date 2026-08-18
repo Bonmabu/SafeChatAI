@@ -1823,13 +1823,15 @@ def get_current_user(
             "tenant_id": tenant_id
         }
 
-    except JWTError:
+    except JWTError as e:
+        print("JWT VALIDATION ERROR:", str(e))
         raise HTTPException(
             status_code=401,
-            detail="Invalid or expired token"
+            detail="Invalid token"
         )
-def verify_token(token: str):
 
+
+def verify_token(token: str):
     if not token:
         return None
 
@@ -2376,7 +2378,7 @@ async def analyze(payload: AnalyzeRequest):
         score,
         status,
         user["username"],
-        tenant_id="demo"
+        tenant_id=user["tenant_id"]
     )
 
     print("SCAN SAVED =", scan_id)
@@ -2423,10 +2425,10 @@ async def analyze(payload: AnalyzeRequest):
     print("CORR_ID =", corr_id)
 
     create_alert(
-        payload.text,
-        status,
-        "demo"
-    )
+    payload.text,
+    status,
+    user["tenant_id"]
+)
 
     if corr_id not in ATTACK_TIMELINE:
         ATTACK_TIMELINE[corr_id] = []
@@ -2447,7 +2449,7 @@ async def analyze(payload: AnalyzeRequest):
         severity=status,
         stage=stage,
         mitre=mitre,
-        tenant_id=getattr(payload, "tenant_id", "demo"),
+        tenant_id=user["tenant_id"],
         threat_intel=json.dumps(intel),
         correlation_id=corr_id
     )
@@ -3201,11 +3203,15 @@ def analyze_campaign(nodes):
         "incident_count": len(nodes)
     }
 @app.post("/soc-ai")
-async def soc_ai(payload: dict):
+async def soc_ai(
+    payload: dict,
+    user=Depends(get_current_user)
+):
 
     nodes = payload.get("nodes", [])
     alerts = payload.get("alerts", [])
     text = payload.get("text", "")
+    tenant_id = user["tenant_id"]
 
     # Allow direct threat analysis
     if text:
@@ -3234,10 +3240,10 @@ async def soc_ai(payload: dict):
         add_replay_event(event)
 
         create_alert(
-            text,
-            status,
-            "demo"
-        )
+        text,
+        status,
+        tenant_id
+)
 
         incident_id = create_incident(
             scan_id=None,
@@ -3248,7 +3254,7 @@ async def soc_ai(payload: dict):
             severity=status,
             stage=stage,
             mitre=mitre,
-            tenant_id="demo",
+            tenant_id=tenant_id,
             threat_intel="{}",
             correlation_id=corr_id
         )
@@ -4859,8 +4865,11 @@ class CustomerIncidentUpdate(BaseModel):
 @app.put("/customer/incidents/{incident_id}")
 def update_customer_incident(
     incident_id: int,
-    payload: CustomerIncidentUpdate
+    payload: CustomerIncidentUpdate,
+    user=Depends(get_current_user)
 ):
+    tenant_id = user["tenant_id"]
+
     conn = get_conn()
     cursor = conn.cursor()
 
@@ -4868,21 +4877,72 @@ def update_customer_incident(
         UPDATE incidents
         SET status = ?
         WHERE id = ?
+        AND tenant_id = ?
     """, (
         payload.status,
-        incident_id
+        incident_id,
+        tenant_id
     ))
+
+    updated = cursor.rowcount
 
     conn.commit()
     conn.close()
+
+    if updated == 0:
+        return {
+            "success": False,
+            "error": "Incident not found"
+        }
 
     return {
         "success": True,
         "incident_id": incident_id,
         "status": payload.status
     }
+
+
+@app.get("/customer/incidents/{incident_id}/intel")
+def incident_intel(
+    incident_id: int,
+    user=Depends(get_current_user)
+):
+    tenant_id = user["tenant_id"]
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT threat_intel
+        FROM incidents
+        WHERE id=?
+        AND tenant_id=?
+        """,
+        (
+            incident_id,
+            tenant_id
+        )
+    )
+
+    row = cursor.fetchone()
+
+    conn.close()
+
+    if not row:
+        return {
+            "error": "Incident not found"
+        }
+
+    return {
+        "incident_id": incident_id,
+        "intel": json.loads(row["threat_intel"] or "[]")
+    }
 @app.get("/customer/trends")
-def customer_trends(tenant_id: str = "demo"):
+def customer_trends(
+    user=Depends(get_current_user)
+):
+    tenant_id = user["tenant_id"]
 
     conn = get_conn()
     cur = conn.cursor()
@@ -4901,8 +4961,13 @@ def customer_trends(tenant_id: str = "demo"):
     conn.close()
 
     return [dict(r) for r in rows]
+
+
 @app.get("/customer/categories")
-def customer_categories(tenant_id: str = "demo"):
+def customer_categories(
+    user=Depends(get_current_user)
+):
+    tenant_id = user["tenant_id"]
 
     conn = get_conn()
     cur = conn.cursor()
@@ -4921,8 +4986,13 @@ def customer_categories(tenant_id: str = "demo"):
     conn.close()
 
     return [dict(r) for r in rows]
+
+
 @app.get("/customer/status")
-def customer_status(tenant_id: str = "demo"):
+def customer_status(
+    user=Depends(get_current_user)
+):
+    tenant_id = user["tenant_id"]
 
     conn = get_conn()
     cur = conn.cursor()
@@ -4940,8 +5010,14 @@ def customer_status(tenant_id: str = "demo"):
     conn.close()
 
     return [dict(r) for r in rows]
+
+
 @app.get("/customer/alerts")
-def customer_alerts(tenant_id: str):
+def customer_alerts(
+    user=Depends(get_current_user)
+):
+    tenant_id = user["tenant_id"]
+
     conn = get_conn()
     cur = conn.cursor()
 
@@ -4954,7 +5030,6 @@ def customer_alerts(tenant_id: str):
     """, (tenant_id,))
 
     rows = cur.fetchall()
-
     conn.close()
 
     return [dict(r) for r in rows]
@@ -6342,34 +6417,7 @@ def debug_incidents_schema():
     conn.close()
 
     return [dict(r) for r in rows]
-@app.get("/customer/incidents/{incident_id}/intel")
-def incident_intel(incident_id:int):
 
-    conn = get_conn()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        SELECT threat_intel
-        FROM incidents
-        WHERE id=?
-        """,
-        (incident_id,)
-    )
-
-    row = cursor.fetchone()
-
-    conn.close()
-
-    if not row:
-        return {
-            "error":"Incident not found"
-        }
-
-    return {
-        "incident_id":incident_id,
-        "intel":json.loads(row["threat_intel"] or "[]")
-    }
 @app.get("/executive-ai")
 def executive_ai():
 
