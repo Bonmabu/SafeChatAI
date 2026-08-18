@@ -6689,14 +6689,132 @@ def executive_users():
     users = []
 
     for row in cursor.fetchall():
+
         user = dict(row)
 
-        # Do not expose passwords or authentication tokens
+        username = user.get("username")
+        tenant_id = user.get("tenant_id")
+
+        # ---------------------------------
+        # SESSION / ACTIVE STATUS
+        # ---------------------------------
         user["active"] = any(
             session_user
-            and session_user.get("username") == user["username"]
+            and session_user.get("username") == username
             for session_user in ACTIVE_SESSIONS.values()
         )
+
+        # ---------------------------------
+        # TOTAL SCANS
+        # ---------------------------------
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM scans
+            WHERE tenant_id = ?
+        """, (tenant_id,))
+
+        user["total_scans"] = cursor.fetchone()[0] or 0
+
+        # ---------------------------------
+        # TOTAL ALERTS
+        # ---------------------------------
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM alerts
+            WHERE tenant_id = ?
+        """, (tenant_id,))
+
+        user["total_alerts"] = cursor.fetchone()[0] or 0
+
+        # ---------------------------------
+        # TOTAL INCIDENTS
+        # ---------------------------------
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM incidents
+            WHERE tenant_id = ?
+        """, (tenant_id,))
+
+        user["total_incidents"] = cursor.fetchone()[0] or 0
+
+        # ---------------------------------
+        # OPEN INCIDENTS
+        # ---------------------------------
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM incidents
+            WHERE tenant_id = ?
+              AND status = 'OPEN'
+        """, (tenant_id,))
+
+        user["open_incidents"] = cursor.fetchone()[0] or 0
+
+        # ---------------------------------
+        # HIGH-RISK INCIDENTS
+        # ---------------------------------
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM incidents
+            WHERE tenant_id = ?
+              AND risk_score >= 80
+        """, (tenant_id,))
+
+        user["high_risk_incidents"] = cursor.fetchone()[0] or 0
+
+        # ---------------------------------
+        # AVERAGE RISK
+        # ---------------------------------
+        cursor.execute("""
+            SELECT AVG(risk_score)
+            FROM scans
+            WHERE tenant_id = ?
+        """, (tenant_id,))
+
+        avg_risk = cursor.fetchone()[0] or 0
+
+        user["average_risk"] = round(avg_risk, 2)
+
+        # ---------------------------------
+        # LAST SCAN
+        # ---------------------------------
+        cursor.execute("""
+            SELECT MAX(created_at)
+            FROM scans
+            WHERE tenant_id = ?
+        """, (tenant_id,))
+
+        user["last_scan"] = cursor.fetchone()[0]
+
+        # ---------------------------------
+        # LAST INCIDENT
+        # ---------------------------------
+        cursor.execute("""
+            SELECT MAX(created_at)
+            FROM incidents
+            WHERE tenant_id = ?
+        """, (tenant_id,))
+
+        user["last_incident"] = cursor.fetchone()[0]
+
+        # ---------------------------------
+        # SECURITY STATUS
+        # ---------------------------------
+        if user["high_risk_incidents"] > 0:
+            user["security_status"] = "HIGH RISK"
+
+        elif user["open_incidents"] > 0:
+            user["security_status"] = "ATTENTION"
+
+        elif user["total_scans"] > 0 and user["average_risk"] >= 50:
+            user["security_status"] = "ELEVATED"
+
+        else:
+            user["security_status"] = "NORMAL"
+
+        # ---------------------------------
+        # NEVER EXPOSE AUTH SECRETS
+        # ---------------------------------
+        user.pop("password_hash", None)
 
         users.append(user)
 
@@ -6706,7 +6824,6 @@ def executive_users():
         "total_users": len(users),
         "users": users
     }
-
 @app.get("/executive-ai")
 def executive_ai():
 
