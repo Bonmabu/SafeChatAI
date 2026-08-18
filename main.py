@@ -2560,12 +2560,15 @@ async def analyze(
     # ---------------------------------------
     # Permission check
     # ---------------------------------------
-    if not check_permission(user["role"], "analyze"):
-        print("ANALYZE RETURNING: INSUFFICIENT_PERMISSIONS")
-        return {
-            "success": False,
-            "error": "INSUFFICIENT_PERMISSIONS"
-        }
+    if user["role"] not in ("admin", "customer"):
+        print(
+        "ANALYZE RETURNING: INSUFFICIENT_PERMISSIONS",
+        "ROLE =", user["role"]
+    )
+    return {
+        "success": False,
+        "error": "INSUFFICIENT_PERMISSIONS"
+    }
 
     status = calculate_status(score)
     anomaly_flag = predict_threat_anomaly(score)
