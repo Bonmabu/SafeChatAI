@@ -1,10 +1,21 @@
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
-const authConfig = {
+const getTenantId = () => {
+  const token = localStorage.getItem("token");
+
+  if (!token) return null;
+
+  try {
+    return JSON.parse(atob(token.split(".")[1])).tenant_id;
+  } catch {
+    return null;
+  }
+};
+const getAuthConfig = () => ({
   headers: {
     Authorization: `Bearer ${localStorage.getItem("token")}`
   }
-};
+});
 import CustomerNav from "./CustomerNav";
 import ForceGraph2D from "react-force-graph-2d";
 import AttackMap from "../components/AttackMap";
@@ -40,7 +51,7 @@ fontSize: 28 }}>
   );
 }
 export default function CustomerDashboard() {
-  const tenantId = "demo";
+  const tenantId = getTenantId();
   const graphRef = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -185,16 +196,16 @@ setSocSummary(res.data);
     try {
       const res = await axios.get(
   `${API}/customer/dashboard`,
-  authConfig
+  getAuthConfig()
 );
 
       console.log("Dashboard API Response:", res.data);
 setSummary(res.data);
 const incidents = await axios.get(
   `${API}/incidents`,
-  authConfig
+  getAuthConfig()
 );
-const token = localStorage.getItem("token");
+
 const stats = {
     Critical: 0,
     High: 0,
@@ -238,10 +249,7 @@ async function loadAttackTrend() {
     );
 
    const res = await axios.get(`${API}/customer/attack-trend`, {
-  params: {
-    tenant_id: tenantId
-  },
-  headers: authConfig.headers
+  headers: getAuthConfig().headers
 });
 
     console.log("TREND DATA =", res.data);
@@ -342,7 +350,7 @@ async function loadGraph() {
   try {
     const res = await axios.get(
   `${API}/incidents`,
-  authConfig
+ getAuthConfig()
 );
 
     const incidents = res.data || [];
@@ -493,7 +501,22 @@ const WS_URL =
 }
 
 break;
+        case "executive_dashboard":
 
+    console.log("Executive dashboard event received");
+
+    // This event is broadcast globally by the SOC engine.
+    // Customer Dashboard does not need to process it.
+    break;
+        case "threat_intelligence":
+
+    console.log("Threat intelligence event received");
+
+    // Global SOC intelligence event.
+    // Customer Dashboard does not need to process it directly.
+    break;
+
+        
         case "dashboard_update":
 
     loadDashboard();
@@ -1106,15 +1129,18 @@ onClick={async () => {
             }
         ]);
 
+        const token = localStorage.getItem("token");
+
         const res = await fetch(`${API}/soc-ai-stream`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                text: userInput
-            })
-        });
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+    },
+    body: JSON.stringify({
+        text: userInput
+    })
+});
 
         const response = await res.json();
 

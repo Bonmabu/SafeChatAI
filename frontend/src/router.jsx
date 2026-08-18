@@ -1,29 +1,37 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import Login from "./Login";
 import { lazy, Suspense } from "react";
 
-const App = lazy(() => import("./App"));
-const CustomerDashboard = lazy(() => import("./customer/CustomerDashboard"));
-const CustomerTimeline = lazy(() => import("./customer/CustomerTimeline"));
-const CustomerAnalytics = lazy(() => import("./customer/CustomerAnalytics"));
-const ExecutiveDashboard = lazy(() => import("./executive/ExecutiveDashboard"));
-function ProtectedRoute({ children }) {
-  const token = localStorage.getItem("token");
+import Login from "./Login";
+import ProtectedRoute from "./ProtectedRoute";
 
-  return token ? children : <Navigate to="/login" replace />;
-}
+const App = lazy(() => import("./App"));
+const CustomerDashboard = lazy(
+  () => import("./customer/CustomerDashboard")
+);
+const CustomerTimeline = lazy(
+  () => import("./customer/CustomerTimeline")
+);
+const CustomerAnalytics = lazy(
+  () => import("./customer/CustomerAnalytics")
+);
+const ExecutiveDashboard = lazy(
+  () => import("./executive/ExecutiveDashboard")
+);
 
 export default function Router() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <Routes>
 
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/login"
+          element={<Login />}
+        />
 
         <Route
           path="/"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["admin"]}>
               <App />
             </ProtectedRoute>
           }
@@ -32,7 +40,9 @@ export default function Router() {
         <Route
           path="/customer"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute
+              allowedRoles={["admin", "analyst", "customer"]}
+            >
               <CustomerDashboard />
             </ProtectedRoute>
           }
@@ -41,7 +51,9 @@ export default function Router() {
         <Route
           path="/customer/timeline"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute
+              allowedRoles={["admin", "analyst", "customer"]}
+            >
               <CustomerTimeline />
             </ProtectedRoute>
           }
@@ -50,7 +62,9 @@ export default function Router() {
         <Route
           path="/customer/analytics"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute
+              allowedRoles={["admin", "analyst", "customer"]}
+            >
               <CustomerAnalytics />
             </ProtectedRoute>
           }
@@ -59,10 +73,17 @@ export default function Router() {
         <Route
           path="/executive"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute
+              allowedRoles={["admin", "viewer"]}
+            >
               <ExecutiveDashboard />
             </ProtectedRoute>
           }
+        />
+
+        <Route
+          path="*"
+          element={<Navigate to="/login" replace />}
         />
 
       </Routes>
