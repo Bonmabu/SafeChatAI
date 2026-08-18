@@ -2507,15 +2507,14 @@ def autonomous_soc_response(incident_id, category, score):
     return actions
     
 @app.post("/analyze")
-async def analyze(payload: AnalyzeRequest):
+async def analyze(
+    payload: AnalyzeRequest,
+    user=Depends(get_current_user)
+):
     global LAST_CORRELATION_ID
 
     print("🔥 ANALYZE ENDPOINT HIT")
 
-    user = {
-        "username": "developer",
-        "role": "admin"
-    }
     category, score, stage, mitre, confidence, matches = classify_threat(payload.text)
 
     event = {
@@ -3992,7 +3991,10 @@ async def soc_chat(payload: dict):
 
     return result
 @app.post("/soc-ai-stream")
-async def soc_ai_stream(payload: dict):
+async def soc_ai_stream(
+    payload: dict,
+    user=Depends(get_current_user)
+):
     print("🔥 SOC-AI-STREAM ENDPOINT HIT")
 
     request = AnalyzeRequest(
@@ -4002,7 +4004,7 @@ async def soc_ai_stream(payload: dict):
     source_ip=payload.get("source_ip")
 )
 
-    result = await analyze(request)
+    result = await analyze(request, user)
 
     ai = result["data"]
 
