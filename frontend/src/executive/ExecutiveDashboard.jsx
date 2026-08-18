@@ -1203,6 +1203,20 @@ Last Updated: {lastUpdated}
   title="🤖 AI Decisions"
   value={kpis?.ai_decisions ?? "N/A"}
 />
+<Card
+  title="👥 Total Users"
+  value={kpis?.total_users ?? 0}
+/>
+
+<Card
+  title="🆕 New Accounts"
+  value={kpis?.new_accounts ?? 0}
+/>
+
+<Card
+  title="🟢 Active Users"
+  value={kpis?.active_users ?? 0}
+/>
 </div>
 <div
   style={{

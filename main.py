@@ -4932,6 +4932,19 @@ def executive_dashboard():
     """)
     avg_risk = cursor.fetchone()[0] or 0
 
+    # Executive-only user/account metrics
+    cursor.execute("SELECT COUNT(*) FROM users")
+    total_users = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM users
+        WHERE DATE(created_at) = DATE('now')
+    """)
+    new_accounts = cursor.fetchone()[0]
+
+    active_users = len(ACTIVE_SESSIONS)
+
     security_score = max(0, 100 - avg_risk)
 
     conn.close()
@@ -4942,7 +4955,12 @@ def executive_dashboard():
         "total_scans": total_scans,
         "total_alerts": total_alerts,
         "total_incidents": total_incidents,
-        "open_incidents": open_incidents
+        "open_incidents": open_incidents,
+
+        # Executive-only account metrics
+        "total_users": total_users,
+        "new_accounts": new_accounts,
+        "active_users": active_users
     }
 @app.get("/executive/risk-trend")
 def executive_risk_trend():
