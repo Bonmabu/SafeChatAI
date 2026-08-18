@@ -4022,6 +4022,19 @@ async def soc_ai_stream(
 
     result = await analyze(request, user)
 
+    print("SOC-AI-STREAM ANALYZE RESULT =", result)
+
+    if not result.get("success", True):
+        return result
+
+    if "data" not in result:
+        print("SOC-AI-STREAM ERROR: analyze() returned no data")
+        return {
+        "success": False,
+        "error": "ANALYZE_RETURNED_NO_DATA",
+        "details": result
+    }
+
     ai = result["data"]
 
     risk = (
