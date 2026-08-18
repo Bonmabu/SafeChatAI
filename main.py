@@ -960,31 +960,36 @@ def classify_threat(text: str):
 MITRE_ATTACK = {
     "Phishing": {
         "tactic": "Initial Access",
-        "technique": "T1566",
+        "id": "T1566",
+        "technique": "Phishing",
         "name": "Phishing"
     },
 
     "Malware": {
         "tactic": "Execution",
-        "technique": "T1204",
+        "id": "T1204",
+        "technique": "User Execution",
         "name": "User Execution"
     },
 
     "Fraud": {
         "tactic": "Credential Access",
-        "technique": "T1110",
+        "id": "T1110",
+        "technique": "Brute Force",
         "name": "Brute Force"
     },
 
     "Harassment": {
         "tactic": "Impact",
-        "technique": "T1499",
+        "id": "T1499",
+        "technique": "Endpoint Denial of Service",
         "name": "Endpoint Denial of Service"
     },
 
     "Safe": {
         "tactic": "None",
-        "technique": "-",
+        "id": "-",
+        "technique": "No Mapping",
         "name": "No Mapping"
     }
 }
