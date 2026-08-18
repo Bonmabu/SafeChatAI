@@ -2515,19 +2515,21 @@ async def analyze(
 
     print("🔥 ANALYZE ENDPOINT HIT")
 
-    category, score, stage, mitre, confidence, matches = classify_threat(payload.text)
+    category, score, stage, mitre, confidence, matches = classify_threat(
+        payload.text
+    )
 
     event = {
-    "category": category,
-    "score": score,
-    "stage": stage,
-    "mitre": mitre,
-    "confidence": confidence,
-    "matches": matches,
-    "username": payload.username or "",
-    "hostname": payload.hostname or "",
-    "source_ip": payload.source_ip or ""
-}
+        "category": category,
+        "score": score,
+        "stage": stage,
+        "mitre": mitre,
+        "confidence": confidence,
+        "matches": matches,
+        "username": payload.username or "",
+        "hostname": payload.hostname or "",
+        "source_ip": payload.source_ip or ""
+    }
 
     campaign = engine_detect_campaign(event)
     add_event(event)
@@ -2538,6 +2540,7 @@ async def analyze(
 
     print("CLASSIFIER OUTPUT:", category, score)
     print("ANALYZE COMPLETE")
+
     iocs = extract_iocs(payload.text)
 
     if iocs:
@@ -2554,9 +2557,11 @@ async def analyze(
     print(iocs)
     print("PASSED IOC STAGE")
 
+    # ---------------------------------------
+    # Permission check
+    # ---------------------------------------
     if not check_permission(user["role"], "analyze"):
-        print("ANALYZE RETURNING:")
-        print(result)
+        print("ANALYZE RETURNING: INSUFFICIENT_PERMISSIONS")
         return {
             "success": False,
             "error": "INSUFFICIENT_PERMISSIONS"
@@ -2565,6 +2570,9 @@ async def analyze(
     status = calculate_status(score)
     anomaly_flag = predict_threat_anomaly(score)
 
+    # ---------------------------------------
+    # Save scan
+    # ---------------------------------------
     scan_id = create_scan(
         payload.text,
         category,
@@ -2610,29 +2618,36 @@ async def analyze(
         payload.text
     )
 
+    # ---------------------------------------
     # Determine ATT&CK stage
-    
-
+    # ---------------------------------------
     mitre = mitre_lookup(category)
 
     print("CORR_ID =", corr_id)
 
     create_alert(
-    payload.text,
-    status,
-    user["tenant_id"]
-)
+        payload.text,
+        status,
+        user["tenant_id"]
+    )
 
     if corr_id not in ATTACK_TIMELINE:
         ATTACK_TIMELINE[corr_id] = []
+
     mitre_info = mitre_lookup(category)
 
     if isinstance(mitre_info, dict):
         stage = mitre_info.get("tactic", stage)
-        mitre = f"{mitre_info.get('id', 'TA0000')} - {mitre_info.get('technique', 'Unknown')}"
+        mitre = (
+            f"{mitre_info.get('id', 'TA0000')} - "
+            f"{mitre_info.get('technique', 'Unknown')}"
+        )
     else:
         mitre = str(mitre_info)
 
+    # ---------------------------------------
+    # Create incident
+    # ---------------------------------------
     incident_id = create_incident(
         scan_id=scan_id,
         message=payload.text,
@@ -2648,18 +2663,19 @@ async def analyze(
     )
 
     print("INCIDENT ID =", incident_id)
-# -------------------------
-# Update attack graph FIRST
-# -------------------------
+
+    # ---------------------------------------
+    # Update attack graph FIRST
+    # ---------------------------------------
     ATTACK_GRAPH["nodes"][str(incident_id)] = {
-    "id": str(incident_id),
-    "category": category,
-    "max_score": score,
-    "score": score,
-    "stage": stage,
-    "mitre": mitre,
-    "count": 1
-}
+        "id": str(incident_id),
+        "category": category,
+        "max_score": score,
+        "score": score,
+        "stage": stage,
+        "mitre": mitre,
+        "count": 1
+    }
 
     ids = list(ATTACK_GRAPH["nodes"].keys())
 
