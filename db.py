@@ -72,6 +72,20 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    # Password reset fields
+    try:
+        cursor.execute(
+            "ALTER TABLE users ADD COLUMN reset_token TEXT"
+        )
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute(
+            "ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP"
+        )
+    except sqlite3.OperationalError:
+        pass
         # threat IOC table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS threat_iocs (

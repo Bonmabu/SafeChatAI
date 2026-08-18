@@ -10,6 +10,8 @@ console.log("AUTH API =", API);
 
 export default function Login({ onLogin }) {
   const [isSignup, setIsSignup] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -25,6 +27,54 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
+const requestPasswordReset = async () => {
+  if (loading) return;
+
+  if (!resetEmail.trim()) {
+    setError("Please enter your email address.");
+    return;
+  }
+
+  setError("");
+  setLoading(true);
+
+  try {
+    const res = await axios.post(`${API}/forgot-password`, {
+      email: resetEmail.trim(),
+    });
+
+    if (res.data.success) {
+      setError("");
+      alert(
+        res.data.message ||
+          "If an account exists for this email, a reset request has been created."
+      );
+
+      // Development only:
+      if (res.data.reset_token) {
+        console.log(
+          "DEVELOPMENT RESET TOKEN:",
+          res.data.reset_token
+        );
+      }
+    } else {
+      setError(
+        res.data.message ||
+          "Unable to process password reset."
+      );
+    }
+  } catch (err) {
+    console.error("PASSWORD RESET ERROR:", err);
+
+    setError(
+      err.response?.data?.detail ||
+        err.response?.data?.message ||
+        "Unable to connect to the SafeChat AI server."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const authenticate = async () => {
     if (loading) return;
@@ -243,6 +293,80 @@ export default function Login({ onLogin }) {
             AUTH CARD
         ======================================================== */}
         <div className="login-card">
+{isForgotPassword ? (
+  <div className="login-card-header">
+
+    <div className="status-line">
+      <span className="status-dot" />
+      PASSWORD RECOVERY
+    </div>
+
+    <h1>Forgot your password?</h1>
+
+    <p>
+      Enter your account email and we'll help you reset
+      your password securely.
+    </p>
+
+    {error && (
+      <div className="login-error">
+        <span>⚠</span>
+        <span>{error}</span>
+      </div>
+    )}
+
+    <div className="input-group">
+
+      <label>EMAIL ADDRESS</label>
+
+      <div className="input-wrapper">
+
+        <span className="input-icon">@</span>
+
+        <input
+          type="email"
+          placeholder="security@company.com"
+          value={resetEmail}
+          onChange={(e) =>
+            setResetEmail(e.target.value)
+          }
+          autoComplete="email"
+        />
+
+      </div>
+
+    </div>
+
+    <button
+      className={`login-button ${
+        loading ? "loading" : ""
+      }`}
+      onClick={requestPasswordReset}
+      disabled={loading}
+    >
+      {loading
+        ? "PROCESSING..."
+        : "SEND RESET REQUEST"}
+    </button>
+
+    <div className="auth-switch">
+
+      <button
+        type="button"
+        onClick={() => {
+          setIsForgotPassword(false);
+          setResetEmail("");
+          setError("");
+        }}
+      >
+        ← Back to sign in
+      </button>
+
+    </div>
+
+  </div>
+) : (
+  <>
 
           <div className="login-card-header">
 
@@ -580,39 +704,70 @@ export default function Login({ onLogin }) {
           </div>
 
           {/* ======================================================
-              LOGIN / SIGNUP SWITCH
-          ====================================================== */}
-          <div className="auth-switch">
+    LOGIN / SIGNUP SWITCH
+====================================================== */}
 
-            {isSignup ? (
-              <>
-                <span>
-                  Already have an account?
-                </span>
+{!isSignup && (
+  <div
+    style={{
+      marginTop: "18px",
+      marginBottom: "14px",
+      textAlign: "center",
+    }}
+  >
+    <button
+      type="button"
+      onClick={() => {
+        setIsForgotPassword(true);
+        setError("");
+      }}
+      style={{
+        border: "none",
+        background: "transparent",
+        color: "#00ffc8",
+        fontSize: "11px",
+        fontWeight: 800,
+        cursor: "pointer",
+      }}
+    >
+      Forgot password?
+    </button>
+  </div>
+)}
 
-                <button
-                  type="button"
-                  onClick={switchMode}
-                >
-                  Sign in
-                </button>
-              </>
-            ) : (
-              <>
-                <span>
-                  Don't have an account?
-                </span>
+<div className="auth-switch">
 
-                <button
-                  type="button"
-                  onClick={switchMode}
-                >
-                  Create account
-                </button>
-              </>
-            )}
+  {isSignup ? (
+    <>
+      <span>
+        Already have an account?
+      </span>
 
-          </div>
+      <button
+        type="button"
+        onClick={switchMode}
+      >
+        Sign in
+      </button>
+    </>
+  ) : (
+    <>
+      <span>
+        Don't have an account?
+      </span>
+
+      <button
+        type="button"
+        onClick={switchMode}
+      >
+        Create account
+      </button>
+    </>
+  )}
+
+</div>
+  </>
+)}
 
         </div>
 

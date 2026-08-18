@@ -1001,6 +1001,7 @@ def mitre_lookup(category: str):
         MITRE_ATTACK["Safe"]
     )
 import hashlib
+import secrets
 
 def generate_correlation_key(category: str, message: str):
     base = f"{category}:{message}"
@@ -2380,6 +2381,197 @@ def login(request: LoginRequest):
         return {
             "success": False,
             "message": "Unable to process login."
+        }
+
+    finally:
+        conn.close()
+# ============================================================
+# PASSWORD RESET
+# ============================================================
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@app.post("/forgot-password")
+def forgot_password(request: ForgotPasswordRequest):
+
+    email = request.email.strip().lower()
+
+    if not email:
+        return {
+            "success": False,
+            "message": "Email is required."
+        }
+
+    conn = get_conn()
+
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM users
+            WHERE LOWER(email) = ?
+            """,
+            (email,)
+        )
+
+        user = cursor.fetchone()
+
+        # Always return the same message so we don't reveal
+        # whether an email exists in the system.
+        if not user:
+            return {
+                "success": True,
+                "message": (
+                    "If an account exists for this email, "
+                    "a password reset request has been created."
+                )
+            }
+
+        # Generate cryptographically secure token
+        reset_token = secrets.token_urlsafe(48)
+
+        # Token valid for 30 minutes
+        expires_at = datetime.utcnow() + timedelta(minutes=30)
+
+        cursor.execute(
+            """
+            UPDATE users
+            SET reset_token = ?,
+                reset_token_expires = ?
+            WHERE id = ?
+            """,
+            (
+                reset_token,
+                expires_at.isoformat(),
+                user["id"]
+            )
+        )
+
+        conn.commit()
+
+        print(
+            "PASSWORD RESET TOKEN GENERATED FOR:",
+            email,
+            flush=True
+        )
+
+        return {
+            "success": True,
+            "message": (
+                "If an account exists for this email, "
+                "a password reset request has been created."
+            ),
+
+            # TEMPORARY DEVELOPMENT VALUE.
+            # We will remove this before production email delivery.
+            "reset_token": reset_token
+        }
+
+    except Exception as e:
+
+        print(
+            "FORGOT PASSWORD ERROR:",
+            str(e),
+            flush=True
+        )
+
+        return {
+            "success": False,
+            "message": "Unable to process password reset."
+        }
+
+    finally:
+        conn.close()
+
+
+@app.post("/reset-password")
+def reset_password(request: ResetPasswordRequest):
+
+    token = request.token.strip()
+    new_password = request.new_password
+
+    if not token:
+        return {
+            "success": False,
+            "message": "Reset token is required."
+        }
+
+    if len(new_password) < 8:
+        return {
+            "success": False,
+            "message": "Password must be at least 8 characters."
+        }
+
+    conn = get_conn()
+
+    try:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM users
+            WHERE reset_token = ?
+              AND reset_token_expires > ?
+            """,
+            (
+                token,
+                datetime.utcnow().isoformat()
+            )
+        )
+
+        user = cursor.fetchone()
+
+        if not user:
+            return {
+                "success": False,
+                "message": "Invalid or expired reset token."
+            }
+
+        # Reuse the existing bcrypt password hashing
+        new_password_hash = hash_password(new_password)
+
+        cursor.execute(
+            """
+            UPDATE users
+            SET password_hash = ?,
+                reset_token = NULL,
+                reset_token_expires = NULL
+            WHERE id = ?
+            """,
+            (
+                new_password_hash,
+                user["id"]
+            )
+        )
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "message": "Password reset successful. You can now sign in."
+        }
+
+    except Exception as e:
+
+        print(
+            "RESET PASSWORD ERROR:",
+            str(e),
+            flush=True
+        )
+
+        return {
+            "success": False,
+            "message": "Unable to reset password."
         }
 
     finally:
