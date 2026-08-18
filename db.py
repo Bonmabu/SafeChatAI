@@ -48,15 +48,30 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+            # tenants table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS tenants (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tenant_id TEXT UNIQUE,
-    company_name TEXT,
-    industry TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-""")
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tenant_id TEXT UNIQUE,
+        company_name TEXT,
+        industry TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # users table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        full_name TEXT,
+        email TEXT UNIQUE,
+        password_hash TEXT NOT NULL,
+        role TEXT DEFAULT 'customer',
+        tenant_id TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
         # threat IOC table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS threat_iocs (

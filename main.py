@@ -24,6 +24,7 @@ from reportlab.platypus import (
 from dotenv import load_dotenv
 import os
 import logging
+import sqlite3
 
 load_dotenv()
 
@@ -2101,87 +2102,283 @@ class ThreatHuntRequest(BaseModel):
     min_score: int | None = None
     max_score: int | None = None
     keyword: str | None = None
+# =========================
+# AUTHENTICATION
+# =========================
 
-
-class LoginRequest(BaseModel):
+class SignupRequest(BaseModel):
+    full_name: str
+    company_name: str
+    industry: str
+    email: str
     username: str
     password: str
 
 
-FAKE_USERS = {
-    "admin": {
-        "password": hash_password(os.getenv("ADMIN_PASSWORD")),
-        "role": "admin",
-        "tenant_id": "demo"
-    },
-    "analyst": {
-        "password": hash_password(os.getenv("ANALYST_PASSWORD")),
-        "role": "analyst",
-        "tenant_id": "demo"
-    },
-    "viewer": {
-        "password": hash_password(os.getenv("VIEWER_PASSWORD")),
-        "role": "viewer",
-        "tenant_id": "demo"
-    },
-    "customer": {
-        "password": hash_password(os.getenv("CUSTOMER_PASSWORD")),
-        "role": "customer",
-        "tenant_id": "demo"
-    }
-}
-from fastapi import Header
+@app.post("/signup")
+def signup(request: SignupRequest):
+
+    # Basic validation
+    full_name = request.full_name.strip()
+    company_name = request.company_name.strip()
+    industry = request.industry.strip()
+    email = request.email.strip().lower()
+    username = request.username.strip()
+
+    if not all([
+        full_name,
+        company_name,
+        industry,
+        email,
+        username,
+        request.password
+    ]):
+        return {
+            "success": False,
+            "message": "All fields are required."
+        }
+
+    if len(request.password) < 8:
+        return {
+            "success": False,
+            "message": "Password must be at least 8 characters."
+        }
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        # Check existing username
+        cursor.execute(
+            "SELECT id FROM users WHERE username = ?",
+            (username,)
+        )
+
+        if cursor.fetchone():
+            return {
+                "success": False,
+                "message": "Username already exists."
+            }
+
+        # Check existing email
+        cursor.execute(
+            "SELECT id FROM users WHERE email = ?",
+            (email,)
+        )
+
+        if cursor.fetchone():
+            return {
+                "success": False,
+                "message": "Email already registered."
+            }
+
+        # Generate unique tenant ID
+        tenant_id = f"tenant_{username.lower()}"
+
+        # Make sure tenant ID is unique
+        cursor.execute(
+            "SELECT id FROM tenants WHERE tenant_id = ?",
+            (tenant_id,)
+        )
+
+        if cursor.fetchone():
+            return {
+                "success": False,
+                "message": "Unable to create tenant. Please choose another username."
+            }
+
+        # Create tenant
+        cursor.execute(
+            """
+            INSERT INTO tenants (
+                tenant_id,
+                company_name,
+                industry
+            )
+            VALUES (?, ?, ?)
+            """,
+            (
+                tenant_id,
+                company_name,
+                industry
+            )
+        )
+
+        # Hash password
+        password_hash = hash_password(request.password)
+
+        # Create customer user
+        cursor.execute(
+            """
+            INSERT INTO users (
+                username,
+                full_name,
+                email,
+                password_hash,
+                role,
+                tenant_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                username,
+                full_name,
+                email,
+                password_hash,
+                "customer",
+                tenant_id
+            )
+        )
+
+        conn.commit()
+
+        # Create login token immediately
+        token = create_access_token(
+            {
+                "sub": username,
+                "role": "customer",
+                "tenant_id": tenant_id
+            }
+        )
+
+        return {
+            "success": True,
+            "message": "Account created successfully.",
+            "token": token,
+            "role": "customer",
+            "tenant_id": tenant_id
+        }
+
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+
+        print(
+            "SIGNUP DATABASE ERROR:",
+            str(e),
+            flush=True
+        )
+
+        return {
+            "success": False,
+            "message": "Username or email already exists."
+        }
+
+    except Exception as e:
+        conn.rollback()
+
+        print(
+            "SIGNUP ERROR:",
+            str(e),
+            flush=True
+        )
+
+        return {
+            "success": False,
+            "message": "Unable to create account."
+        }
+
+    finally:
+        conn.close()
 
 
 @app.post("/login")
 def login(request: LoginRequest):
 
-    user = FAKE_USERS.get(request.username)
+    username = request.username.strip()
 
-    print("LOGIN USER:", request.username, flush=True)
-    print("LOGIN PASSWORD:", repr(request.password), flush=True)
-    print("USER FOUND:", user is not None, flush=True)
+    conn = get_conn()
+    cursor = conn.cursor()
 
-    if not user:
+    try:
+
+        cursor.execute(
+            """
+            SELECT
+                username,
+                full_name,
+                email,
+                password_hash,
+                role,
+                tenant_id
+            FROM users
+            WHERE username = ?
+            """,
+            (username,)
+        )
+
+        user = cursor.fetchone()
+
+        # Keep existing environment-based admin account
+        # available while we transition to database users.
+        if not user and username == "admin":
+            admin_password = os.getenv("ADMIN_PASSWORD")
+
+            if admin_password and request.password == admin_password:
+
+                token = create_access_token(
+                    {
+                        "sub": "admin",
+                        "role": "admin",
+                        "tenant_id": "demo"
+                    }
+                )
+
+                return {
+                    "success": True,
+                    "message": "Login successful",
+                    "token": token,
+                    "role": "admin",
+                    "tenant_id": "demo"
+                }
+
+        if not user:
+            return {
+                "success": False,
+                "message": "Invalid username or password."
+            }
+
+        verified = verify_password(
+            request.password,
+            user["password_hash"]
+        )
+
+        if not verified:
+            return {
+                "success": False,
+                "message": "Invalid username or password."
+            }
+
+        token = create_access_token(
+            {
+                "sub": user["username"],
+                "role": user["role"],
+                "tenant_id": user["tenant_id"]
+            }
+        )
+
         return {
-        "success": False,
-        "message": "Invalid username"
-    }
-
-    print(
-    "ENDPOINT VERIFY:",
-    verify_password(request.password, user["password"]),
-    flush=True
-)
-
-    verified = verify_password(
-        request.password,
-        user["password"]
-    )
-
-    print("VERIFY RESULT:", verified, flush=True)
-
-    if not verified:
-        return {
-            "success": False,
-            "message": "Invalid password"
+            "success": True,
+            "message": "Login successful",
+            "token": token,
+            "role": user["role"],
+            "tenant_id": user["tenant_id"]
         }
 
-    token = create_access_token(
-    {
-        "sub": request.username,
-        "role": user["role"],
-        "tenant_id": user["tenant_id"]
-    }
-)
+    except Exception as e:
 
-    return {
-    "success": True,
-    "message": "Login successful",
-    "token": token,
-    "role": user["role"],
-    "tenant_id": user["tenant_id"]
-}
+        print(
+            "LOGIN DATABASE ERROR:",
+            str(e),
+            flush=True
+        )
+
+        return {
+            "success": False,
+            "message": "Unable to process login."
+        }
+
+    finally:
+        conn.close()
 def block_source(incident_id):
     print(f"[SOC] Blocking source for incident {incident_id}")
 
@@ -2308,10 +2505,7 @@ def autonomous_soc_response(incident_id, category, score):
             print(f"[SOC] Logged incident {incident_id}")
 
     return actions
-    class LoginRequest(BaseModel):
-        username: str
-        password: str
-
+    
 @app.post("/analyze")
 async def analyze(payload: AnalyzeRequest):
     global LAST_CORRELATION_ID
