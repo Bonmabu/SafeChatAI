@@ -312,10 +312,17 @@ setAnalytics(analyticsRes.data);
       `${API_BASE}/attack-graph`
     );
 if (!aiSummary) {
+  const token = localStorage.getItem("token");
+
   const aiRes = await axios.post(
     `${API_BASE}/soc-ai`,
     {
-      query: "incident threat pattern health"
+      text: "incident threat pattern health"
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
     }
   );
 
