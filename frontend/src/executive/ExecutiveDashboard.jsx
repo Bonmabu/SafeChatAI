@@ -149,6 +149,7 @@ const [replayRunning, setReplayRunning] = useState(false);
 const [replayPaused, setReplayPaused] = useState(false);
 const [replaySpeed, setReplaySpeed] = useState(1000);
   const [kpis, setKpis] = useState(null);
+  const [users, setUsers] = useState([]);
   const [briefing, setBriefing] = useState(null);
   const [riskTrend, setRiskTrend] = useState([]);
   const [threatDistribution, setThreatDistribution] = useState([]);
@@ -567,6 +568,8 @@ async function downloadBoardReport() {
   try {
     const kpi = await axios.get(`${API}/executive/dashboard`);
     setKpis(kpi.data);
+    const usersRes = await axios.get(`${API}/executive/users`);
+    setUsers(usersRes.data.users || []);
 
     const mapRes = await axios.get(`${API}/executive/threat-map`);
     setThreatMap(mapRes.data);
@@ -2623,6 +2626,74 @@ Recommended Actions
         </div>
       )}
 <KPICards kpis={kpis} />
+<div
+  style={{
+    marginTop: 30,
+    background: "#111827",
+    border: "1px solid #334155",
+    borderRadius: 16,
+    padding: 20,
+    overflowX: "auto"
+  }}
+>
+  <h2 style={{ color: "#00ffc8", marginBottom: 20 }}>
+    👥 Executive User Directory
+  </h2>
+
+  <table
+    style={{
+      width: "100%",
+      borderCollapse: "collapse",
+      color: "white"
+    }}
+  >
+    <thead>
+      <tr>
+        <th style={{ padding: 12, textAlign: "left" }}>Name</th>
+        <th style={{ padding: 12, textAlign: "left" }}>Username</th>
+        <th style={{ padding: 12, textAlign: "left" }}>Email</th>
+        <th style={{ padding: 12, textAlign: "left" }}>Role</th>
+        <th style={{ padding: 12, textAlign: "left" }}>Tenant</th>
+        <th style={{ padding: 12, textAlign: "left" }}>Created</th>
+        <th style={{ padding: 12, textAlign: "left" }}>Status</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {users.map((user) => (
+        <tr key={user.id}>
+          <td style={{ padding: 12 }}>
+            {user.full_name || "—"}
+          </td>
+
+          <td style={{ padding: 12 }}>
+            {user.username}
+          </td>
+
+          <td style={{ padding: 12 }}>
+            {user.email || "—"}
+          </td>
+
+          <td style={{ padding: 12 }}>
+            {user.role}
+          </td>
+
+          <td style={{ padding: 12 }}>
+            {user.tenant_id}
+          </td>
+
+          <td style={{ padding: 12 }}>
+            {user.created_at}
+          </td>
+
+          <td style={{ padding: 12 }}>
+            {user.active ? "🟢 Active" : "⚪ Inactive"}
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
 
 <ExecutiveWarRoom
     summary={summary}

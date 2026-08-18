@@ -6667,6 +6667,45 @@ def debug_incidents_schema():
     conn.close()
 
     return [dict(r) for r in rows]
+@app.get("/executive/users")
+def executive_users():
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            id,
+            username,
+            full_name,
+            email,
+            role,
+            tenant_id,
+            created_at
+        FROM users
+        ORDER BY created_at DESC
+    """)
+
+    users = []
+
+    for row in cursor.fetchall():
+        user = dict(row)
+
+        # Do not expose passwords or authentication tokens
+        user["active"] = any(
+            session_user
+            and session_user.get("username") == user["username"]
+            for session_user in ACTIVE_SESSIONS.values()
+        )
+
+        users.append(user)
+
+    conn.close()
+
+    return {
+        "total_users": len(users),
+        "users": users
+    }
 
 @app.get("/executive-ai")
 def executive_ai():
