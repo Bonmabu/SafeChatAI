@@ -1,7 +1,8 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function CustomerNav() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const linkStyle = (path) => ({
     color: location.pathname === path ? "#22d3ee" : "white",
@@ -12,6 +13,14 @@ export default function CustomerNav() {
       location.pathname === path ? "#1e293b" : "transparent",
     fontWeight: "bold"
   });
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("tenant_id");
+
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div
@@ -26,7 +35,7 @@ export default function CustomerNav() {
       }}
     >
       <Link to="/customer" style={linkStyle("/customer")}>
-        🏠 Dashboard
+        🛡️ Dashboard
       </Link>
 
       <Link
@@ -42,6 +51,22 @@ export default function CustomerNav() {
       >
         📜 Timeline
       </Link>
+
+      <button
+        onClick={handleLogout}
+        style={{
+          marginLeft: "auto",
+          padding: "10px 20px",
+          borderRadius: 8,
+          border: "1px solid #ef4444",
+          background: "#0f172a",
+          color: "#ef4444",
+          fontWeight: "bold",
+          cursor: "pointer"
+        }}
+      >
+        Logout
+      </button>
     </div>
   );
 }
