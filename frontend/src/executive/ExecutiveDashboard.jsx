@@ -149,6 +149,8 @@ const [replayRunning, setReplayRunning] = useState(false);
 const [replayPaused, setReplayPaused] = useState(false);
 const [replaySpeed, setReplaySpeed] = useState(1000);
   const [kpis, setKpis] = useState(null);
+  
+  const [usersLoading, setUsersLoading] = useState(true);
   const [users, setUsers] = useState([]);
   const [briefing, setBriefing] = useState(null);
   const [riskTrend, setRiskTrend] = useState([]);
@@ -569,8 +571,10 @@ async function downloadBoardReport() {
     const kpi = await axios.get(`${API}/executive/dashboard`);
     setKpis(kpi.data);
     const usersRes = await axios.get(`${API}/executive/users`);
-    setUsers(usersRes.data.users || []);
 
+    setUsers(usersRes.data?.users || []);
+    setUsersLoading(false);
+    
     const mapRes = await axios.get(`${API}/executive/threat-map`);
     setThreatMap(mapRes.data);
 
@@ -1208,18 +1212,224 @@ Last Updated: {lastUpdated}
 />
 <Card
   title="👥 Total Users"
-  value={kpis?.total_users ?? 0}
+  value={users.length}
 />
 
 <Card
   title="🆕 New Accounts"
-  value={kpis?.new_accounts ?? 0}
+  value={
+    users.filter(
+      user =>
+        user.created_at &&
+        new Date(user.created_at).toDateString() ===
+        new Date().toDateString()
+    ).length
+  }
 />
 
 <Card
   title="🟢 Active Users"
-  value={kpis?.active_users ?? 0}
+  value={users.filter(user => user.active).length}
 />
+</div>
+<div
+  style={{
+    marginTop: 30,
+    background: "#111827",
+    border: "1px solid #334155",
+    borderRadius: 16,
+    padding: 24,
+    overflowX: "auto"
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 20
+    }}
+  >
+    <h2
+      style={{
+        color: "#00ffc8",
+        margin: 0
+      }}
+    >
+      👥 Enterprise User Directory
+    </h2>
+
+    <span
+      style={{
+        color: "#94a3b8",
+        fontSize: 14
+      }}
+    >
+      {users.length} registered user{users.length !== 1 ? "s" : ""}
+    </span>
+  </div>
+
+  {usersLoading ? (
+    <div
+      style={{
+        color: "#94a3b8",
+        padding: 30,
+        textAlign: "center"
+      }}
+    >
+      Loading user directory...
+    </div>
+  ) : users.length === 0 ? (
+    <div
+      style={{
+        color: "#94a3b8",
+        padding: 30,
+        textAlign: "center"
+      }}
+    >
+      No users found.
+    </div>
+  ) : (
+    <table
+      style={{
+        width: "100%",
+        borderCollapse: "collapse",
+        minWidth: 950
+      }}
+    >
+      <thead>
+        <tr
+          style={{
+            borderBottom: "1px solid #334155",
+            color: "#94a3b8",
+            textAlign: "left"
+          }}
+        >
+          <th style={{ padding: "12px 10px" }}>ID</th>
+          <th style={{ padding: "12px 10px" }}>Full Name</th>
+          <th style={{ padding: "12px 10px" }}>Username</th>
+          <th style={{ padding: "12px 10px" }}>Email</th>
+          <th style={{ padding: "12px 10px" }}>Role</th>
+          <th style={{ padding: "12px 10px" }}>Tenant ID</th>
+          <th style={{ padding: "12px 10px" }}>Created</th>
+          <th style={{ padding: "12px 10px" }}>Status</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {users.map(user => (
+          <tr
+            key={user.id}
+            style={{
+              borderBottom: "1px solid #1e293b"
+            }}
+          >
+            <td
+              style={{
+                padding: "14px 10px",
+                color: "#cbd5e1"
+              }}
+            >
+              {user.id}
+            </td>
+
+            <td
+              style={{
+                padding: "14px 10px",
+                color: "#ffffff",
+                fontWeight: 600
+              }}
+            >
+              {user.full_name || "—"}
+            </td>
+
+            <td
+              style={{
+                padding: "14px 10px",
+                color: "#38bdf8"
+              }}
+            >
+              {user.username || "—"}
+            </td>
+
+            <td
+              style={{
+                padding: "14px 10px",
+                color: "#cbd5e1"
+              }}
+            >
+              {user.email || "—"}
+            </td>
+
+            <td
+              style={{
+                padding: "14px 10px"
+              }}
+            >
+              <span
+                style={{
+                  padding: "5px 10px",
+                  borderRadius: 12,
+                  background: "#1e3a8a",
+                  color: "#bfdbfe",
+                  fontSize: 12,
+                  fontWeight: 600
+                }}
+              >
+                {user.role || "customer"}
+              </span>
+            </td>
+
+            <td
+              style={{
+                padding: "14px 10px",
+                color: "#94a3b8",
+                fontFamily: "monospace",
+                fontSize: 12
+              }}
+            >
+              {user.tenant_id || "—"}
+            </td>
+
+            <td
+              style={{
+                padding: "14px 10px",
+                color: "#94a3b8",
+                whiteSpace: "nowrap"
+              }}
+            >
+              {user.created_at
+                ? new Date(user.created_at).toLocaleString()
+                : "—"}
+            </td>
+
+            <td
+              style={{
+                padding: "14px 10px"
+              }}
+            >
+              <span
+                style={{
+                  padding: "5px 10px",
+                  borderRadius: 12,
+                  background: user.active
+                    ? "#064e3b"
+                    : "#3f1d1d",
+                  color: user.active
+                    ? "#6ee7b7"
+                    : "#fca5a5",
+                  fontSize: 12,
+                  fontWeight: 600
+                }}
+              >
+                {user.active ? "● Active" : "● Inactive"}
+              </span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
 </div>
 <div
   style={{
