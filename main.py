@@ -121,6 +121,8 @@ from db import (
     save_threat_ioc,
     add_threat_intel_column,
     save_incident,
+    save_threat_dna,
+    get_all_threat_dna,
     get_executive_threat_map
 )
 # =========================
@@ -2104,10 +2106,17 @@ def generate_threat_dna(
 def register_threat_dna(dna):
     """
     Store and correlate Threat DNA fingerprints.
+
+    SQLite is the persistent source of truth.
+    THREAT_DNA remains as an in-memory cache for the current process.
     """
 
     fingerprint = dna["fingerprint"]
 
+    # Persist to SQLite
+    persisted = save_threat_dna(dna)
+
+    # Keep the existing in-memory structure/API intact
     if fingerprint not in THREAT_DNA:
         THREAT_DNA[fingerprint] = {
             "fingerprint": fingerprint,
@@ -2126,15 +2135,48 @@ def register_threat_dna(dna):
     record["occurrences"] += 1
     record["last_seen"] = dna["timestamp"]
 
+    # Use persisted first_seen if available
+    if persisted:
+        record["first_seen"] = persisted.get(
+            "first_seen",
+            record["first_seen"]
+        )
+
     return record
-
-
 def get_threat_dna():
-    return {
-        "total_fingerprints": len(THREAT_DNA),
-        "fingerprints": list(THREAT_DNA.values())
-    }
+    """
+    Return persistent Threat DNA records.
 
+    SQLite survives application restarts.
+    """
+
+    rows = get_all_threat_dna()
+
+    fingerprints = []
+
+    for row in rows:
+        fingerprints.append({
+            "fingerprint": row["fingerprint"],
+            "category": row["category"],
+            "risk_band": row["risk_band"],
+            "mitre": row["mitre"],
+            "events": [],
+            "first_seen": row["first_seen"],
+            "last_seen": row["last_seen"],
+            "occurrences": row["occurrences"],
+            "behavior_signature": row["behavior_signature"],
+            "ioc_profile": {
+                "urls": row["urls"],
+                "emails": row["emails"],
+                "ips": row["ips"]
+            },
+            "score": row["score"]
+        })
+
+    return {
+        "total_fingerprints": len(fingerprints),
+        "fingerprints": fingerprints
+    }
 
 @app.get("/threat-dna")
 def threat_dna():

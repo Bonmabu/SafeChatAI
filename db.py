@@ -183,6 +183,24 @@ def init_db():
         risk TEXT
     )
     """)
+    # Threat DNA persistence
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS threat_dna (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fingerprint TEXT UNIQUE NOT NULL,
+        category TEXT,
+        risk_band TEXT,
+        mitre TEXT,
+        behavior_signature TEXT,
+        urls INTEGER DEFAULT 0,
+        emails INTEGER DEFAULT 0,
+        ips INTEGER DEFAULT 0,
+        score REAL DEFAULT 0,
+        first_seen TEXT,
+        last_seen TEXT,
+        occurrences INTEGER DEFAULT 0
+    )
+    """)
     
     conn.commit()
     conn.close()
@@ -1412,3 +1430,106 @@ def create_default_tenant():
 
 init_db()
 create_default_tenant()
+def save_threat_dna(dna):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    fingerprint = dna["fingerprint"]
+
+    cursor.execute("""
+        SELECT *
+        FROM threat_dna
+        WHERE fingerprint = ?
+    """, (fingerprint,))
+
+    existing = cursor.fetchone()
+
+    ioc_profile = dna.get("ioc_profile", {})
+
+    if existing:
+        cursor.execute("""
+            UPDATE threat_dna
+            SET
+                category = ?,
+                risk_band = ?,
+                mitre = ?,
+                behavior_signature = ?,
+                urls = ?,
+                emails = ?,
+                ips = ?,
+                score = ?,
+                last_seen = ?,
+                occurrences = occurrences + 1
+            WHERE fingerprint = ?
+        """, (
+            dna["category"],
+            dna["risk_band"],
+            dna["mitre"],
+            dna["behavior_signature"],
+            ioc_profile.get("urls", 0),
+            ioc_profile.get("emails", 0),
+            ioc_profile.get("ips", 0),
+            dna["score"],
+            dna["timestamp"],
+            fingerprint
+        ))
+    else:
+        cursor.execute("""
+            INSERT INTO threat_dna (
+                fingerprint,
+                category,
+                risk_band,
+                mitre,
+                behavior_signature,
+                urls,
+                emails,
+                ips,
+                score,
+                first_seen,
+                last_seen,
+                occurrences
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """, (
+            fingerprint,
+            dna["category"],
+            dna["risk_band"],
+            dna["mitre"],
+            dna["behavior_signature"],
+            ioc_profile.get("urls", 0),
+            ioc_profile.get("emails", 0),
+            ioc_profile.get("ips", 0),
+            dna["score"],
+            dna["timestamp"],
+            dna["timestamp"]
+        ))
+
+    conn.commit()
+
+    cursor.execute("""
+        SELECT *
+        FROM threat_dna
+        WHERE fingerprint = ?
+    """, (fingerprint,))
+
+    row = cursor.fetchone()
+
+    conn.close()
+
+    return dict(row) if row else None
+
+
+def get_all_threat_dna():
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM threat_dna
+        ORDER BY last_seen DESC
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
