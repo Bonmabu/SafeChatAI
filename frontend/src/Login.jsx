@@ -49,14 +49,6 @@ const requestPasswordReset = async () => {
         res.data.message ||
           "If an account exists for this email, a reset request has been created."
       );
-
-      // Development only:
-      if (res.data.reset_token) {
-        console.log(
-          "DEVELOPMENT RESET TOKEN:",
-          res.data.reset_token
-        );
-      }
     } else {
       setError(
         res.data.message ||

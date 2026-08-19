@@ -2469,11 +2469,7 @@ def forgot_password(request: ForgotPasswordRequest):
             "message": (
                 "If an account exists for this email, "
                 "a password reset request has been created."
-            ),
-
-            # TEMPORARY DEVELOPMENT VALUE.
-            # We will remove this before production email delivery.
-            "reset_token": reset_token
+            )
         }
 
     except Exception as e:
