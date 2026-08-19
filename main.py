@@ -85,8 +85,6 @@ EVENT_STREAM = {
 }
 LAST_CORRELATION_ID = None
 
-ATTACK_TIMELINE = {}
-
 LOCK = threading.Lock()
 
 from sklearn.ensemble import IsolationForest
@@ -1015,14 +1013,41 @@ def now_ts():
 def add_graph_node(node_id, category, score, stage=None, mitre=None):
     global ATTACK_GRAPH
 
-    ATTACK_GRAPH["nodes"][node_id] = {
-        "id": node_id,
-        "category": category,
-        "max_score": score,
-        "stage": stage,
-        "mitre": mitre,
-        "count": 1
-    }
+    if not node_id:
+        return ATTACK_GRAPH
+
+    node_id = str(node_id)
+
+    existing = ATTACK_GRAPH["nodes"].get(node_id)
+
+    if existing:
+        existing["max_score"] = max(
+            existing.get("max_score", 0),
+            score
+        )
+
+        existing["score"] = score
+        existing["count"] = existing.get("count", 1) + 1
+
+        if stage:
+            existing["stage"] = stage
+
+        if mitre:
+            existing["mitre"] = mitre
+
+        if category:
+            existing["category"] = category
+
+    else:
+        ATTACK_GRAPH["nodes"][node_id] = {
+            "id": node_id,
+            "category": category,
+            "max_score": score,
+            "score": score,
+            "stage": stage,
+            "mitre": mitre,
+            "count": 1
+        }
 
     ATTACK_GRAPH["last_node"] = node_id
 
@@ -1066,29 +1091,32 @@ def add_graph_edge(source: str, target: str, category="CORRELATED_ATTACK"):
         }
 
 
-    # Check duplicate edge
+        # Check duplicate edge
     for edge in ATTACK_GRAPH["edges"]:
 
         if (
-            edge["source"] == source
-            and edge["target"] == target
+            edge.get("source") == source
+            and edge.get("target") == target
         ):
-            edge["weight"] = edge.get("weight",1) + 1
+            edge["weight"] = edge.get("weight", 1) + 1
             edge["timestamp"] = now_ts()
-            return
+            edge["category"] = category
+            edge["relationship"] = "CORRELATED_ATTACK"
+
+            return ATTACK_GRAPH
 
 
     # Add new edge
     ATTACK_GRAPH["edges"].append({
-
         "source": source,
         "target": target,
         "relationship": "CORRELATED_ATTACK",
         "category": category,
         "weight": 1,
         "timestamp": now_ts()
-
     })
+
+    return ATTACK_GRAPH
 
 
     # Limit graph size
@@ -1949,10 +1977,13 @@ def autonomous_event_correlator(category: str, score: float, corr_id: str):
     global ATTACK_GRAPH
 
     """
-    Automatically links related threats without rules
+    Automatically links related threats without rules.
+    Correlation is stored in ATTACK_CORRELATION and ATTACK_TIMELINE.
+    The attack graph itself is reserved for actual attack-chain relationships.
     """
 
     ensure_timeline(corr_id)
+
     if corr_id not in ATTACK_CORRELATION:
         ATTACK_CORRELATION[corr_id] = []
 
@@ -1966,18 +1997,27 @@ def autonomous_event_correlator(category: str, score: float, corr_id: str):
         if node["category"] == category:
             similarity += 0.6
 
-        score_diff = abs(node.get("max_score", node.get("score", 0)) - score)
+        score_diff = abs(
+            node.get("max_score", node.get("score", 0)) - score
+        )
+
         if score_diff < 15:
             similarity += 0.4
 
         if similarity >= 0.7:
+
             ATTACK_CORRELATION[corr_id].append({
-    "id": other_id,
-    "category": node["category"],
-    "score": node.get("max_score", node.get("score", 0)),
-    "stage": node.get("stage", "Unknown")
-})
-            add_graph_edge(corr_id, other_id, category)
+                "id": other_id,
+                "category": node["category"],
+                "score": node.get(
+                    "max_score",
+                    node.get("score", 0)
+                ),
+                "stage": node.get(
+                    "stage",
+                    "Unknown"
+                )
+            })
 
             ATTACK_TIMELINE[corr_id].append({
                 "type": "auto_correlation",
@@ -1985,6 +2025,119 @@ def autonomous_event_correlator(category: str, score: float, corr_id: str):
                 "score": similarity,
                 "timestamp": now_ts()
             })
+# ============================================================
+# THREAT DNA ENGINE
+# ============================================================
+
+THREAT_DNA = {}
+
+
+def generate_threat_dna(
+    category: str,
+    score: float,
+    text: str = "",
+    mitre: str = "",
+    iocs: dict | None = None
+):
+    """
+    Generate a behavioral fingerprint for a detected threat.
+    """
+
+    import hashlib
+    import re
+
+    iocs = iocs or {}
+
+    normalized_text = re.sub(
+        r"\s+",
+        " ",
+        text.lower().strip()
+    )
+
+    keywords = re.findall(
+        r"[a-zA-Z0-9_]{4,}",
+        normalized_text
+    )
+
+    keyword_signature = "|".join(sorted(set(keywords[:30])))
+
+    url_count = len(iocs.get("urls", []))
+    email_count = len(iocs.get("emails", []))
+    ip_count = len(iocs.get("ips", []))
+
+    dna_source = "|".join([
+        category,
+        str(round(float(score) / 10) * 10),
+        mitre or "",
+        keyword_signature,
+        str(url_count),
+        str(email_count),
+        str(ip_count)
+    ])
+
+    fingerprint = hashlib.sha256(
+        dna_source.encode("utf-8")
+    ).hexdigest()[:16]
+
+    return {
+        "fingerprint": fingerprint,
+        "category": category,
+        "risk_band": (
+            "CRITICAL" if score >= 90
+            else "HIGH" if score >= 75
+            else "MEDIUM" if score >= 50
+            else "LOW"
+        ),
+        "mitre": mitre,
+        "ioc_profile": {
+            "urls": url_count,
+            "emails": email_count,
+            "ips": ip_count
+        },
+        "behavior_signature": keyword_signature,
+        "score": score,
+        "timestamp": now_ts()
+    }
+
+
+def register_threat_dna(dna):
+    """
+    Store and correlate Threat DNA fingerprints.
+    """
+
+    fingerprint = dna["fingerprint"]
+
+    if fingerprint not in THREAT_DNA:
+        THREAT_DNA[fingerprint] = {
+            "fingerprint": fingerprint,
+            "category": dna["category"],
+            "risk_band": dna["risk_band"],
+            "mitre": dna["mitre"],
+            "events": [],
+            "first_seen": dna["timestamp"],
+            "last_seen": dna["timestamp"],
+            "occurrences": 0
+        }
+
+    record = THREAT_DNA[fingerprint]
+
+    record["events"].append(dna)
+    record["occurrences"] += 1
+    record["last_seen"] = dna["timestamp"]
+
+    return record
+
+
+def get_threat_dna():
+    return {
+        "total_fingerprints": len(THREAT_DNA),
+        "fingerprints": list(THREAT_DNA.values())
+    }
+
+
+@app.get("/threat-dna")
+def threat_dna():
+    return get_threat_dna()
 def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
     global ATTACK_GRAPH
 
@@ -2041,7 +2194,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
     if category == "Phishing":
         add_graph_edge("Email", "Phishing", category)
         add_graph_edge("Phishing", "Credential Theft", category)
-
+        add_graph_edge("Credential Theft", corr_id, category)
     elif category == "Malware":
         add_graph_edge("Malware", "Endpoint Compromise")
 
@@ -2054,25 +2207,6 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
     print(ATTACK_GRAPH)
 
     build_attack_clusters()
-
-    for existing_id, node in ATTACK_GRAPH["nodes"].items():
-
-        if existing_id == corr_id:
-            continue
-
-        if node.get("stage") == stage:
-            add_graph_edge(
-                existing_id,
-                corr_id,
-                f"{node['stage']} → {stage}"
-            )
-
-        elif abs(node.get("max_score", node.get("score", 0)) - score) <= 15:
-            add_graph_edge(
-                existing_id,
-                corr_id,
-                "related_attack"
-            )
 
     return decision
 def build_attack_clusters():
@@ -2839,6 +2973,23 @@ async def analyze(
         )
     else:
         mitre = str(mitre_info)
+    # ---------------------------------------
+    # Threat DNA
+    # ---------------------------------------
+
+    threat_dna_record = generate_threat_dna(
+        category=category,
+        score=score,
+        text=payload.text,
+        mitre=mitre,
+        iocs=iocs
+    )
+
+    threat_dna_result = register_threat_dna(
+        threat_dna_record
+    )
+
+    print("THREAT DNA =", threat_dna_result)
 
     # ---------------------------------------
     # Create incident
@@ -2860,43 +3011,11 @@ async def analyze(
     print("INCIDENT ID =", incident_id)
 
     # ---------------------------------------
-    # Update attack graph FIRST
-    # ---------------------------------------
-    ATTACK_GRAPH["nodes"][str(incident_id)] = {
-        "id": str(incident_id),
-        "category": category,
-        "max_score": score,
-        "score": score,
-        "stage": stage,
-        "mitre": mitre,
-        "count": 1
-    }
-
+# Attack graph is updated by the
+# autonomous SOC orchestrator.
+# corr_id is the canonical graph node ID.
 # ---------------------------------------
-# Add correlation node to attack graph
-# ---------------------------------------
-    graph = add_graph_node(
-    corr_id,
-    category,
-    score,
-    stage,
-    mitre
-)
-
-# ---------------------------------------
-# Create real attack-chain relationship
-# ---------------------------------------
-    if LAST_CORRELATION_ID and LAST_CORRELATION_ID != corr_id:
-        add_graph_edge(
-        LAST_CORRELATION_ID,
-        corr_id,
-        "attack_chain"
-    )
-
-    LAST_CORRELATION_ID = corr_id
-
-    print("GRAPH AFTER INSERT")
-    print(ATTACK_GRAPH)
+    print("GRAPH BEFORE ORCHESTRATOR =", ATTACK_GRAPH)
 
     decision = soc_autonomous_orchestrator(
         category,
@@ -4655,7 +4774,6 @@ def live_incidents():
     return incidents[:20]
 @app.get("/graph-test")
 def graph_test():
-    soc_autonomous_orchestrator("Phishing", 90, "debug123")
     print("========== GRAPH TEST ==========")
     print("ATTACK_GRAPH id =", id(ATTACK_GRAPH))
     print("Nodes =", len(ATTACK_GRAPH["nodes"]))

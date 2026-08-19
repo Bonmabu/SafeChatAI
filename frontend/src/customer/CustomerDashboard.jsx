@@ -60,6 +60,7 @@ export default function CustomerDashboard() {
   const [alerts, setAlerts] = useState([]);
 const [campaign, setCampaign] = useState(null);
 const [iocs, setIocs] = useState([]);
+const [threatDNA, setThreatDNA] = useState([]);
 const [responseTimeline, setResponseTimeline] = useState([]);
 const [replayIndex, setReplayIndex] = useState(0);
 const [replayData, setReplayData] = useState([]);
@@ -92,58 +93,68 @@ const [chatLoading, setChatLoading] = useState(false);
 const [streamingText, setStreamingText] = useState("");
 function startReplay() {
   if (!replayData || replayData.length === 0) return;
+
+  clearInterval(replayIntervalRef.current);
+
+  setReplayIndex(0);
+  setReplayProgress(0);
   setIsReplaying(true);
   setIsPaused(false);
-  let i = replayIndex;
+
+  let i = 0;
+
   replayIntervalRef.current = setInterval(() => {
-    if (isPaused) return;
+    setIsPaused((paused) => {
+      if (paused) return paused;
 
-    if (i >= replayData.length) {
-      clearInterval(replayIntervalRef.current);
-      setIsReplaying(false);
-      return;
-    }
+      if (i >= replayData.length) {
+        clearInterval(replayIntervalRef.current);
+        setIsReplaying(false);
+        return paused;
+      }
 
-    setReplayProgress(((i + 1) / replayData.length) * 100);
+      const current = replayData[i];
 
-    const current = replayData[i];
-    setGraphData(current);
+      if (current) {
+        setReplayIndex(i);
 
+        /*
+         * Backend replay events are individual security events.
+         * If the event already contains graph data, display it.
+         * Otherwise keep the current graph and update the replay state.
+         */
+        if (current.nodes && current.links) {
+          setGraphData({
+            nodes: current.nodes,
+            links: current.links
+          });
+        }
 
-    const focusNode = current.nodes?.[current.nodes.length - 1];
+        setReplayProgress(
+          ((i + 1) / replayData.length) * 100
+        );
+      }
 
-    if (focusNode && graphRef.current) {
-      setTimeout(() => {
-        graphRef.current.centerAt(focusNode.x || 0, focusNode.y || 0, 800);
-        graphRef.current.zoom(4, 800);
-      }, 100);
-    }
+      i++;
 
-    i++;
-
-setReplayIndex(i);
+      return paused;
+    });
   }, replaySpeed);
 }
-
 function togglePauseReplay() {
   setIsPaused((prev) => !prev);
 }
 function stopReplay() {
   clearInterval(replayIntervalRef.current);
+  replayIntervalRef.current = null;
+
   setIsReplaying(false);
   setIsPaused(false);
+  setReplayIndex(0);
+  setReplayProgress(0);
 
-  const current = replayData[replayIndex];
-
-if (!current) return;
-
-setGraphData(current);
-
-// pause-on-critical logic
-const node = current.nodes?.[current.nodes.length - 1];
-
-if (node?.score >= 85) {
-  setIsPaused(true);
+  if (replayData.length > 0) {
+    setGraphData(replayData[0]);
   }
 }
   const [summary, setSummary] = useState({});
@@ -166,6 +177,8 @@ useEffect(() => {
   loadGraph();
   loadAttackTrend();
   loadIOCs();
+  loadThreatDNA();
+  loadReplay();
 
   const ws = startLiveStream();
 
@@ -173,7 +186,9 @@ useEffect(() => {
     loadDashboard();
     loadSummary();
     loadIOCs();
-}, 5000);
+    loadThreatDNA();
+    loadReplay();
+  }, 5000);
 
   return () => {
     clearInterval(interval);
@@ -280,6 +295,61 @@ async function loadIOCs() {
 
   } catch (err) {
     console.error("IOC LOAD ERROR:", err);
+  }
+}
+async function loadThreatDNA() {
+  try {
+    const res = await axios.get(`${API}/threat-dna`);
+
+    setThreatDNA(res.data?.fingerprints || []);
+
+  } catch (err) {
+    console.error("THREAT DNA LOAD ERROR:", err);
+  }
+}
+async function loadReplay() {
+  try {
+    const res = await axios.get(`${API}/attack-replay`);
+
+    const replay = Array.isArray(res.data)
+  ? res.data
+  : res.data?.events || [];
+
+// Convert backend replay events into graph snapshots
+const replaySnapshots = replay.map((event, index) => {
+  const nodeId =
+    event.username ||
+    event.hostname ||
+    event.source_ip ||
+    `replay-${index}`;
+
+  const node = {
+    id: nodeId,
+    category: event.category || "Unknown",
+    score: Number(event.score || 0),
+    stage: event.stage || "Unknown",
+    mitre: event.mitre || "Unknown",
+    source_ip: event.source_ip || "",
+    hostname: event.hostname || "",
+    username: event.username || "",
+    time: event.time || ""
+  };
+
+  return {
+    time: event.time || "",
+    nodes: [node],
+    links: []
+  };
+});
+
+setReplayData(replaySnapshots);
+
+if (replaySnapshots.length === 0) {
+  setReplayIndex(0);
+  setReplayProgress(0);
+}
+  } catch (err) {
+    console.error("THREAT REPLAY LOAD ERROR:", err);
   }
 }
 async function generateIncidentSummary() {
@@ -541,7 +611,7 @@ break;
 
     break;
 
-        case "response_timeline":
+                case "response_timeline":
         case "auto_response_event":
 
             setResponseTimeline(prev => [
@@ -550,6 +620,26 @@ break;
                     level: msg.data?.level || "UNKNOWN",
                     actions: msg.data?.actions || [],
                     escalation: msg.data?.escalation || false
+                },
+                ...prev
+            ].slice(0,20));
+
+            break;
+
+
+        case "ai_decision_event":
+
+            console.log("AI decision event received", msg);
+
+            setResponseTimeline(prev => [
+                {
+                    time: msg.timestamp || new Date().toLocaleTimeString(),
+                    level: msg.data?.decision?.recommended_action?.level || "AI",
+                    actions:
+                        msg.data?.decision?.recommended_action?.actions || [],
+                    escalation:
+                        msg.data?.decision?.recommended_action?.escalation || false,
+                    source: "SOC AI"
                 },
                 ...prev
             ].slice(0,20));
@@ -1041,7 +1131,7 @@ break;
 <div style={{ marginBottom: 10 }}>
   <button
     onClick={startReplay}
-    disabled={isReplaying || timelineData.length === 0}
+    disabled={isReplaying || replayData.length === 0}
     style={{
       padding: "8px 14px",
       background: "#00ffc8",
@@ -1352,7 +1442,7 @@ onClick={async () => {
   </h2>
 
   <AttackMap nodes={graphData.nodes} />
-</div>
+</div>{/* THREAT INTELLIGENCE / IOC SECTION */}
 <div
   style={{
     background: "rgba(17,24,39,.75)",
@@ -1397,7 +1487,177 @@ onClick={async () => {
   </table>
 </div>
 
-      {/* GRAPH SECTION */}
+{/* THREAT DNA SECTION */}
+<div
+  style={{
+    marginTop: 25,
+    marginBottom: 25,
+    padding: 20,
+    background: "#0f172a",
+    border: "1px solid #1e293b",
+    borderRadius: 12
+  }}
+>
+  <h2 style={{ color: "#00ffc8", marginBottom: 15 }}>
+    🧬 Threat DNA
+  </h2>
+
+  {threatDNA.length === 0 ? (
+    <p style={{ color: "#94a3b8" }}>
+      No Threat DNA fingerprints detected yet.
+    </p>
+  ) : (
+    threatDNA.map((dna) => {
+      const latestEvent =
+        dna.events?.[dna.events.length - 1] || {};
+
+      return (
+        <div
+          key={dna.fingerprint}
+          style={{
+            marginBottom: 15,
+            padding: 16,
+            background: "#020617",
+            border: "1px solid #334155",
+            borderRadius: 10
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 12
+            }}
+          >
+            <h3 style={{ color: "#38bdf8", margin: 0 }}>
+              🧬 {dna.fingerprint}
+            </h3>
+
+            <span
+              style={{
+                padding: "5px 10px",
+                borderRadius: 6,
+                background:
+                  dna.risk_band === "HIGH"
+                    ? "#7f1d1d"
+                    : dna.risk_band === "MEDIUM"
+                    ? "#854d0e"
+                    : "#14532d",
+                color: "#fff",
+                fontWeight: "bold",
+                fontSize: 12
+              }}
+            >
+              {dna.risk_band || "UNKNOWN"}
+            </span>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 10,
+              color: "#cbd5e1"
+            }}
+          >
+            <div>
+              <b>Category:</b>
+              <br />
+              {dna.category || "-"}
+            </div>
+
+            <div>
+              <b>MITRE:</b>
+              <br />
+              {dna.mitre || "-"}
+            </div>
+
+            <div>
+              <b>Occurrences:</b>
+              <br />
+              {dna.occurrences ?? 0}
+            </div>
+
+            <div>
+              <b>First Seen:</b>
+              <br />
+              {dna.first_seen || "-"}
+            </div>
+
+            <div>
+              <b>Last Seen:</b>
+              <br />
+              {dna.last_seen || "-"}
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: 15,
+              padding: 12,
+              background: "#0f172a",
+              borderRadius: 8
+            }}
+          >
+            <b style={{ color: "#00ffc8" }}>
+              Behavioral Signature
+            </b>
+
+            <pre
+              style={{
+                marginTop: 8,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                color: "#94a3b8",
+                fontSize: 12
+              }}
+            >
+              {latestEvent.behavior_signature ??
+                latestEvent.behavioral_signature ??
+                latestEvent.signature ??
+                "No behavioral signature available"}
+            </pre>
+          </div>
+
+          <div
+            style={{
+              marginTop: 12,
+              padding: 12,
+              background: "#0f172a",
+              borderRadius: 8
+            }}
+          >
+            <b style={{ color: "#00ffc8" }}>
+              IOC Profile
+            </b>
+
+            <pre
+              style={{
+                marginTop: 8,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                color: "#94a3b8",
+                fontSize: 12
+              }}
+            >
+              {JSON.stringify(
+                latestEvent.iocs ??
+                  latestEvent.ioc_profile ??
+                  {},
+                null,
+                2
+              )}
+            </pre>
+          </div>
+        </div>
+      );
+    })
+  )}
+</div>
+
+{/* GRAPH SECTION */}
       <div
         style={{
           background: "rgba(17,24,39,0.75)",
