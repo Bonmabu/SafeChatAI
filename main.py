@@ -2872,35 +2872,31 @@ async def analyze(
         "count": 1
     }
 
-    ids = list(ATTACK_GRAPH["nodes"].keys())
-
-    if len(ids) >= 2:
-        add_graph_edge(
-        ids[-2],
-        ids[-1],
-        category
-    )
-
-    graph = add_graph_node(
+# ---------------------------------------
+# Add correlation node to attack graph
+# ---------------------------------------
+graph = add_graph_node(
     corr_id,
     category,
     score,
     stage,
     mitre
 )
-# # Create attack chain edge
-    if LAST_CORRELATION_ID and LAST_CORRELATION_ID != corr_id:
-        add_graph_edge(
-            LAST_CORRELATION_ID,
-            corr_id,
-            category
-        )
+
+# ---------------------------------------
+# Create real attack-chain relationship
+# ---------------------------------------
+if LAST_CORRELATION_ID and LAST_CORRELATION_ID != corr_id:
+    add_graph_edge(
+        LAST_CORRELATION_ID,
+        corr_id,
+        "attack_chain"
+    )
+
+LAST_CORRELATION_ID = corr_id
 
     print("GRAPH AFTER INSERT")
     print(ATTACK_GRAPH)
-
-    LAST_CORRELATION_ID = corr_id
-
 
     decision = soc_autonomous_orchestrator(
         category,
@@ -3027,17 +3023,23 @@ async def analyze(
         ],
         "links": ATTACK_GRAPH["edges"]
     })
-    if len(ATTACK_GRAPH["nodes"]) > 1:
-        add_graph_edge(
-        list(ATTACK_GRAPH["nodes"].keys())[-2],
-        corr_id,
-        "attack_chain"
-    )
+    
     await manager.broadcast({
     "type": "attack_graph_live",
     "graph": {
-        "nodes": list(ATTACK_GRAPH["nodes"].values()),
-        "links": ATTACK_GRAPH["edges"]
+        "nodes": [
+            node
+            for node in ATTACK_GRAPH["nodes"].values()
+            if node.get("category") != "Safe"
+        ],
+        "links": [
+            edge
+            for edge in ATTACK_GRAPH["edges"]
+            if edge.get("source") in ATTACK_GRAPH["nodes"]
+            and edge.get("target") in ATTACK_GRAPH["nodes"]
+            and ATTACK_GRAPH["nodes"][edge["source"]].get("category") != "Safe"
+            and ATTACK_GRAPH["nodes"][edge["target"]].get("category") != "Safe"
+        ]
     }
 })
     await manager.broadcast({
