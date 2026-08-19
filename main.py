@@ -2875,7 +2875,7 @@ async def analyze(
 # ---------------------------------------
 # Add correlation node to attack graph
 # ---------------------------------------
-graph = add_graph_node(
+    graph = add_graph_node(
     corr_id,
     category,
     score,
@@ -2886,14 +2886,14 @@ graph = add_graph_node(
 # ---------------------------------------
 # Create real attack-chain relationship
 # ---------------------------------------
-if LAST_CORRELATION_ID and LAST_CORRELATION_ID != corr_id:
-    add_graph_edge(
+    if LAST_CORRELATION_ID and LAST_CORRELATION_ID != corr_id:
+        add_graph_edge(
         LAST_CORRELATION_ID,
         corr_id,
         "attack_chain"
     )
 
-LAST_CORRELATION_ID = corr_id
+    LAST_CORRELATION_ID = corr_id
 
     print("GRAPH AFTER INSERT")
     print(ATTACK_GRAPH)
