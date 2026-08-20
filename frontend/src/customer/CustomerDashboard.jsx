@@ -1509,7 +1509,7 @@ onClick={async () => {
   ) : (
     threatDNA.map((dna) => {
       const latestEvent =
-        dna.events?.[dna.events.length - 1] || {};
+  dna.events?.[dna.events.length - 1] || dna;
 
       return (
         <div
