@@ -1070,7 +1070,7 @@ break;
           textShadow: "0 0 15px rgba(0,255,255,0.5)"
         }}
       >
-        &#128737; Customer Security Dashboard
+        ðŸ›¡ Customer Security Dashboard
       </h1>
 {alerts.length > 0 && (
   <div
@@ -1085,7 +1085,7 @@ break;
     }}
   >
     <h3 style={{ color: "#ef4444", marginBottom: 10 }}>
-      [INCIDENT] LIVE ALERTS
+      ðŸš¨ LIVE ALERTS
     </h3>
 
     {alerts.map((a) => (
@@ -1134,7 +1134,7 @@ break;
   }}
 >
   <h2 style={{ color: "#fff" }}>
-    &#128200; Live Attack Trend
+    ðŸ“ˆ Live Attack Trend
   </h2>
 
   <div
@@ -1180,7 +1180,7 @@ break;
       color: "#22c55e"
     }}
   >
-    🧠 Root Cause Detected: <b>{rootNode.id}</b>
+    ðŸ§  Root Cause Detected: <b>{rootNode.id}</b>
   </div>
 )}
 
@@ -1253,7 +1253,7 @@ break;
     </div>
   </div>
 </div>
-        <h2 style={{ color: "#fff" }}>&#128737; Security Status</h2>
+        <h2 style={{ color: "#fff" }}>ðŸ›¡ Security Status</h2>
 <div
   style={{
     marginBottom: 20,
@@ -1264,7 +1264,7 @@ break;
   }}
 >
   <h3 style={{ color: "#00ffc8" }}>
-    🧠 Live Threat Intelligence
+    ðŸ§  Live Threat Intelligence
   </h3>
 
   <p>
@@ -1314,7 +1314,7 @@ break;
     <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
     <h3 style={{ color: "#38bdf8" }}>
-      🧠 Autonomous SOC Brain
+      ðŸ§  Autonomous SOC Brain
     </h3>
 
     <p>
@@ -1345,7 +1345,7 @@ break;
 
     {aiSummary.soc_brain.recommended_action.actions.map(
       (action, i) => (
-        <div key={i}>&#9989; {action}</div>
+        <div key={i}>âœ… {action}</div>
       )
     )}
   </>
@@ -1353,7 +1353,7 @@ break;
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h3 style={{ color: "#00ffc8" }}>
-  [ALERT] Threat Heat Map
+  ðŸ”¥ Threat Heat Map
 </h3>
 
 <div
@@ -1453,12 +1453,12 @@ break;
       fontWeight: "bold"
     }}
   >
-    [PLAY] Replay Attack Timeline
+    â–¶ Replay Attack Timeline
   </button>
 </div>
 
 <h3 style={{ color: "#00ffc8", marginBottom: 10 }}>
-  🧠 SOC AI Chat Analyzer
+  ðŸ§  SOC AI Chat Analyzer
 </h3>
   {/* CHAT LOG */}
   <div style={{
@@ -1497,7 +1497,7 @@ break;
     }}
   />
 
-{/* [ALERT] ADD STREAM OUTPUT RIGHT HERE */}
+{/* ðŸ”¥ ADD STREAM OUTPUT RIGHT HERE */}
 <div style={{
   marginTop: 10,
   padding: 10,
@@ -1612,7 +1612,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    {chatLoading ? "Analyzing..." : "🧠 Analyze"}
+    {chatLoading ? "Analyzing..." : "ðŸ§  Analyze"}
   </button>
 </div>
 <div
@@ -1625,7 +1625,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    [AI] Autonomous Response Timeline
+    ðŸ¤– Autonomous Response Timeline
   </h2>
 
   {responseTimeline.length === 0 ? (
@@ -1657,7 +1657,7 @@ onClick={async () => {
 
     <div style={{ marginTop: 8 }}>
       {item.actions?.map((action, i) => (
-        <div key={i}>&#9989; {action}</div>
+        <div key={i}>âœ… {action}</div>
       ))}
     </div>
 
@@ -1669,7 +1669,7 @@ onClick={async () => {
           fontWeight: "bold"
         }}
       >
-        [INCIDENT] Escalated to SOC
+        ðŸš¨ Escalated to SOC
       </div>
     )}
   </div>
@@ -1686,7 +1686,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    [INCIDENT] Live Incident Queue
+    ðŸš¨ Live Incident Queue
   </h2>
 
   <table
@@ -1753,7 +1753,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    &#127758; Global Attack Map
+    ðŸŒ Global Attack Map
   </h2>
 
   <AttackMap nodes={graphData.nodes} />
@@ -1768,7 +1768,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    &#129525; Threat Intelligence (IOCs)
+    ðŸ§¬ Threat Intelligence (IOCs)
   </h2>
 
   <table
@@ -1814,7 +1814,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#00ffc8", marginBottom: 15 }}>
-    &#129525; Threat DNA
+    ðŸ§¬ Threat DNA
   </h2>
 
   {threatDNA.length === 0 ? (
@@ -1846,7 +1846,7 @@ onClick={async () => {
             }}
           >
             <h3 style={{ color: "#38bdf8", margin: 0 }}>
-              &#129525; {dna.fingerprint}
+              ðŸ§¬ {dna.fingerprint}
             </h3>
 
             <span
@@ -1982,10 +1982,10 @@ onClick={async () => {
         }}
       >
 <div style={{ marginBottom: 10, color: "#9ca3af" }}>
-  &#129525; Kill Chain Tracking Enabled
+  ðŸ§¬ Kill Chain Tracking Enabled
 </div>
         <h2 style={{ color: "#fff", marginBottom: 10 }}>
-          &#127758; Live Attack Graph
+          ðŸŒ Live Attack Graph
         </h2>
 <div
   style={{
@@ -2036,7 +2036,7 @@ onClick={async () => {
       fontWeight: "bold"
     }}
   >
-    [SEARCH] Locate
+    ðŸ” Locate
   </button>
 </div>
 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
@@ -2059,7 +2059,7 @@ onClick={async () => {
       cursor: generating ? "not-allowed" : "pointer"
     }}
   >
-    {generating ? "Analyzing..." : "🧠 Generate Incident Summary"}
+    {generating ? "Analyzing..." : "ðŸ§  Generate Incident Summary"}
   </button>
 
 </div>
@@ -2153,7 +2153,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    [PLAY] Start Replay
+    â–¶ Start Replay
   </button>
 
   <button
@@ -2167,7 +2167,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    &#9208; Pause
+    â¸ Pause
   </button>
 
   <button
@@ -2185,7 +2185,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    &#9209; Stop
+    â¹ Stop
   </button>
 
 </div>
@@ -2201,10 +2201,10 @@ onClick={async () => {
       color: "#9ca3af"
     }}
   >
-    <h4 style={{ color: "#00ffc8" }}>🧠 AI Incident Summary</h4>
+    <h4 style={{ color: "#00ffc8" }}>ðŸ§  AI Incident Summary</h4>
 {aiSummary?.campaign && (
   <div className="ai-card">
-    <h3>[TARGET] Attack Campaign Intelligence</h3>
+    <h3>ðŸŽ¯ Attack Campaign Intelligence</h3>
 
     <p>
       <b>Campaign:</b> {aiSummary.campaign}
@@ -2222,7 +2222,7 @@ onClick={async () => {
 <SOCAssistant />
 {aiSummary?.attack_story && (
   <div className="ai-card">
-    <h3>&#128214; Attack Narrative</h3>
+    <h3>ðŸ“– Attack Narrative</h3>
     <p>{aiSummary.attack_story}</p>
   </div>
 )}
@@ -2253,7 +2253,7 @@ onClick={async () => {
 
     <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
-    <h4 style={{ color: "#22c55e" }}>&#127758; Root Cause Analysis</h4>
+    <h4 style={{ color: "#22c55e" }}>ðŸŒ± Root Cause Analysis</h4>
 
     <p><b>Patient Zero:</b> {aiSummary.root_cause?.id}</p>
 
@@ -2267,7 +2267,7 @@ onClick={async () => {
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h4 style={{ color: "#60a5fa" }}>
-  &#128214; AI Attack Narrative
+  ðŸ“– AI Attack Narrative
 </h4>
 
 <div
@@ -2285,7 +2285,7 @@ onClick={async () => {
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h4 style={{ color: "#facc15" }}>
-  [SHIELD] MITRE ATT&CK Timeline
+  ðŸ›¡ MITRE ATT&CK Timeline
 </h4>
 
 <div
@@ -2321,7 +2321,7 @@ onClick={async () => {
   ))}
 </div>
 <h4 style={{ color: "#38bdf8", marginTop: 20 }}>
-    [SHIELD] MITRE ATT&CK Timeline
+    ðŸ›¡ MITRE ATT&CK Timeline
 </h4>
 
 <div
@@ -2384,7 +2384,7 @@ onClick={async () => {
     <hr style={{ margin: "20px 0", borderColor: "#334155" }} />
 
     <h4 style={{ color: "#38bdf8" }}>
-      [TARGET] Attack Campaign
+      ðŸŽ¯ Attack Campaign
     </h4>
 
     <div
@@ -2456,7 +2456,7 @@ onClick={async () => {
   }}
 >
   <h3 style={{color:"#00ffff"}}>
-    [PLAY] Replay Event {playbackIndex + 1}
+    â–¶ Replay Event {playbackIndex + 1}
   </h3>
 
   <p>
@@ -2567,7 +2567,7 @@ MITRE: ${node.mitre || "Unknown"}`
   return Math.max(4, (node.score || 10) / 5);
 }}
 
-  // [ALERT] NEW: professional glow + labels
+  // ðŸ”¥ NEW: professional glow + labels
   nodeCanvasObject={(node, ctx, globalScale) => {
     const size = Math.max(4, (node.score || 10) / 4);
 
@@ -2688,7 +2688,7 @@ MITRE: ${node.mitre || "Unknown"}`
                 {selectedNode.attackPath.map((a, i) => (
   <div key={i}>
     {typeof a.source === "object" ? a.source.id : a.source}
-    {" &#8594; "}
+    {" â†’ "}
     {typeof a.target === "object" ? a.target.id : a.target}
   </div>
 ))}
@@ -2882,156 +2882,9 @@ MITRE: ${node.mitre || "Unknown"}`
         </div>
       </>
     )}
-    </div>
-
-  {/* DIGITAL TWIN ↔ ATTACK GRAPH CORRELATION */}
-  <div
-    style={{
-      marginTop: 25,
-      marginBottom: 25,
-      padding: 20,
-      background: "#0f172a",
-      border: "1px solid #1e293b",
-      borderRadius: 12
-    }}
-  >
-    <h2 style={{ color: "#00ffc8", marginTop: 0 }}>
-      🧬 Digital Twin ↔ Live Attack Graph
-    </h2>
-
-    <p style={{ color: "#94a3b8", marginTop: 0 }}>
-      Correlation between enterprise assets, incidents and live attack paths.
-    </p>
-
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        gap: 12
-      }}
-    >
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>Twin Assets</div>
-        <div style={{ color: "#fff", fontSize: 28, fontWeight: "bold" }}>
-          {digitalTwin.summary?.assets ?? 0}
-        </div>
-      </div>
-
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>
-          Twin Relationships
-        </div>
-        <div style={{ color: "#fff", fontSize: 28, fontWeight: "bold" }}>
-          {digitalTwin.summary?.relationships ?? 0}
-        </div>
-      </div>
-
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>
-          Attack Graph Nodes
-        </div>
-        <div style={{ color: "#60a5fa", fontSize: 28, fontWeight: "bold" }}>
-          {graphData?.nodes?.length ?? 0}
-        </div>
-      </div>
-
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>
-          Attack Graph Connections
-        </div>
-        <div style={{ color: "#facc15", fontSize: 28, fontWeight: "bold" }}>
-          {graphData?.links?.length ?? 0}
-        </div>
-      </div>
-    </div>
-
-    <div
-      style={{
-        marginTop: 18,
-        padding: 15,
-        background: "#111827",
-        borderRadius: 10,
-        border: "1px solid #1e293b"
-      }}
-    >
-      <h3 style={{ color: "#fff", marginTop: 0 }}>
-        🔗 Correlation Status
-      </h3>
-
-      <div style={{ color: "#22c55e", fontWeight: "bold" }}>
-        ● DIGITAL TWIN LINKED TO ATTACK GRAPH
-      </div>
-
-      <div style={{ color: "#94a3b8", marginTop: 8 }}>
-        Live attack nodes are correlated with the enterprise Digital Twin
-        asset model.
-      </div>
-    </div>
-
-    <div style={{ marginTop: 18 }}>
-      <h3 style={{ color: "#fff" }}>
-        🧠 Active Twin Relationships
-      </h3>
-
-      {digitalTwin.relationships?.length > 0 ? (
-        digitalTwin.relationships.slice(0, 20).map((rel, index) => (
-          <div
-            key={index}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "9px 12px",
-              marginBottom: 6,
-              background: "#111827",
-              borderRadius: 6,
-              borderLeft: "2px solid #00ffc8"
-            }}
-          >
-            <span style={{ color: "#60a5fa" }}>
-              {rel.source || rel.from || rel.source_id || "Unknown"}
-            </span>
-
-            <span style={{ color: "#64748b" }}>→</span>
-
-            <span style={{ color: "#f87171" }}>
-              {rel.target || rel.to || rel.target_id || "Unknown"}
-            </span>
-
-            {rel.relationship && (
-              <span
-                style={{
-                  marginLeft: "auto",
-                  color: "#94a3b8",
-                  fontSize: 12
-                }}
-              >
-                {rel.relationship}
-              </span>
-            )}
-          </div>
-        ))
-      ) : (
-        <p style={{ color: "#94a3b8" }}>
-          No Digital Twin relationships available.
-        </p>
-      )}
-    </div>
-  </div>
-
-  </div>
+  </div></div>
   );
 }
-
-
-
-
-
-
-
-
-
-
 
 
 

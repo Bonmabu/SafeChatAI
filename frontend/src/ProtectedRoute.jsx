@@ -28,6 +28,10 @@ export default function ProtectedRoute({
       return <Navigate to="/executive" replace />;
     }
 
+    if (role === "analyst") {
+      return <Navigate to="/customer" replace />;
+    }
+
     return <Navigate to="/login" replace />;
   }
 

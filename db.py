@@ -461,6 +461,7 @@ SELECT
     incidents.notes,
     incidents.tenant_id,
     incidents.created_at,
+    incidents.correlation_id,
 
     scans.risk_score,
     scans.user

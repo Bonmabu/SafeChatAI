@@ -50,7 +50,7 @@ def detect_campaign(event):
     now = datetime.utcnow().isoformat()
 
     # Campaign key
-    key = f"{source_ip}:{hostname}:{category}"
+    key = f"{source_ip}:{hostname}:{username}"
 
     if key not in CAMPAIGNS:
 

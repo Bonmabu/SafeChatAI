@@ -1,4 +1,4 @@
-from fastapi import (
+﻿from fastapi import (
     FastAPI,
     Header,
     Request,
@@ -6,10 +6,28 @@ from fastapi import (
     WebSocketDisconnect,
     Depends
 )
-from replay_engine import add_replay_event, get_replay
-from attack_graph import add_event, get_graph
+from replay_engine import (
+    add_replay_event,
+    get_replay,
+    build_replay
+)
+from attack_graph import (
+    add_event,
+    get_graph,
+    save_node,
+    save_edge,
+)
+from digital_twin import (
+    ingest_event,
+    get_digital_twin_summary,
+    get_asset_graph,
+    get_asset,
+    recalculate_all_asset_risks,
+    get_high_risk_assets,
+    get_asset_risk_summary,
+)
 from fastapi.responses import FileResponse
-from correlation import correlate_event, get_campaigns
+from correlation import correlate_event
 from passlib.context import CryptContext
 from ai.soc_brain import executive_reasoning
 from io import BytesIO
@@ -248,7 +266,7 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
 )
-# 🔐 PHASE 9 AUTH SYSTEM
+# ðŸ” PHASE 9 AUTH SYSTEM
 INCIDENT_DECLARED = False
 CRISIS_MODE = False
 ACTIVE_SESSIONS = {}
@@ -311,8 +329,8 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        print("📡 BROADCAST CALLED")
-        print("👥 CONNECTIONS:", len(self.active_connections))
+        print("ðŸ“¡ BROADCAST CALLED")
+        print("ðŸ‘¥ CONNECTIONS:", len(self.active_connections))
 
         dead = []
 
@@ -321,7 +339,7 @@ class ConnectionManager:
                 await connection.send_json(message)
 
             except Exception as e:
-                print("❌ SEND FAILED:", e)
+                print("âŒ SEND FAILED:", e)
                 dead.append(connection)
 
         for d in dead:
@@ -1020,6 +1038,7 @@ def add_graph_node(node_id, category, score, stage=None, mitre=None):
         return ATTACK_GRAPH
 
     node_id = str(node_id)
+    score = float(score or 0)
 
     existing = ATTACK_GRAPH["nodes"].get(node_id)
 
@@ -1052,6 +1071,9 @@ def add_graph_node(node_id, category, score, stage=None, mitre=None):
             "count": 1
         }
 
+    # Persist node to SQLite
+    save_node(ATTACK_GRAPH["nodes"][node_id])
+
     ATTACK_GRAPH["last_node"] = node_id
 
     return ATTACK_GRAPH
@@ -1060,11 +1082,13 @@ def add_graph_edge(source: str, target: str, category="CORRELATED_ATTACK"):
     global ATTACK_GRAPH
 
     if not source or not target:
-        return
+        return ATTACK_GRAPH
 
     if source == target:
-        return
+        return ATTACK_GRAPH
 
+    source = str(source)
+    target = str(target)
 
     # Ensure nodes structure
     if isinstance(ATTACK_GRAPH.get("nodes"), list):
@@ -1073,16 +1097,17 @@ def add_graph_edge(source: str, target: str, category="CORRELATED_ATTACK"):
             for n in ATTACK_GRAPH["nodes"]
         }
 
-
     # Create source node if missing
     if source not in ATTACK_GRAPH["nodes"]:
         ATTACK_GRAPH["nodes"][source] = {
             "id": source,
             "category": source,
             "max_score": 50,
+            "score": 50,
             "count": 1
         }
 
+        save_node(ATTACK_GRAPH["nodes"][source])
 
     # Create target node if missing
     if target not in ATTACK_GRAPH["nodes"]:
@@ -1090,11 +1115,13 @@ def add_graph_edge(source: str, target: str, category="CORRELATED_ATTACK"):
             "id": target,
             "category": target,
             "max_score": 50,
+            "score": 50,
             "count": 1
         }
 
+        save_node(ATTACK_GRAPH["nodes"][target])
 
-        # Check duplicate edge
+    # Check existing edge
     for edge in ATTACK_GRAPH["edges"]:
 
         if (
@@ -1106,25 +1133,30 @@ def add_graph_edge(source: str, target: str, category="CORRELATED_ATTACK"):
             edge["category"] = category
             edge["relationship"] = "CORRELATED_ATTACK"
 
+            save_edge(edge)
+
             return ATTACK_GRAPH
 
-
-    # Add new edge
-    ATTACK_GRAPH["edges"].append({
+    # Create new edge
+    edge = {
         "source": source,
         "target": target,
         "relationship": "CORRELATED_ATTACK",
         "category": category,
         "weight": 1,
         "timestamp": now_ts()
-    })
+    }
 
-    return ATTACK_GRAPH
+    ATTACK_GRAPH["edges"].append(edge)
 
+    # Persist edge to SQLite
+    save_edge(edge)
 
-    # Limit graph size
+    # Keep memory graph bounded
     if len(ATTACK_GRAPH["edges"]) > 500:
         ATTACK_GRAPH["edges"] = ATTACK_GRAPH["edges"][-500:]
+
+    return ATTACK_GRAPH
 def extract_iocs(text):
 
     ips = re.findall(
@@ -1300,7 +1332,7 @@ def predict_breach_risk():
     # -------------------------
     risk_trend = (risk * 0.5) + (incidents * 2) + (alerts * 0.2) + (critical * 3)
 
-    # normalize to 0–100 scale
+    # normalize to 0â€“100 scale
     forecast_score = min(100, risk_trend)
 
     # -------------------------
@@ -1308,13 +1340,13 @@ def predict_breach_risk():
     # -------------------------
     if forecast_score >= 75:
         probability = "HIGH"
-        window = "0–24 HOURS"
+        window = "0â€“24 HOURS"
     elif forecast_score >= 50:
         probability = "MEDIUM"
-        window = "1–3 DAYS"
+        window = "1â€“3 DAYS"
     elif forecast_score >= 25:
         probability = "LOW"
-        window = "3–7 DAYS"
+        window = "3â€“7 DAYS"
     else:
         probability = "MINIMAL"
         window = "STABLE"
@@ -1343,7 +1375,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         "escalation": False
     }
 
-    # 🔴 CRITICAL THREAT
+    # ðŸ”´ CRITICAL THREAT
     if score >= 90:
         decision["level"] = "CRITICAL"
         decision["actions"] = [
@@ -1353,7 +1385,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # 🟠 HIGH THREAT
+    # ðŸŸ  HIGH THREAT
     elif score >= 80:
         decision["level"] = "HIGH"
         decision["actions"] = [
@@ -1363,7 +1395,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # 🟡 MEDIUM
+    # ðŸŸ¡ MEDIUM
     elif score >= 50:
         decision["level"] = "MEDIUM"
         decision["actions"] = [
@@ -1371,7 +1403,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
             "MONITOR BEHAVIOR"
         ]
 
-    # 🟢 LOW
+    # ðŸŸ¢ LOW
     else:
         decision["level"] = "LOW"
         decision["actions"] = ["LOG ONLY"]
@@ -1965,11 +1997,11 @@ def auto_tune_risk_model():
 
     avg_recent_risk = sum(x["score"] for x in recent[-10:]) / 10
 
-    # 🔴 too many threats → increase sensitivity
+    # ðŸ”´ too many threats â†’ increase sensitivity
     if avg_recent_risk > 80:
         SOC_REASONING_STATE["risk_bias"] += 0.05
 
-    # 🟢 too safe → reduce sensitivity
+    # ðŸŸ¢ too safe â†’ reduce sensitivity
     elif avg_recent_risk < 30:
         SOC_REASONING_STATE["risk_bias"] -= 0.03
 
@@ -2103,7 +2135,7 @@ def generate_threat_dna(
     }
 
 
-def register_threat_dna(dna):
+def register_threat_dna(dna, correlation_id=None):
     """
     Store and correlate Threat DNA fingerprints.
 
@@ -2130,6 +2162,8 @@ def register_threat_dna(dna):
         }
 
     record = THREAT_DNA[fingerprint]
+    if correlation_id:
+        record["correlation_id"] = correlation_id
 
     record["events"].append(dna)
     record["occurrences"] += 1
@@ -2246,7 +2280,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
 
     elif category == "Harassment":
         add_graph_edge("User Report", "Harassment")
-    print("✅ GRAPH NODE ADDED")
+    print("âœ… GRAPH NODE ADDED")
     print(ATTACK_GRAPH)
 
     build_attack_clusters()
@@ -2883,7 +2917,7 @@ async def analyze(
 ):
     global LAST_CORRELATION_ID
 
-    print("🔥 ANALYZE ENDPOINT HIT")
+    print("ðŸ”¥ ANALYZE ENDPOINT HIT")
 
     category, score, stage, mitre, confidence, matches = classify_threat(
         payload.text
@@ -2902,12 +2936,12 @@ async def analyze(
     }
 
     campaign = engine_detect_campaign(event)
+
+    corr_id = campaign.get("id") if campaign else None
+
+    print("CAMPAIGN ID =", corr_id)
+
     add_event(event)
-
-    print("CALLING add_replay_event()")
-    add_replay_event(event)
-    print("RETURNED FROM add_replay_event()")
-
     print("CLASSIFIER OUTPUT:", category, score)
     print("ANALYZE COMPLETE")
 
@@ -2985,17 +3019,32 @@ async def analyze(
 
     print("INTEL =", intel)
 
-    corr_id = generate_correlation_key(
+    if not corr_id:
+        corr_id = generate_correlation_key(
         category,
         payload.text
     )
 
-    # ---------------------------------------
-    # Determine ATT&CK stage
-    # ---------------------------------------
+    print("FINAL CORRELATION ID =", corr_id)
+
+# ---------------------------------------
+# Determine ATT&CK stage
+# ---------------------------------------
     mitre = mitre_lookup(category)
 
     print("CORR_ID =", corr_id)
+
+# ---------------------------------------
+# ATTACK REPLAY EVENT
+# ---------------------------------------
+    event["correlation_id"] = corr_id
+    event["source"] = payload.source_ip or payload.hostname or "unknown_source"
+    event["target"] = payload.username or payload.hostname or "unknown_target"
+    event["event_type"] = "THREAT"
+
+    print("CALLING add_replay_event()")
+    add_replay_event(event)
+    print("RETURNED FROM add_replay_event()")
 
     create_alert(
         payload.text,
@@ -3029,8 +3078,9 @@ async def analyze(
     )
 
     threat_dna_result = register_threat_dna(
-        threat_dna_record
-    )
+    threat_dna_record,
+    correlation_id=corr_id
+)
 
     print("THREAT DNA =", threat_dna_result)
 
@@ -3542,7 +3592,7 @@ async def startup():
     add_threat_intel_column()
     train_threat_model()
 
-    # 🔥 ADD THIS TEST NODE
+    # ðŸ”¥ ADD THIS TEST NODE
     await manager.broadcast({
         "type": "new_threat",
         "node": {
@@ -3553,7 +3603,7 @@ async def startup():
     })
 
     asyncio.create_task(soc_live_loop())
-    print("🚀 SOC SYSTEM STARTED")
+    print("ðŸš€ SOC SYSTEM STARTED")
 # =========================
 # DASHBOARD UI (MINIMAL)
 # =========================
@@ -3569,7 +3619,7 @@ def ui():
 
     <body style="background:#0b1220;color:white;font-family:Arial;">
 
-        <h1>🔥 ENTERPRISE SOC SIEM</h1>
+        <h1>ðŸ”¥ ENTERPRISE SOC SIEM</h1>
 
         <pre id="feed">Connecting...</pre>
 
@@ -4370,7 +4420,7 @@ async def soc_ai_stream(
     payload: dict,
     user=Depends(get_current_user)
 ):
-    print("🔥 SOC-AI-STREAM ENDPOINT HIT")
+    print("ðŸ”¥ SOC-AI-STREAM ENDPOINT HIT")
 
     request = AnalyzeRequest(
     text=payload.get("text", ""),
@@ -4394,7 +4444,59 @@ async def soc_ai_stream(
         "details": result
     }
 
-    ai = result["data"]
+        ai = result["data"]
+
+    # ==========================================
+    # DIGITAL TWIN INGESTION
+    # ==========================================
+    try:
+        digital_twin_event = {
+            "tenant_id": getattr(user, "tenant_id", None)
+                if user else None,
+
+            "username": payload.get("username"),
+            "hostname": payload.get("hostname"),
+            "source_ip": payload.get("source_ip"),
+
+            "category": ai.get("category"),
+            "score": ai.get("score", 0),
+
+            "stage": ai.get("stage"),
+            "mitre": ai.get("mitre"),
+
+            "correlation_id": ai.get(
+                "correlation_id"
+            ),
+
+            "message": payload.get("text", "")
+        }
+
+        digital_twin_result = ingest_event(
+            digital_twin_event
+        )
+        tenant_id = digital_twin_event.get(
+            "tenant_id"
+        )
+
+        digital_twin_risk = recalculate_all_asset_risks(
+            tenant_id
+        )
+
+        print(
+            "DIGITAL TWIN RISK RECALCULATED =",
+            digital_twin_risk
+        )
+
+        print(
+            "DIGITAL TWIN UPDATED =",
+            digital_twin_result
+        )
+
+    except Exception as e:
+        print(
+            "DIGITAL TWIN INGEST ERROR =",
+            str(e)
+        )
 
     risk = (
     ai.get("soc_brain", {}).get("risk_level", "UNKNOWN")
@@ -4405,7 +4507,7 @@ async def soc_ai_stream(
     if ai["category"] == "Safe":
 
         reply = f"""
-✅ Threat Assessment Complete
+âœ… Threat Assessment Complete
 
 I analyzed your message and found no indicators of phishing, malware, credential theft, fraud, or social engineering.
 
@@ -4419,10 +4521,10 @@ Risk Level:
 {risk}
 
 Reasoning:
-• No suspicious keywords detected.
-• No malicious IOC indicators were extracted.
-• No known attack patterns matched.
-• No MITRE ATT&CK technique was triggered.
+â€¢ No suspicious keywords detected.
+â€¢ No malicious IOC indicators were extracted.
+â€¢ No known attack patterns matched.
+â€¢ No MITRE ATT&CK technique was triggered.
 
 Recommended Action:
 Continue normal operations.
@@ -4434,7 +4536,7 @@ Confidence:
     else:
 
         reply = f"""
-🚨 Threat Assessment Complete
+ðŸš¨ Threat Assessment Complete
 
 This communication appears malicious.
 
@@ -4448,9 +4550,9 @@ Risk Level:
 {risk}
 
 Why I believe this is malicious:
-• Threat classification engine matched known attack patterns.
-• Risk score exceeded the detection threshold.
-• SOC Brain classified the event as {risk}.
+â€¢ Threat classification engine matched known attack patterns.
+â€¢ Risk score exceeded the detection threshold.
+â€¢ SOC Brain classified the event as {risk}.
 """
 
         if ai["mitre"]:
@@ -4488,10 +4590,10 @@ Suspicious IPs:
         reply += """
 
 Recommended Actions:
-• Isolate the affected endpoint.
-• Block identified indicators.
-• Review authentication logs.
-• Notify the SOC team.
+â€¢ Isolate the affected endpoint.
+â€¢ Block identified indicators.
+â€¢ Review authentication logs.
+â€¢ Notify the SOC team.
 
 Confidence:
 96%
@@ -4779,7 +4881,7 @@ def attack_graph():
             })
             existing.add(scan_id)
 
-        # Category → Scan
+        # Category â†’ Scan
         links.append({
             "source": category,
             "target": scan_id
@@ -4922,7 +5024,7 @@ def ui_incident_timeline(corr_id: str):
 @app.websocket("/ws/soc")
 async def soc_stream(websocket: WebSocket):
 
-    print("🔥 /ws/soc CONNECTED")
+    print("ðŸ”¥ /ws/soc CONNECTED")
 
     await manager.connect(websocket)
 
@@ -6549,7 +6651,7 @@ def executive_pdf_report():
         story.append(
 
             Paragraph(
-                "• " + item,
+                "â€¢ " + item,
                 styles["BodyText"]
             )
 
@@ -7506,7 +7608,7 @@ async def declare_incident():
 
     event = add_executive_event(
         "INCIDENT",
-        "🚨 Incident declared by Executive Commander",
+        "ðŸš¨ Incident declared by Executive Commander",
         "CRITICAL"
     )
 
@@ -7537,7 +7639,7 @@ async def crisis_mode():
 
     event = add_executive_event(
         "CRISIS",
-        "⚠ Enterprise crisis mode activated",
+        "âš  Enterprise crisis mode activated",
         "CRITICAL"
     )
 
@@ -7547,7 +7649,7 @@ async def crisis_mode():
 
     return {
         "success":True,
-        "message":"⚠ Executive Crisis Mode Activated",
+        "message":"âš  Executive Crisis Mode Activated",
         "posture": EXECUTIVE_STATUS
     }
 
@@ -7556,7 +7658,7 @@ async def notify_board():
 
     event = add_executive_event(
         "BOARD",
-        "📢 Board members notified",
+        "ðŸ“¢ Board members notified",
         "HIGH"
     )
 
@@ -7565,7 +7667,7 @@ async def notify_board():
 
     return {
         "success": True,
-        "message": "📢 Board Members Notified",
+        "message": "ðŸ“¢ Board Members Notified",
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -7601,7 +7703,7 @@ async def generate_report():
 
     event = add_executive_event(
         "REPORT",
-        "📄 Executive security report generated",
+        "ðŸ“„ Executive security report generated",
         "INFO"
     )
 
@@ -7610,7 +7712,7 @@ async def generate_report():
 
     return {
         "success": True,
-        "message": "📄 Executive Report Generated",
+        "message": "ðŸ“„ Executive Report Generated",
         "report": report
     }
 
@@ -7625,9 +7727,18 @@ async def executive_posture():
 
     return EXECUTIVE_STATUS
 @app.get("/attack-replay")
-def attack_replay():
+def attack_replay(correlation_id: str | None = None):
 
-    return get_replay()
+    if correlation_id:
+        return build_replay(correlation_id)
+
+    events = get_replay()
+
+    return {
+        "correlation_id": None,
+        "count": len(events),
+        "events": events
+    }
 @app.get("/compliance-summary")
 def get_compliance_summary():
     return compliance_summary()
@@ -7697,3 +7808,135 @@ def root():
         "status": "online",
         "version": "production"
     }
+@app.get("/digital-twin")
+def digital_twin(
+    user=Depends(get_current_user)
+):
+    try:
+        tenant_id = getattr(user, "tenant_id", None)
+
+        summary = get_digital_twin_summary(tenant_id)
+
+        graph = get_asset_graph(tenant_id)
+
+        risk_summary = get_asset_risk_summary(tenant_id)
+
+        high_risk_assets = get_high_risk_assets(tenant_id)
+
+        return {
+            "success": True,
+
+            "digital_twin": {
+                "summary": summary,
+
+                "risk": risk_summary,
+
+                "assets": graph["assets"],
+
+                "relationships": graph["relationships"],
+
+                "high_risk_assets": high_risk_assets
+            }
+        }
+
+    except Exception as e:
+
+        print(
+            "DIGITAL TWIN API ERROR =",
+            str(e)
+        )
+
+        return {
+            "success": False,
+            "error": "DIGITAL_TWIN_ERROR",
+            "details": str(e)
+        }
+@app.get("/digital-twin/asset/{asset_id:path}")
+def digital_twin_asset(
+    asset_id: str,
+    user=Depends(get_current_user)
+):
+    try:
+        tenant_id = getattr(user, "tenant_id", None)
+
+        asset = get_asset(asset_id)
+
+        if not asset:
+            return {
+                "success": False,
+                "error": "ASSET_NOT_FOUND",
+                "asset_id": asset_id
+            }
+
+        if tenant_id is not None:
+            asset_tenant = asset.get("tenant_id")
+
+            if asset_tenant is not None and str(asset_tenant) != str(tenant_id):
+                return {
+                    "success": False,
+                    "error": "ASSET_NOT_FOUND",
+                    "asset_id": asset_id
+                }
+
+        try:
+            risk = calculate_asset_risk(asset_id)
+        except Exception as risk_error:
+            print("DIGITAL TWIN ASSET RISK ERROR =", str(risk_error))
+            risk = None
+
+        return {
+            "success": True,
+            "asset": asset,
+            "risk": risk
+        }
+
+    except Exception as e:
+        print("DIGITAL TWIN ASSET ERROR =", str(e))
+
+        return {
+            "success": False,
+            "error": "DIGITAL_TWIN_ASSET_ERROR",
+            "details": str(e)
+        }
+@app.get("/digital-twin/risk")
+def digital_twin_risk(
+    user=Depends(get_current_user)
+):
+    try:
+
+        tenant_id = getattr(user, "tenant_id", None)
+
+        results = recalculate_all_asset_risks(
+            tenant_id
+        )
+
+        summary = get_asset_risk_summary(
+            tenant_id
+        )
+
+        high_risk = get_high_risk_assets(
+            tenant_id
+        )
+
+        return {
+            "success": True,
+            "risk": {
+                "summary": summary,
+                "assets": results,
+                "high_risk_assets": high_risk
+            }
+        }
+
+    except Exception as e:
+
+        print(
+            "DIGITAL TWIN RISK ERROR =",
+            str(e)
+        )
+
+        return {
+            "success": False,
+            "error": "DIGITAL_TWIN_RISK_ERROR",
+            "details": str(e)
+        }
+

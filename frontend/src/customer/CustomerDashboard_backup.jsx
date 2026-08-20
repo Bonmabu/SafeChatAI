@@ -1,11 +1,27 @@
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
+function getAuthConfig() {
+  return {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`
+    }
+  };
+}
 import CustomerNav from "./CustomerNav";
 import ForceGraph2D from "react-force-graph-2d";
 import AttackMap from "../components/AttackMap";
-
-const API = "http://127.0.0.1:8000";
-
+import SOCAssistant from "./SOCAssistant";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid
+} from "recharts";
+const API = import.meta.env.VITE_API_BASE;
+const token = localStorage.getItem("token");
 function Card({ title, value }) {
   return (
     <div
@@ -25,16 +41,55 @@ fontSize: 28 }}>
     </div>
   );
 }
+export default function CustomerDashboard() {
+  const tenantId = "demo";
+  const graphRef = useRef(null);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState("");
+  const [socket, setSocket] = useState(null);
+  const [alerts, setAlerts] = useState([]);
+const [campaign, setCampaign] = useState(null);
+const [iocs, setIocs] = useState([]);
+const [responseTimeline, setResponseTimeline] = useState([]);
+const [replayIndex, setReplayIndex] = useState(0);
+const [replayData, setReplayData] = useState([]);
+const [aiSummary, setAiSummary] = useState("");
+const [generating, setGenerating] = useState(false);
+const [timelineData, setTimelineData] = useState([]);
+const [attackTrend, setAttackTrend] = useState([]);
+const [isPaused, setIsPaused] = useState(false);
+
+const [replaySpeed, setReplaySpeed] = useState(800);
+const [isReplaying, setIsReplaying] = useState(false);
+const [replayProgress, setReplayProgress] = useState(0);
+
+const replayIntervalRef = useRef(null);
+const pausedReplayRef = useRef(false);
+
+const [highestRiskNode, setHighestRiskNode] = useState(null);
+const [currentThreatLevel, setCurrentThreatLevel] = useState("LOW");
+const [threatStats, setThreatStats] = useState({
+  Critical: 0,
+  High: 0,
+  Medium: 0,
+  Low: 0
+});
+const [activeTab, setActiveTab] = useState("dashboard");
+const [searchNode, setSearchNode] = useState("");
+const [highlightNodes, setHighlightNodes] = useState(new Set());
+const [highlightLinks, setHighlightLinks] = useState(new Set());
+const [userInput, setUserInput] = useState("");
+const [chatLog, setChatLog] = useState([]);
+const [chatLoading, setChatLoading] = useState(false);
+const [streamingText, setStreamingText] = useState("");
 function startReplay() {
   if (!replayData || replayData.length === 0) return;
-
   setIsReplaying(true);
   setIsPaused(false);
-
-  let i = 0;
-
+  let i = replayIndex;
   replayIntervalRef.current = setInterval(() => {
-    if (isPaused) return;
+    if (pausedReplayRef.current) return;
 
     if (i >= replayData.length) {
       clearInterval(replayIntervalRef.current);
@@ -42,10 +97,11 @@ function startReplay() {
       return;
     }
 
-    setReplayProgress((i / replayData.length) * 100);
+    setReplayProgress(((i + 1) / replayData.length) * 100);
 
     const current = replayData[i];
     setGraphData(current);
+
 
     const focusNode = current.nodes?.[current.nodes.length - 1];
 
@@ -57,10 +113,13 @@ function startReplay() {
     }
 
     i++;
+
+setReplayIndex(i);
   }, replaySpeed);
 }
+
 function togglePauseReplay() {
-  setIsPaused((prev) => !prev);
+  pausedReplayRef.current = !pausedReplayRef.current;
 }
 function stopReplay() {
   clearInterval(replayIntervalRef.current);
@@ -68,6 +127,8 @@ function stopReplay() {
   setIsPaused(false);
 
   const current = replayData[replayIndex];
+
+if (!current) return;
 
 setGraphData(current);
 
@@ -78,60 +139,15 @@ if (node?.score >= 85) {
   setIsPaused(true);
   }
 }
-export default function CustomerDashboard() {
-  const tenantId = "demo";
-
-  const graphRef = useRef(null);
-  const [selectedNode, setSelectedNode] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState("");
-  const [socket, setSocket] = useState(null);
-  const [alerts, setAlerts] = useState([]);
-const [replayIndex, setReplayIndex] = useState(0);
-const [replayData, setReplayData] = useState([]);
-const [aiSummary, setAiSummary] = useState("");
-const [generating, setGenerating] = useState(false);
-const [timelineIndex, setTimelineIndex] = useState(0);
-const [isReplaying, setIsReplaying] = useState(false);
-const [timelineData, setTimelineData] = useState([]);
-const [replaySpeed, setReplaySpeed] = useState(800);
-const [isPaused, setIsPaused] = useState(false);
-const replayIntervalRef = useRef(null);
-const [replayProgress, setReplayProgress] = useState(0);
-const [highestRiskNode, setHighestRiskNode] = useState(null);
-const [currentThreatLevel, setCurrentThreatLevel] = useState("LOW");
-const [searchNode, setSearchNode] = useState("");
-const [highlightNodes, setHighlightNodes] = useState(new Set());
-const [highlightLinks, setHighlightLinks] = useState(new Set());
-const [playbackIndex, setPlaybackIndex] = useState(-1);
-const playbackTimer = useRef(null);
-const [userInput, setUserInput] = useState("");
-const [chatLog, setChatLog] = useState([]);
-const [chatLoading, setChatLoading] = useState(false);
-const [streamingText, setStreamingText] = useState("");
-
-
-  const [summary, setSummary] = useState({
-    total_scans: 0,
-    total_alerts: 0,
-    total_incidents: 0,
-    security_score: 100
-  });
+  const [summary, setSummary] = useState({});
+const [socSummary, setSocSummary] = useState({});
 
   const [graphData, setGraphData] = useState({
   nodes: [],
   links: []
 });
 const [rootNode, setRootNode] = useState(null);
-useEffect(() => {
-  loadDashboard();
-  loadGraph();
-  startLiveStream();
 
-  return () => {
-    if (socket) socket.close();
-  };
-}, []);
 useEffect(() => {
   if (alerts.length > 5) {
     setAlerts((prev) => prev.slice(0, 5));
@@ -141,26 +157,72 @@ useEffect(() => {
   useEffect(() => {
   loadDashboard();
   loadGraph();
-  startLiveStream();
+  loadAttackTrend();
+  loadIOCs();
 
-  // 🔴 ADD THIS: auto refresh KPIs every 5 seconds
+  const ws = startLiveStream();
+
   const interval = setInterval(() => {
     loadDashboard();
-  }, 5000);
+    loadSummary();
+    loadIOCs();
+}, 5000);
 
   return () => {
     clearInterval(interval);
-    if (socket) socket.close();
+
+    if (ws) {
+      ws.close();
+    }
   };
 }, []);
+async function loadSummary() {
+  try {
+    const res = await axios.get(`${API}/soc-summary`);
+setSocSummary(res.data);
+  } catch (err) {
+    console.error("SOC SUMMARY ERROR:", err);
+  }
+}
 
   async function loadDashboard() {
     try {
-      const res = await axios.get(`${API}/customer/dashboard`, {
-        params: { tenant_id: tenantId }
-      });
+      const res = await axios.get(
+  `${API}/customer/dashboard`,
+  getAuthConfig()
+);
 
-      setSummary(res.data);
+      console.log("Dashboard API Response:", res.data);
+setSummary(res.data);
+const incidents = await axios.get(
+  `${API}/incidents`,
+  getAuthConfig()
+);
+const token = localStorage.getItem("token");
+const stats = {
+    Critical: 0,
+    High: 0,
+    Medium: 0,
+    Low: 0
+};
+
+incidents.data.forEach(i => {
+
+    if (i.risk_score >= 90)
+        stats.Critical++;
+
+    else if (i.risk_score >= 75)
+        stats.High++;
+
+    else if (i.risk_score >= 50)
+        stats.Medium++;
+
+    else
+        stats.Low++;
+
+});
+
+setThreatStats(stats);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       console.error(err);
@@ -168,6 +230,54 @@ useEffect(() => {
       setLoading(false);
     }
   }
+async function loadAttackTrend() {
+
+  console.log("ATTACK TREND FUNCTION CALLED");
+
+  try {
+
+    console.log(
+      "CALLING URL =",
+      `${API}/customer/attack-trend`
+    );
+
+   const res = await axios.get(`${API}/customer/attack-trend`, {
+  params: {
+    tenant_id: tenantId
+  },
+  headers: getAuthConfig().headers
+});
+
+    console.log("TREND DATA =", res.data);
+
+    setAttackTrend(res.data);
+
+  } catch(err){
+
+    console.error(
+      "ATTACK TREND ERROR =",
+      err.response?.data || err.message
+    );
+
+  }
+}
+async function loadIOCs() {
+  try {
+
+    const token = localStorage.getItem("token");
+
+    const res = await axios.get(`${API}/customer/iocs`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    setIocs(res.data);
+
+  } catch (err) {
+    console.error("IOC LOAD ERROR:", err);
+  }
+}
 async function generateIncidentSummary() {
   try {
     setGenerating(true);
@@ -206,14 +316,21 @@ const payload = {
     };
 
     const res = await axios.post(`${API}/soc-ai`, payload);
+console.log(res.data);
 
-    setAiSummary(res.data);
+console.log("SOC AI RESPONSE =", res.data);
+
+const aiData = res.data.data || res.data;
+
+setAiSummary(aiData);
+setCampaign(res.data.primary_campaign);
   } catch (err) {
     console.log(err.response?.data);
   } finally {
     setGenerating(false);
   }
 }
+
 function getMitreTechnique(node) {
   const type = (node.category || "").toLowerCase();
   const score = node.score || 0;
@@ -229,11 +346,10 @@ function getMitreTechnique(node) {
 }
 async function loadGraph() {
   try {
-    const res = await axios.get(`${API}/incidents`, {
-  params: {
-    tenant_id: tenantId
-  }
-});
+    const res = await axios.get(
+  `${API}/incidents`,
+  getAuthConfig()
+);
 
     const incidents = res.data || [];
 console.log("INCIDENTS:", incidents);
@@ -263,9 +379,24 @@ console.log("NODES:", nodes);
 console.log("LINKS:", links);
 
     setGraphData({
-      nodes,
-      links
-    });
+  nodes,
+  links
+});
+
+    if (nodes.length) {
+    const highest = [...nodes].sort((a, b) => b.score - a.score)[0];
+
+    setHighestRiskNode(highest);
+
+    if (highest.score >= 90)
+        setCurrentThreatLevel("CRITICAL");
+    else if (highest.score >= 75)
+        setCurrentThreatLevel("HIGH");
+    else if (highest.score >= 50)
+        setCurrentThreatLevel("MEDIUM");
+    else
+        setCurrentThreatLevel("LOW");
+}
 
   } catch (err) {
     console.error("Graph load failed:", err);
@@ -298,112 +429,205 @@ function getAttackStage(node) {
   return "UNKNOWN";
 }
 function startLiveStream() {
-  const ws = new WebSocket("ws://127.0.0.1:8000/ws/incidents");
+const WS_URL =
+ import.meta.env.VITE_WS_URL ||
+ `${import.meta.env.VITE_WS_BASE || "ws://127.0.0.1:8000"}/ws/soc`;
+  const ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
     console.log("LIVE STREAM CONNECTED");
   };
 
   ws.onmessage = (event) => {
-  try {
-    const incident = JSON.parse(event.data);
+    const msg = JSON.parse(event.data);
 
-    const newNode = {
-  id: `incident-${incident.id || Date.now()}`,
-  category: incident.category || "Unknown",
-  score: Number(incident.risk_score ?? 50),
-stage: getAttackStage({
-  category: incident.category,
-  score: Number(incident.risk_score ?? 50)
-}),
-
-
-  // 🔴 ATTACK TRACE DATA
-  parent: incident.source || null,
-  targetSystem: incident.target || "unknown",
-  timestamp: incident.time || new Date().toISOString()
-};
-setTimelineData((prev) => [...prev, newNode].slice(-100));
-setReplayData((prev) => [
-  ...prev,
-  {
-    nodes: [...graphData.nodes],
-    links: [...graphData.links],
-    timestamp: Date.now()
-  }
-]);
-    setGraphData((prev) => {
-      const nodes = [...prev.nodes, newNode];
-
-      const links = [...prev.links];
-
-// 🔴 REAL ATTACK FLOW
-if (newNode.parent) {
-  links.push({
-    source: newNode.parent,
-    target: newNode.id
-  });
-} else {
-  links.push({
-    source: nodes[nodes.length - 2]?.id || newNode.id,
-    target: newNode.id
-  });
-}
-const highest = nodes.reduce(
-  (a, b) => (a.score > b.score ? a : b),
-  nodes[0]
-);
-
-setHighestRiskNode(highest);
-
-if (highest.score >= 90) {
-  setCurrentThreatLevel("CRITICAL");
-} else if (highest.score >= 75) {
-  setCurrentThreatLevel("HIGH");
-} else if (highest.score >= 50) {
-  setCurrentThreatLevel("MEDIUM");
-} else {
-  setCurrentThreatLevel("LOW");
-}
-
-      return {
-        nodes: nodes.slice(-60),
-        links: links.slice(-60)
-      };
-    });
-
-    // 🚨 CRITICAL ALERT TRIGGER
-    if (newNode.score >= 85) {
-      setAlerts((prev) => [
-        {
-          id: Date.now(),
-          message: `CRITICAL THREAT: ${newNode.category}`,
-          severity: newNode.score
-        },
-        ...prev.slice(0, 5)
-      ]);
-
-      console.log("🚨 CRITICAL ALERT:", newNode);
+    if (!msg.type && msg.event_type) {
+        msg.type = msg.event_type;
     }
 
-  } catch (err) {
-    console.error("WS error:", err);
-  }
-};
-  ws.onerror = (err) => {
-    console.error("WebSocket error:", err);
-  };
+    console.log(msg);
 
+    switch (msg.type) {
+
+        case "ioc_update":
+            setIocs(prev => {
+                const existing = prev.find(x => x.id === msg.data.id);
+
+                if (existing) {
+                    return prev.map(x =>
+                        x.id === msg.data.id ? msg.data : x
+                    );
+                }
+
+                return [msg.data, ...prev].slice(0, 50);
+            });
+            break;
+
+        case "alert":
+            setAlerts(prev => [msg, ...prev].slice(0, 20));
+            break;
+
+        case "attack_graph":
+
+{
+    const nodes = msg.nodes || [];
+    const links = (msg.links || []).filter(link => {
+
+    if (!link) return false;
+
+        const source =
+            typeof link.source === "object"
+            ? link.source.id
+            : link.source;
+
+        const target =
+            typeof link.target === "object"
+            ? link.target.id
+            : link.target;
+
+        return (
+            nodes.some(n => n.id === source) &&
+            nodes.some(n => n.id === target)
+        );
+
+    });
+
+
+    setGraphData({
+        nodes,
+        links
+    });
+}
+
+break;
+
+        case "dashboard_update":
+
+    loadDashboard();
+
+    setThreatStats(prev => {
+        const stats = { ...prev };
+
+        if (msg.data.score >= 90)
+            stats.Critical++;
+
+        else if (msg.data.score >= 75)
+            stats.High++;
+
+        else if (msg.data.score >= 50)
+            stats.Medium++;
+
+        else
+            stats.Low++;
+
+        return stats;
+    });
+
+    break;
+
+        case "response_timeline":
+        case "auto_response_event":
+
+            setResponseTimeline(prev => [
+                {
+                    time: msg.timestamp || new Date().toLocaleTimeString(),
+                    level: msg.data?.level || "UNKNOWN",
+                    actions: msg.data?.actions || [],
+                    escalation: msg.data?.escalation || false
+                },
+                ...prev
+            ].slice(0,20));
+
+            break;
+
+        case "new_threat":
+
+            setTimelineData(prev => [...prev,msg.node]);
+            break;
+
+        case "alert_event":
+
+            setAttackTrend(prev=>[
+                ...prev.slice(-49),
+                {
+                    time:new Date().toLocaleTimeString(),
+                    score:msg.score
+                }
+            ]);
+
+            break;
+
+        case "attack_graph_live":
+
+setGraphData(prev => {
+
+    const nodes = [
+        ...prev.nodes.filter(
+            n => n.id !== msg.node?.id
+        ),
+        msg.node
+    ].filter(Boolean);
+
+
+    const links = (msg.links || []).filter(link => {
+
+        if (!link) return false;
+
+
+        const source =
+            typeof link.source === "object"
+            ? link.source?.id
+            : link.source;
+
+
+        const target =
+            typeof link.target === "object"
+            ? link.target?.id
+            : link.target;
+
+
+        if (!source || !target) {
+            return false;
+        }
+
+
+        return (
+            nodes.some(n => n.id === source) &&
+            nodes.some(n => n.id === target)
+        );
+
+    });
+
+
+    return {
+        nodes,
+        links
+    };
+
+});
+
+
+break;
+
+        default:
+            console.log("Unknown websocket event",msg);
+    }
+};
+ ws.onerror = (err) => {
+  console.error("WebSocket error:", err);
+};
   setSocket(ws);
+
+  return ws;
 }
 
   if (loading) {
-    return (
-      <div style={{ padding: 40, color: "white" }}>
-        Loading Customer Dashboard...
-      </div>
-    );
-  }
+  return (
+    <div style={{ padding: 40, color: "white" }}>
+      Loading Customer Dashboard...
+    </div>
+  );
+}
 
   return (
     <div
@@ -430,6 +654,32 @@ if (highest.score >= 90) {
       >
         🛡 Customer Security Dashboard
       </h1>
+<div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    gap: "12px",
+    marginBottom: "25px",
+    flexWrap: "wrap"
+  }}
+>
+<button onClick={() => setActiveTab("analyzer")}>
+    🧠 Analyzer
+  </button>
+  <button onClick={() => setActiveTab("dashboard")}>
+    🏠 Dashboard
+  </button>
+
+  <button onClick={() => setActiveTab("analytics")}>
+    📊 Analytics
+  </button>
+
+  <button onClick={() => setActiveTab("timeline")}>
+    📜 Timeline
+  </button>
+
+  
+</div>
 {alerts.length > 0 && (
   <div
     style={{
@@ -451,11 +701,13 @@ if (highest.score >= 90) {
         {a.message} (Risk: {a.severity})
       </div>
     ))}
+
   </div>
 )}
-
-      {/* CARDS */}
-      <div
+  {activeTab === "dashboard" && (
+<>
+    {/* CARDS */}
+    <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
@@ -477,36 +729,144 @@ if (highest.score >= 90) {
           ? "#ffcc00"
           : "#ff3b30"
     }}>
-      {summary?.security_score ?? 0}%
+      {socSummary?.security_score ?? 0}%
     </span>
   }
 />
         
       </div>
+<div
+  style={{
+    background: "rgba(17,24,39,0.75)",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 25
+  }}
+>
+  <h2 style={{ color: "#fff" }}>
+    📈 Live Attack Trend
+  </h2>
+
+  <div
+  style={{
+    width: "100%",
+    height: 350,
+    minHeight: 350,
+    display: "block"
+  }}
+>
+<div style={{color:"#00ffc8"}}>
+  Points: {attackTrend.length}
+</div>
+  <ResponsiveContainer width="100%" height={350}>
+    <LineChart data={attackTrend}>
+      <CartesianGrid stroke="#334155" />
+      <XAxis dataKey="time" />
+      <YAxis />
+      <Tooltip />
+      <Line
+        type="monotone"
+        dataKey="score"
+        stroke="#00ffc8"
+        strokeWidth={3}
+        dot={false}
+      />
+    </LineChart>
+  </ResponsiveContainer>
+</div>
+
+</div>
 
       {/* STATUS */}
 {rootNode && (
-  <div style={{
-    marginTop: 10,
-    padding: 10,
-    borderRadius: 8,
-    background: "#0f172a",
-    border: "1px solid #22c55e",
-    color: "#22c55e"
-  }}>
+  <div
+    style={{
+      marginTop: 10,
+      marginBottom: 15,
+      padding: 10,
+      borderRadius: 8,
+      background: "#0f172a",
+      border: "1px solid #22c55e",
+      color: "#22c55e"
+    }}
+  >
     🧠 Root Cause Detected: <b>{rootNode.id}</b>
   </div>
 )}
-      <div
-        style={{
-          background: "rgba(17,24,39,0.75)",
-          borderRadius: 16,
-          padding: 20,
-          marginBottom: 25,
-          border: "1px solid rgba(255,255,255,0.08)"
-        }}
-      >
-        <h2 style={{ color: "#fff" }}>🛡 Security Status</h2>
+
+<div
+  style={{
+    background: "rgba(17,24,39,0.75)",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 25,
+    border: "1px solid rgba(255,255,255,0.08)"
+  }}
+>
+<div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: 25
+  }}
+>
+  <div
+    style={{
+  width: 180,
+  height: 180,
+  borderRadius: "50%",
+  border: `12px solid ${
+    currentThreatLevel === "CRITICAL"
+      ? "#ef4444"
+      : currentThreatLevel === "HIGH"
+      ? "#f97316"
+      : currentThreatLevel === "MEDIUM"
+      ? "#facc15"
+      : "#22c55e"
+  }`,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "#0f172a",
+  boxShadow: "0 0 30px rgba(0,255,255,.25)"
+}}
+  >
+    <div style={{ fontSize: 18, color: "#94a3b8" }}>
+      Cyber Risk
+    </div>
+
+    <div
+      style={{
+        fontSize: 46,
+        fontWeight: "bold",
+        color: "#fff"
+      }}
+    >
+      {highestRiskNode?.score || 0}
+    </div>
+
+    <div
+      style={{
+        color:
+          currentThreatLevel === "CRITICAL"
+            ? "#ef4444"
+            : currentThreatLevel === "HIGH"
+            ? "#f97316"
+            : currentThreatLevel === "MEDIUM"
+            ? "#facc15"
+            : "#22c55e",
+        fontWeight: "bold"
+      }}
+    >
+      {currentThreatLevel}
+    </div>
+</div>
+</div>
+
+<h2 style={{ color: "#fff" }}>
+  🛡 Security Status
+</h2>
 <div
   style={{
     marginBottom: 20,
@@ -562,12 +922,118 @@ if (highest.score >= 90) {
     <b>Last Incident:</b>{" "}
     {lastUpdated}
   </p>
+{aiSummary?.soc_brain?.reasoning && (
+  <>
+    <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
+
+    <h3 style={{ color: "#38bdf8" }}>
+      🧠 Autonomous SOC Brain
+    </h3>
+
+    <p>
+      <b>Predicted Next Stage:</b>{" "}
+      {aiSummary.soc_brain.predicted_next_stage}
+    </p>
+
+    <p>
+      <b>Confidence:</b>{" "}
+      {aiSummary.soc_brain.confidence}%
+    </p>
+
+    <p>
+      <b>Decision Level:</b>{" "}
+      {aiSummary.soc_brain.recommended_action.level}
+    </p>
+
+    <p>
+      <b>Escalation:</b>{" "}
+      {aiSummary.soc_brain.recommended_action.escalation
+        ? "YES"
+        : "NO"}
+    </p>
+
+    <h4 style={{ color: "#22c55e" }}>
+      Recommended Actions
+    </h4>
+
+    {aiSummary.soc_brain.recommended_action.actions.map(
+      (action, i) => (
+        <div key={i}>✅ {action}</div>
+      )
+    )}
+  </>
+)}
+<hr style={{ margin: "15px 0", borderColor: "#334155" }} />
+
+<h3 style={{ color: "#00ffc8" }}>
+  🔥 Threat Heat Map
+</h3>
+
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(4,1fr)",
+    gap: 10,
+    marginTop: 10
+  }}
+>
+  <div
+    style={{
+      background: "#7f1d1d",
+      padding: 10,
+      borderRadius: 8,
+      textAlign: "center"
+    }}
+  >
+    <h2>{threatStats.Critical}</h2>
+    <small>Critical</small>
+  </div>
+
+  <div
+    style={{
+      background: "#9a3412",
+      padding: 10,
+      borderRadius: 8,
+      textAlign: "center"
+    }}
+  >
+    <h2>{threatStats.High}</h2>
+    <small>High</small>
+  </div>
+
+  <div
+    style={{
+      background: "#854d0e",
+      padding: 10,
+      borderRadius: 8,
+      textAlign: "center"
+    }}
+  >
+    <h2>{threatStats.Medium}</h2>
+    <small>Medium</small>
+  </div>
+
+  <div
+    style={{
+      background: "#166534",
+      padding: 10,
+      borderRadius: 8,
+      textAlign: "center"
+    }}
+  >
+    <h2>{threatStats.Low}</h2>
+    <small>Low</small>
+  </div>
 </div>
-        <p>Security Score: <b>{summary.security_score}%</b></p>
-        <p style={{ color: "#9ca3af" }}>
-          Last Updated: {lastUpdated}
-        </p>
-      </div>
+
+<p>
+  <b>Security Score:</b> {summary.security_score}%
+</p>
+
+<p style={{ color: "#9ca3af" }}>
+  Last Updated: {lastUpdated}
+</p>
+
 {isReplaying && (
   <div style={{ marginBottom: 10 }}>
     <div style={{ height: 6, background: "#1f2937", borderRadius: 10 }}>
@@ -586,6 +1052,7 @@ if (highest.score >= 90) {
     </p>
   </div>
 )}
+
 <div style={{ marginBottom: 10 }}>
   <button
     onClick={startReplay}
@@ -602,202 +1069,195 @@ if (highest.score >= 90) {
     ▶ Replay Attack Timeline
   </button>
 </div>
-<div style={{ marginBottom: 20 }}>
-  <textarea
-    placeholder="Paste message / incident log / alert..."
-    style={{
-      width: "100%",
-      height: 80,
-      borderRadius: 10,
-      padding: 10,
-      background: "#0f172a",
-      color: "#fff",
-      border: "1px solid #334155"
-    }}
-    value={userInput}
-    onChange={(e) => setUserInput(e.target.value)}
-  />
-
-  <button
-    onClick={async () => {
-      const res = await axios.post(`${API}/soc-ai`, {
-        message: userInput
-      });
-
-      setAiSummary(res.data.data); // IMPORTANT: your JSON structure
-    }}
-    style={{
-      marginTop: 10,
-      padding: "10px 16px",
-      background: "#00ffc8",
-      border: "none",
-      borderRadius: 8,
-      fontWeight: "bold",
-      cursor: "pointer"
-    }}
-  >
-    🧠 Analyze Message
-  </button>
 </div>
-<div style={{
-  marginBottom: 20,
-  padding: 15,
-  borderRadius: 12,
-  background: "#0b1220",
-  border: "1px solid #334155"
-}}>
 
-  <h3 style={{ color: "#00ffc8", marginBottom: 10 }}>
-    🧠 SOC AI Chat Analyzer
-  </h3>
-
-  {/* CHAT LOG */}
-  <div style={{
-    maxHeight: 200,
-    overflowY: "auto",
-    marginBottom: 10,
-    padding: 10,
-    background: "#111827",
-    borderRadius: 8
-  }}>
-    {chatLog.map((msg, i) => (
-      <div key={i} style={{ marginBottom: 8 }}>
-        <b style={{ color: msg.role === "user" ? "#60a5fa" : "#22c55e" }}>
-          {msg.role === "user" ? "User" : "SOC AI"}:
-        </b>{" "}
-        <span style={{ color: "#d1d5db" }}>
-          {msg.text}
-        </span>
-      </div>
-    ))}
-  </div>
-
-  {/* INPUT */}
-  <textarea
-    value={userInput}
-    onChange={(e) => setUserInput(e.target.value)}
-    placeholder="Paste incident, email, log, or alert..."
-    style={{
-      width: "100%",
-      height: 80,
-      borderRadius: 8,
-      padding: 10,
-      background: "#0f172a",
-      color: "#fff",
-      border: "1px solid #334155"
-    }}
-  />
-<textarea
-  value={userInput}
-  onChange={(e) => setUserInput(e.target.value)}
-  placeholder="Paste incident, email, log, or alert..."
+<div
   style={{
-    width: "100%",
-    height: 80,
-    borderRadius: 8,
-    padding: 10,
-    background: "#0f172a",
-    color: "#fff",
-    border: "1px solid #334155"
+    background: "rgba(17,24,39,.75)",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 25,
+    border: "1px solid rgba(255,255,255,.08)"
   }}
-/>
+>
 
-{/* 🔥 ADD STREAM OUTPUT RIGHT HERE */}
-<div style={{
-  marginTop: 10,
-  padding: 10,
-  background: "#0f172a",
-  borderRadius: 8,
-  color: "#22c55e",
-  minHeight: 40
-}}>
-  {streamingText}
-</div>
+  <h2 style={{ color: "#fff", marginBottom: 15 }}>
+    🤖 Autonomous Response Timeline
+  </h2>
 
-  <button
-    disabled={chatLoading}
-    onClick={async () => {
-      if (!userInput.trim()) return;
-
-      const newUserMsg = { role: "user", text: userInput };
-
-      setChatLog((prev) => [...prev, newUserMsg]);
-      setChatLoading(true);
-
-      try {
-        setStreamingText("");
-
-const res = await fetch(`${API}/soc-ai-stream`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({ message: userInput })
-});
-
-const reader = res.body.getReader();
-const decoder = new TextDecoder();
-
-let fullText = "";
-
-while (true) {
-  const { value, done } = await reader.read();
-  if (done) break;
-
-  const chunk = decoder.decode(value);
-  fullText += chunk;
-
-  setStreamingText(fullText); // LIVE UPDATE
-}
-
-        const ai = res.data.data;
-
-        const aiMsg = {
-          role: "ai",
-          text:
-            `Risk: ${ai.score} | ${ai.category} | ` +
-            `MITRE: ${ai.mitre || "N/A"} | Status: ${ai.status}`
-        };
-
-        setChatLog((prev) => [...prev, aiMsg]);
-
-        // OPTIONAL: auto inject into graph if malicious
-        if (ai.score >= 70) {
-          setAlerts((prev) => [
-            {
-              id: Date.now(),
-              message: `AI DETECTED THREAT: ${ai.category}`,
-              severity: ai.score
-            },
-            ...prev.slice(0, 5)
-          ]);
-        }
-
-      } catch (err) {
-        setChatLog((prev) => [
-          ...prev,
-          { role: "ai", text: "Error analyzing message" }
-        ]);
-      }
-
-      setUserInput("");
-      setChatLoading(false);
-    }}
+  {responseTimeline.length === 0 ? (
+    <p style={{ color: "#9ca3af" }}>
+      Waiting for autonomous responses...
+    </p>
+  ) : (
+    responseTimeline.map((item, index) => (
+  <div
+    key={index}
     style={{
-      marginTop: 10,
-      padding: "10px 16px",
-      background: chatLoading ? "#334155" : "#00ffc8",
-      border: "none",
+      marginBottom: 15,
+      padding: 12,
+      background: "#111827",
       borderRadius: 8,
-      fontWeight: "bold",
-      cursor: "pointer"
+      borderLeft: "4px solid #00ffc8"
     }}
   >
-    {chatLoading ? "Analyzing..." : "🧠 Analyze"}
-  </button>
+    <div>
+      <b>{item.time}</b>
+    </div>
 
+    <div style={{ marginTop: 6 }}>
+      Threat Level:
+      <span style={{ color: "#f97316", marginLeft: 6 }}>
+        {item.level}
+      </span>
+    </div>
+
+    <div style={{ marginTop: 8 }}>
+      {item.actions?.map((action, i) => (
+        <div key={i}>✅ {action}</div>
+      ))}
+    </div>
+
+    {item.escalation && (
+      <div
+        style={{
+          marginTop: 8,
+          color: "#ef4444",
+          fontWeight: "bold"
+        }}
+      >
+        🚨 Escalated to SOC
+      </div>
+    )}
+  </div>
+))
+  )}
+</div>
+<div
+  style={{
+    background: "rgba(17,24,39,.75)",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 25,
+    border: "1px solid rgba(255,255,255,.08)"
+  }}
+>
+  <h2 style={{ color: "#fff", marginBottom: 15 }}>
+    🚨 Live Incident Queue
+  </h2>
+
+  <table
+    style={{
+      width: "100%",
+      borderCollapse: "collapse",
+      color: "#fff"
+    }}
+  >
+    <thead>
+      <tr>
+        <th align="left">ID</th>
+        <th align="left">Category</th>
+        <th align="left">Score</th>
+        <th align="left">Stage</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {graphData.nodes
+        .slice()
+        .reverse()
+        .slice(0, 8)
+        .map((node) => (
+          <tr
+            key={node.id}
+            style={{
+              borderTop: "1px solid #334155"
+            }}
+          >
+            <td>{node.id}</td>
+
+            <td>{node.category}</td>
+
+            <td
+              style={{
+                color:
+                  node.score >= 90
+                    ? "#ef4444"
+                    : node.score >= 75
+                    ? "#f97316"
+                    : node.score >= 50
+                    ? "#facc15"
+                    : "#22c55e"
+              }}
+            >
+              {node.score}
+            </td>
+
+            <td>{node.stage}</td>
+          </tr>
+        ))}
+    </tbody>
+  </table>
 </div>
 
+<div
+  style={{
+    background: "rgba(17,24,39,.75)",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 25,
+    border: "1px solid rgba(255,255,255,.08)"
+  }}
+>
+  <h2 style={{ color: "#fff", marginBottom: 15 }}>
+    🌍 Global Attack Map
+  </h2>
+
+  <AttackMap nodes={graphData.nodes} />
+</div>
+<div
+  style={{
+    background: "rgba(17,24,39,.75)",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 25,
+    border: "1px solid rgba(255,255,255,.08)"
+  }}
+>
+  <h2 style={{ color: "#fff", marginBottom: 15 }}>
+    🧬 Threat Intelligence (IOCs)
+  </h2>
+
+  <table
+    style={{
+      width: "100%",
+      color: "#fff",
+      borderCollapse: "collapse"
+    }}
+  >
+    <thead>
+      <tr>
+        <th align="left">Indicator</th>
+        <th align="left">Category</th>
+        <th align="left">Score</th>
+        <th align="left">Confidence</th>
+        <th align="left">Sightings</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {iocs.map((ioc) => (
+        <tr key={ioc.id}>
+          <td>{ioc.indicator}</td>
+          <td>{ioc.category}</td>
+          <td>{ioc.score}</td>
+          <td>{ioc.confidence}%</td>
+          <td>{ioc.sightings}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
       {/* GRAPH SECTION */}
       <div
         style={{
@@ -866,26 +1326,7 @@ while (true) {
   </button>
 </div>
 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-  <button
-    onClick={() => {
-      if (playbackTimer.current)
-        clearInterval(playbackTimer.current);
-
-      setPlaybackIndex(0);
-
-      playbackTimer.current = setInterval(() => {
-        setPlaybackIndex((prev) => {
-          if (prev >= (graphData.nodes?.length || 0) - 1) {
-            clearInterval(playbackTimer.current);
-            return prev;
-          }
-          return prev + 1;
-        });
-      }, 1000);
-    }}
-  >
-    ▶ Play
-  </button>
+  
 </div>
 
   <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
@@ -907,30 +1348,10 @@ while (true) {
     {generating ? "Analyzing..." : "🧠 Generate Incident Summary"}
   </button>
 
-</div>
 
   <button
-    onClick={() => {
-      setIsReplaying(true);
-setReplayIndex(0);
-setReplayProgress(0);
-
-      if (playbackTimer.current)
-        clearInterval(playbackTimer.current);
-
-      setPlaybackIndex(0);
-
-      playbackTimer.current = setInterval(() => {
-        setPlaybackIndex(prev => {
-          if (prev >= replayData[replayIndex]?.nodes.length - 1) {
-            clearInterval(playbackTimer.current);
-            setIsReplaying(false);
-            return prev;
-          }
-          return prev + 1;
-        });
-      }, 1000);
-    }}
+    onClick={startReplay}
+    disabled={isReplaying || replayData.length === 0}
     style={{
       padding: "10px 16px",
       background: "#22c55e",
@@ -943,8 +1364,11 @@ setReplayProgress(0);
     ▶ Start Replay
   </button>
 
+
   <button
-    onClick={() => clearInterval(playbackTimer.current)}
+    onClick={() => {
+      pausedReplayRef.current = true;
+    }}
     style={{
       padding: "10px 16px",
       background: "#f59e0b",
@@ -957,11 +1381,14 @@ setReplayProgress(0);
     ⏸ Pause
   </button>
 
+
   <button
     onClick={() => {
-      clearInterval(playbackTimer.current);
-      setPlaybackIndex(-1);
+      clearInterval(replayIntervalRef.current);
       setIsReplaying(false);
+      pausedReplayRef.current = false;
+      setReplayIndex(0);
+      setReplayProgress(0);
     }}
     style={{
       padding: "10px 16px",
@@ -976,7 +1403,6 @@ setReplayProgress(0);
   </button>
 
 </div>
-
 {aiSummary && (
   <div
     style={{
@@ -989,6 +1415,42 @@ setReplayProgress(0);
     }}
   >
     <h4 style={{ color: "#00ffc8" }}>🧠 AI Incident Summary</h4>
+{aiSummary?.campaign && (
+  <div className="ai-card">
+    <h3>🎯 Attack Campaign Intelligence</h3>
+
+    <p>
+      <b>Campaign:</b> {aiSummary.campaign}
+    </p>
+
+    <p>
+      <b>Confidence:</b> {aiSummary.campaign_confidence}%
+    </p>
+
+    <p>
+      <b>Description:</b> {aiSummary.campaign_description}
+    </p>
+  </div>
+)}
+<SOCAssistant />
+{aiSummary?.attack_story && (
+  <div className="ai-card">
+    <h3>📖 Attack Narrative</h3>
+    <p>{aiSummary.attack_story}</p>
+  </div>
+)}
+<div
+  style={{
+    background: "#0f172a",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 15,
+    color: "#d1d5db",
+    lineHeight: 1.7
+  }}
+>
+  {aiSummary.attack_story}
+</div>
 
     <p><b>Summary:</b> {aiSummary.summary}</p>
 
@@ -1015,10 +1477,112 @@ setReplayProgress(0);
     <p><b>MITRE:</b> {aiSummary.root_cause?.mitre}</p>
 
     <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
+<hr style={{ margin: "15px 0", borderColor: "#334155" }} />
+
+<h4 style={{ color: "#60a5fa" }}>
+  📖 AI Attack Narrative
+</h4>
+
+<div
+  style={{
+    background: "#0f172a",
+    padding: 12,
+    borderRadius: 8,
+    color: "#d1d5db",
+    lineHeight: 1.8,
+    marginBottom: 15
+  }}
+>
+  {aiSummary.attack_story}
+</div>
+<hr style={{ margin: "15px 0", borderColor: "#334155" }} />
+
+<h4 style={{ color: "#facc15" }}>
+  🛡 MITRE ATT&CK Timeline
+</h4>
+
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    marginBottom: 20
+  }}
+>
+  {aiSummary.mitre_timeline?.map((item, i) => (
+    <div
+      key={i}
+      style={{
+        background: "#0f172a",
+        padding: 10,
+        borderRadius: 8,
+        borderLeft: "4px solid #facc15"
+      }}
+    >
+      <div style={{ color: "#fff", fontWeight: "bold" }}>
+        {item.stage}
+      </div>
+
+      <div style={{ color: "#9ca3af" }}>
+        {item.technique}
+      </div>
+
+      <div style={{ color: "#22c55e" }}>
+        Risk Score: {item.score}
+      </div>
+    </div>
+  ))}
+</div>
+<h4 style={{ color: "#38bdf8", marginTop: 20 }}>
+    🛡 MITRE ATT&CK Timeline
+</h4>
+
+<div
+  style={{
+    marginTop: 10,
+    marginBottom: 20
+  }}
+>
+  {aiSummary.mitre_timeline?.map((step, index) => (
+    <div
+      key={index}
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        padding: 10,
+        marginBottom: 8,
+        borderRadius: 8,
+        background: "#0f172a",
+        borderLeft: "4px solid #38bdf8"
+      }}
+    >
+      <div>
+        <b>{step.id}</b>
+      </div>
+
+      <div>{step.stage}</div>
+
+      <div>{step.technique}</div>
+
+      <div
+        style={{
+          color:
+            step.score >= 85
+              ? "#ef4444"
+              : step.score >= 70
+              ? "#f97316"
+              : "#22c55e"
+        }}
+      >
+        {step.score}
+      </div>
+    </div>
+  ))}
+</div>
 
     <h4 style={{ color: "#22c55e" }}>Recommendation</h4>
 
-    <div
+            <div
       style={{
         background: "#0f172a",
         padding: 10,
@@ -1028,8 +1592,215 @@ setReplayProgress(0);
     >
       {aiSummary.recommendation}
     </div>
+
   </div>
 )}
+
+{campaign && (
+  <>
+    <hr style={{ margin: "20px 0", borderColor: "#334155" }} />
+
+    <h4 style={{ color: "#38bdf8" }}>
+      🎯 Attack Campaign
+    </h4>
+
+    <div
+      style={{
+        background: "#0f172a",
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 10
+      }}
+    >
+      <p>
+        <b>Campaign ID:</b> {campaign.campaign_id}
+      </p>
+
+      <p>
+        <b>Incidents:</b> {campaign.incident_count}
+      </p>
+
+      <p>
+        <b>Patient Zero:</b> {campaign.patient_zero?.id}
+      </p>
+
+      <p>
+        <b>Category:</b> {campaign.patient_zero?.category}
+      </p>
+
+      <p>
+        <b>Highest Risk:</b> {campaign.highest_risk?.id}
+      </p>
+
+      <p>
+        <b>Risk Score:</b> {campaign.highest_risk?.score}
+      </p>
+
+            <p>
+        <b>MITRE:</b> {campaign.highest_risk?.mitre}
+      </p>
+    </div>
+  </>
+)}
+
+
+{activeTab === "analyzer" && (
+<>
+  <h3 style={{ color: "#00ffc8", marginBottom: 10 }}>
+    🧠 SOC AI Chat Analyzer
+  </h3>
+  {/* CHAT LOG */}
+  <div style={{
+  maxHeight: 200,
+  overflowY: "auto",
+  marginBottom: 10,
+  padding: 10,
+  background: "#111827",
+  borderRadius: 8
+}}>
+  {chatLog.map((msg, i) => (
+    <div key={i} style={{ marginBottom: 8 }}>
+      <b style={{ color: msg.role === "user" ? "#60a5fa" : "#22c55e" }}>
+        {msg.role === "user" ? "User" : "SOC AI"}:
+      </b>{" "}
+      <span style={{ color: "#d1d5db" }}>
+        {msg.text}
+      </span>
+    </div>
+  ))}
+</div>
+
+{/* INPUT */}
+<textarea
+    value={userInput}
+    onChange={(e) => setUserInput(e.target.value)}
+    placeholder="Paste incident, email, log, or alert..."
+    style={{
+      width: "100%",
+      height: 80,
+      borderRadius: 8,
+      padding: 10,
+      background: "#0f172a",
+      color: "#fff",
+      border: "1px solid #334155"
+    }}
+  />
+
+{/* 🔥 ADD STREAM OUTPUT RIGHT HERE */}
+<div style={{
+  marginTop: 10,
+  padding: 10,
+  background: "#0f172a",
+  borderRadius: 8,
+  color: "#22c55e",
+  minHeight: 40
+}}>
+  {streamingText}
+</div>
+
+  <button
+    disabled={chatLoading}
+onClick={async () => {
+
+    if (chatLoading) return;
+
+    if (!userInput.trim()) return;
+
+    setChatLoading(true);
+
+    try {
+
+        setStreamingText("");
+
+        setChatLog(prev => [
+            ...prev,
+            {
+                role: "user",
+                text: userInput
+            }
+        ]);
+
+        const res = await fetch(`${API}/soc-ai-stream`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                text: userInput
+            })
+        });
+
+        const response = await res.json();
+
+        if (!response.success)
+            throw new Error("Analysis failed");
+
+        const ai = response.data;
+
+        setAiSummary(ai);
+
+        setResponseTimeline(prev => [
+            {
+                time: new Date().toLocaleTimeString(),
+                level: ai.risk_level || ai.level || "Unknown",
+                actions: ai.actions || ai.recommendations || ["Threat analyzed"],
+                escalation:
+                    ai.risk_level === "Critical" ||
+                    ai.risk_level === "High"
+            },
+            ...prev
+        ]);
+
+        setChatLog(prev => [
+            ...prev,
+            {
+                role: "assistant",
+                text:
+                    ai.summary ||
+                    ai.explanation ||
+                    ai.analysis ||
+                    response.reply ||
+                    "Analysis complete."
+            }
+        ]);
+
+        setUserInput("");
+
+    } catch (err) {
+
+        console.error(err);
+
+        setChatLog(prev => [
+            ...prev,
+            {
+                role: "assistant",
+                text: err.message
+            }
+        ]);
+
+    } finally {
+
+        setChatLoading(false);
+
+    }
+
+}}
+    style={{
+      marginTop: 10,
+      padding: "10px 16px",
+      background: chatLoading ? "#334155" : "#00ffc8",
+      border: "none",
+      borderRadius: 8,
+      fontWeight: "bold",
+      cursor: "pointer"
+    }}
+  >
+    {chatLoading ? "Analyzing..." : "🧠 Analyze"}
+</button>
+
+</>
+)}
+
         {/* STATS BAR */}
         <div
           style={{
@@ -1046,9 +1817,69 @@ setReplayProgress(0);
 
         {/* GRAPH */}
         <div style={{ height: 420, borderRadius: 12, overflow: "hidden" }}>
+{playbackIndex >= 0 &&
+ replayData[replayIndex]?.nodes?.[playbackIndex] && (
+
+<div
+  style={{
+    background:"#0f172a",
+    border:"1px solid #00ffff",
+    borderRadius:10,
+    padding:15,
+    marginBottom:15
+  }}
+>
+  <h3 style={{color:"#00ffff"}}>
+    ▶ Replay Event {playbackIndex + 1}
+  </h3>
+
+  <p>
+    <b>Node:</b>{" "}
+    {replayData[replayIndex].nodes[playbackIndex].id}
+  </p>
+
+  <p>
+    <b>Category:</b>{" "}
+    {replayData[replayIndex].nodes[playbackIndex].category}
+  </p>
+
+  <p>
+    <b>MITRE:</b>{" "}
+    {replayData[replayIndex].nodes[playbackIndex].mitre}
+  </p>
+
+  <p>
+    <b>Stage:</b>{" "}
+    {replayData[replayIndex].nodes[playbackIndex].stage}
+  </p>
+
+  <p>
+    <b>Risk:</b>{" "}
+    {replayData[replayIndex].nodes[playbackIndex].score}
+  </p>
+
+</div>
+
+)}
           <ForceGraph2D
   ref={graphRef}
   graphData={graphData}
+linkSource="source"
+linkTarget="target"
+linkDirectionalParticles={(link) => {
+  const target =
+    typeof link.target === "object"
+      ? link.target.id
+      : link.target;
+
+  return playbackIndex >= 0 ? 4 : 2;
+}}
+
+linkDirectionalParticleWidth={(link) => {
+  return playbackIndex >= 0 ? 4 : 2;
+}}
+
+linkDirectionalParticleSpeed={(link) => 0.006}
   backgroundColor="#050b14"
 
   nodeRelSize={6}
@@ -1066,25 +1897,49 @@ setReplayProgress(0);
     highlightLinks.has(link) ? "#00ffff" : "rgba(148,163,184,0.25)"
   }
 
-  linkDirectionalArrowLength={6}
+  linkDirectionalArrowLength={8}
   linkDirectionalArrowRelPos={1}
   linkCurvature={0.25}
 
+  linkLabel={(link) =>
+  link.relation || "attack_chain"
+}
+
   nodeLabel={(node) =>
-    `${node.id} | ${node.category} | Risk: ${node.score} | ${node.mitre}`
+    `${node.id}
+${node.category}
+Stage: ${node.stage || "Unknown"}
+Risk: ${node.score}
+MITRE: ${node.mitre || "Unknown"}`
   }
 
   nodeColor={(node) => {
-    if (node.score >= 85) return "#ff3b30";
-    if (node.score >= 70) return "#ff9500";
-    if (node.score >= 50) return "#facc15";
-    return "#00ffc8";
-  }}
+
+  const current =
+    replayData[replayIndex]?.nodes?.[playbackIndex];
+
+  if (current && current.id === node.id) {
+    return "#00ffff";
+  }
+
+  if (node.score >= 90) return "#ff0000";
+  if (node.score >= 75) return "#ff7a00";
+  if (node.score >= 50) return "#ffd400";
+
+  return "#00ff88";
+}}
 
   nodeVal={(node) => {
-    const base = Math.max(3, (node.score || 10) / 5);
-    return base + (node.score >= 85 ? 5 : node.score >= 60 ? 2 : 0);
-  }}
+
+  const current =
+    replayData[replayIndex]?.nodes?.[playbackIndex];
+
+  if (current && current.id === node.id) {
+    return 16;
+  }
+
+  return Math.max(4, (node.score || 10) / 5);
+}}
 
   // 🔥 NEW: professional glow + labels
   nodeCanvasObject={(node, ctx, globalScale) => {
@@ -1114,10 +1969,15 @@ setReplayProgress(0);
 
     // label (only when zoomed in)
     if (globalScale > 1.2) {
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `${12 / globalScale}px Sans-Serif`;
-      ctx.fillText(node.id, node.x + size + 2, node.y + size + 2);
-    }
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `${12 / globalScale}px Sans-Serif`;
+
+  ctx.fillText(
+    `${node.category || "Threat"} | ${node.stage || "Unknown"}`,
+    node.x + size + 2,
+    node.y + size + 2
+);
+}
   }}
 
   onNodeClick={(node) => {
@@ -1163,60 +2023,49 @@ setReplayProgress(0);
     graphRef.current?.zoom(4, 800);
   }}
 />
+</div>
       
 {/* SELECTED NODE */}
 {selectedNode && (
-          <div
-            style={{
-              marginTop: 20,
-              padding: 15,
-              borderRadius: 12,
-              background: "#111827",
-              border: "1px solid #334155"
-            }}
-          >
-            <h3 style={{ color: "#00ffc8" }}>Selected Asset</h3>
+  <div
+    style={{
+      marginTop: 20,
+      padding: 15,
+      borderRadius: 12,
+      background: "#111827",
+      border: "1px solid #334155"
+    }}
+  >
+    <h3 style={{ color: "#00ffc8" }}>
+      Selected Asset
+    </h3>
 
-            <p><b>ID:</b> {selectedNode.id}</p>
-            <p><b>Type:</b> {selectedNode.category}</p>
-            <p><b>Risk:</b> {selectedNode.score}</p>
-            <p><b>Attack Stage:</b> {selectedNode.stage}</p>
-            <p><b>MITRE Technique:</b> {selectedNode.mitre}</p>
+    <p><b>ID:</b> {selectedNode.id}</p>
+    <p><b>Type:</b> {selectedNode.category}</p>
+    <p><b>Risk:</b> {selectedNode.score}</p>
+    <p><b>Attack Stage:</b> {selectedNode.stage}</p>
+    <p><b>MITRE Technique:</b> {selectedNode.mitre}</p>
 
-            {selectedNode.attackPath?.length > 0 && (
-              <div style={{ marginTop: 10, color: "#9ca3af" }}>
-                <h4>Attack Chain</h4>
+    {selectedNode.attackPath?.length > 0 && (
+      <div style={{ marginTop: 10, color: "#9ca3af" }}>
+        <h4>Attack Chain</h4>
 
                 {selectedNode.attackPath.map((a, i) => (
-  <div key={i}>
-    {typeof a.source === "object" ? a.source.id : a.source}
-    {" → "}
-    {typeof a.target === "object" ? a.target.id : a.target}
-  </div>
-))}
-              </div>
-            )}
+          <div key={i}>
+            {typeof a.source === "object" ? a.source.id : a.source}
+            {" → "}
+            {typeof a.target === "object" ? a.target.id : a.target}
           </div>
-        )}
+        ))}
       </div>
+    )}
+  </div>
+)}
 
-      {/* GLOBAL ATTACK MAP */}
-      <div
-        style={{
-          marginTop: 25,
-          background: "rgba(17,24,39,0.75)",
-          padding: 20,
-          borderRadius: 16,
-          border: "1px solid rgba(255,255,255,0.08)"
-        }}
-      >
-        <h2 style={{ color: "#fff", marginBottom: 15 }}>
-          🌍 Global Attack Map
-        </h2>
+</div>
 
-        <AttackMap nodes={graphData.nodes} />
-      </div>
+</>
+)}
 
-    </div>
-  );
+);
 }

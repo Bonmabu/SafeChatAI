@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 const getTenantId = () => {
   const token = localStorage.getItem("token");
@@ -75,17 +75,6 @@ const [isPaused, setIsPaused] = useState(false);
 const replayIntervalRef = useRef(null);
 const [replayProgress, setReplayProgress] = useState(0);
 const [highestRiskNode, setHighestRiskNode] = useState(null);
-
-const [digitalTwin, setDigitalTwin] = useState({
-  summary: null,
-  risk: null,
-  assets: [],
-  relationships: [],
-  high_risk_assets: []
-});
-
-const [digitalTwinLoading, setDigitalTwinLoading] = useState(false);
-const [digitalTwinError, setDigitalTwinError] = useState(null);
 const [currentThreatLevel, setCurrentThreatLevel] = useState("LOW");
 const [threatStats, setThreatStats] = useState({
   Critical: 0,
@@ -188,7 +177,6 @@ useEffect(() => {
   loadGraph();
   loadAttackTrend();
   loadIOCs();
-  loadDigitalTwin();
   loadThreatDNA();
   // Do not preload the entire 500-event replay.
 // Replay is loaded only when a correlation ID is selected.
@@ -202,7 +190,6 @@ setReplayProgress(0);
   loadDashboard();
   loadSummary();
   loadIOCs();
-  loadDigitalTwin();
   loadThreatDNA();
 }, 5000);
 
@@ -214,44 +201,6 @@ setReplayProgress(0);
     }
   };
 }, []);
-async function loadDigitalTwin() {
-  try {
-    setDigitalTwinLoading(true);
-    setDigitalTwinError(null);
-
-    const res = await axios.get(
-      `${API}/digital-twin`,
-      getAuthConfig()
-    );
-
-    console.log("DIGITAL TWIN DATA =", res.data);
-
-    if (res.data?.success) {
-      setDigitalTwin(res.data.digital_twin || {
-        summary: null,
-        risk: null,
-        assets: [],
-        relationships: [],
-        high_risk_assets: []
-      });
-    } else {
-      setDigitalTwinError(
-        res.data?.error || "DIGITAL_TWIN_ERROR"
-      );
-    }
-  } catch (error) {
-    console.error("DIGITAL TWIN LOAD ERROR =", error);
-
-    setDigitalTwinError(
-      error.response?.data?.detail ||
-      error.response?.data?.error ||
-      error.message ||
-      "DIGITAL_TWIN_ERROR"
-    );
-  } finally {
-    setDigitalTwinLoading(false);
-  }
-}
 async function loadSummary() {
   try {
     const res = await axios.get(
@@ -1070,7 +1019,7 @@ break;
           textShadow: "0 0 15px rgba(0,255,255,0.5)"
         }}
       >
-        &#128737; Customer Security Dashboard
+        🛡 Customer Security Dashboard
       </h1>
 {alerts.length > 0 && (
   <div
@@ -1085,7 +1034,7 @@ break;
     }}
   >
     <h3 style={{ color: "#ef4444", marginBottom: 10 }}>
-      [INCIDENT] LIVE ALERTS
+      🚨 LIVE ALERTS
     </h3>
 
     {alerts.map((a) => (
@@ -1134,7 +1083,7 @@ break;
   }}
 >
   <h2 style={{ color: "#fff" }}>
-    &#128200; Live Attack Trend
+    📈 Live Attack Trend
   </h2>
 
   <div
@@ -1253,7 +1202,7 @@ break;
     </div>
   </div>
 </div>
-        <h2 style={{ color: "#fff" }}>&#128737; Security Status</h2>
+        <h2 style={{ color: "#fff" }}>🛡 Security Status</h2>
 <div
   style={{
     marginBottom: 20,
@@ -1345,7 +1294,7 @@ break;
 
     {aiSummary.soc_brain.recommended_action.actions.map(
       (action, i) => (
-        <div key={i}>&#9989; {action}</div>
+        <div key={i}>✅ {action}</div>
       )
     )}
   </>
@@ -1353,7 +1302,7 @@ break;
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h3 style={{ color: "#00ffc8" }}>
-  [ALERT] Threat Heat Map
+  🔥 Threat Heat Map
 </h3>
 
 <div
@@ -1453,7 +1402,7 @@ break;
       fontWeight: "bold"
     }}
   >
-    [PLAY] Replay Attack Timeline
+    ▶ Replay Attack Timeline
   </button>
 </div>
 
@@ -1497,7 +1446,7 @@ break;
     }}
   />
 
-{/* [ALERT] ADD STREAM OUTPUT RIGHT HERE */}
+{/* 🔥 ADD STREAM OUTPUT RIGHT HERE */}
 <div style={{
   marginTop: 10,
   padding: 10,
@@ -1625,7 +1574,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    [AI] Autonomous Response Timeline
+    🤖 Autonomous Response Timeline
   </h2>
 
   {responseTimeline.length === 0 ? (
@@ -1657,7 +1606,7 @@ onClick={async () => {
 
     <div style={{ marginTop: 8 }}>
       {item.actions?.map((action, i) => (
-        <div key={i}>&#9989; {action}</div>
+        <div key={i}>✅ {action}</div>
       ))}
     </div>
 
@@ -1669,7 +1618,7 @@ onClick={async () => {
           fontWeight: "bold"
         }}
       >
-        [INCIDENT] Escalated to SOC
+        🚨 Escalated to SOC
       </div>
     )}
   </div>
@@ -1686,7 +1635,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    [INCIDENT] Live Incident Queue
+    🚨 Live Incident Queue
   </h2>
 
   <table
@@ -1753,7 +1702,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    &#127758; Global Attack Map
+    🌍 Global Attack Map
   </h2>
 
   <AttackMap nodes={graphData.nodes} />
@@ -1768,7 +1717,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    &#129525; Threat Intelligence (IOCs)
+    🧬 Threat Intelligence (IOCs)
   </h2>
 
   <table
@@ -1814,7 +1763,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#00ffc8", marginBottom: 15 }}>
-    &#129525; Threat DNA
+    🧬 Threat DNA
   </h2>
 
   {threatDNA.length === 0 ? (
@@ -1846,7 +1795,7 @@ onClick={async () => {
             }}
           >
             <h3 style={{ color: "#38bdf8", margin: 0 }}>
-              &#129525; {dna.fingerprint}
+              🧬 {dna.fingerprint}
             </h3>
 
             <span
@@ -1982,10 +1931,10 @@ onClick={async () => {
         }}
       >
 <div style={{ marginBottom: 10, color: "#9ca3af" }}>
-  &#129525; Kill Chain Tracking Enabled
+  🧬 Kill Chain Tracking Enabled
 </div>
         <h2 style={{ color: "#fff", marginBottom: 10 }}>
-          &#127758; Live Attack Graph
+          🌐 Live Attack Graph
         </h2>
 <div
   style={{
@@ -2036,7 +1985,7 @@ onClick={async () => {
       fontWeight: "bold"
     }}
   >
-    [SEARCH] Locate
+    🔍 Locate
   </button>
 </div>
 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
@@ -2153,7 +2102,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    [PLAY] Start Replay
+    ▶ Start Replay
   </button>
 
   <button
@@ -2167,7 +2116,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    &#9208; Pause
+    ⏸ Pause
   </button>
 
   <button
@@ -2185,7 +2134,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    &#9209; Stop
+    ⏹ Stop
   </button>
 
 </div>
@@ -2204,7 +2153,7 @@ onClick={async () => {
     <h4 style={{ color: "#00ffc8" }}>🧠 AI Incident Summary</h4>
 {aiSummary?.campaign && (
   <div className="ai-card">
-    <h3>[TARGET] Attack Campaign Intelligence</h3>
+    <h3>🎯 Attack Campaign Intelligence</h3>
 
     <p>
       <b>Campaign:</b> {aiSummary.campaign}
@@ -2222,7 +2171,7 @@ onClick={async () => {
 <SOCAssistant />
 {aiSummary?.attack_story && (
   <div className="ai-card">
-    <h3>&#128214; Attack Narrative</h3>
+    <h3>📖 Attack Narrative</h3>
     <p>{aiSummary.attack_story}</p>
   </div>
 )}
@@ -2253,7 +2202,7 @@ onClick={async () => {
 
     <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
-    <h4 style={{ color: "#22c55e" }}>&#127758; Root Cause Analysis</h4>
+    <h4 style={{ color: "#22c55e" }}>🌱 Root Cause Analysis</h4>
 
     <p><b>Patient Zero:</b> {aiSummary.root_cause?.id}</p>
 
@@ -2267,7 +2216,7 @@ onClick={async () => {
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h4 style={{ color: "#60a5fa" }}>
-  &#128214; AI Attack Narrative
+  📖 AI Attack Narrative
 </h4>
 
 <div
@@ -2285,7 +2234,7 @@ onClick={async () => {
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h4 style={{ color: "#facc15" }}>
-  [SHIELD] MITRE ATT&CK Timeline
+  🛡 MITRE ATT&CK Timeline
 </h4>
 
 <div
@@ -2321,7 +2270,7 @@ onClick={async () => {
   ))}
 </div>
 <h4 style={{ color: "#38bdf8", marginTop: 20 }}>
-    [SHIELD] MITRE ATT&CK Timeline
+    🛡 MITRE ATT&CK Timeline
 </h4>
 
 <div
@@ -2384,7 +2333,7 @@ onClick={async () => {
     <hr style={{ margin: "20px 0", borderColor: "#334155" }} />
 
     <h4 style={{ color: "#38bdf8" }}>
-      [TARGET] Attack Campaign
+      🎯 Attack Campaign
     </h4>
 
     <div
@@ -2456,7 +2405,7 @@ onClick={async () => {
   }}
 >
   <h3 style={{color:"#00ffff"}}>
-    [PLAY] Replay Event {playbackIndex + 1}
+    ▶ Replay Event {playbackIndex + 1}
   </h3>
 
   <p>
@@ -2567,7 +2516,7 @@ MITRE: ${node.mitre || "Unknown"}`
   return Math.max(4, (node.score || 10) / 5);
 }}
 
-  // [ALERT] NEW: professional glow + labels
+  // 🔥 NEW: professional glow + labels
   nodeCanvasObject={(node, ctx, globalScale) => {
     const size = Math.max(4, (node.score || 10) / 4);
 
@@ -2688,7 +2637,7 @@ MITRE: ${node.mitre || "Unknown"}`
                 {selectedNode.attackPath.map((a, i) => (
   <div key={i}>
     {typeof a.source === "object" ? a.source.id : a.source}
-    {" &#8594; "}
+    {" → "}
     {typeof a.target === "object" ? a.target.id : a.target}
   </div>
 ))}
@@ -2697,343 +2646,6 @@ MITRE: ${node.mitre || "Unknown"}`
           </div>
         )}
       </div>   
-      {/* DIGITAL TWIN PANEL */}
-  <div
-    style={{
-      marginTop: 25,
-      marginBottom: 25,
-      padding: 20,
-      background: "#0f172a",
-      border: "1px solid #1e293b",
-      borderRadius: 12
-    }}
-  >
-    <h2 style={{ color: "#00ffc8", marginBottom: 15 }}>
-      🧬 Digital Twin
-    </h2>
-
-    {digitalTwinLoading ? (
-      <p style={{ color: "#94a3b8" }}>
-        Loading enterprise digital twin...
-      </p>
-    ) : digitalTwinError ? (
-      <p style={{ color: "#f87171" }}>
-        Digital Twin error: {digitalTwinError}
-      </p>
-    ) : (
-      <>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: 12,
-            marginBottom: 20
-          }}
-        >
-          <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-            <div style={{ color: "#94a3b8", fontSize: 13 }}>
-              Assets
-            </div>
-            <div style={{ color: "#fff", fontSize: 28, fontWeight: "bold" }}>
-              {digitalTwin.summary?.assets ?? 0}
-            </div>
-          </div>
-
-          <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-            <div style={{ color: "#94a3b8", fontSize: 13 }}>
-              Relationships
-            </div>
-            <div style={{ color: "#fff", fontSize: 28, fontWeight: "bold" }}>
-              {digitalTwin.summary?.relationships ?? 0}
-            </div>
-          </div>
-
-          <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-            <div style={{ color: "#94a3b8", fontSize: 13 }}>
-              Average Risk
-            </div>
-            <div style={{ color: "#facc15", fontSize: 28, fontWeight: "bold" }}>
-              {digitalTwin.summary?.average_risk ?? 0}
-            </div>
-          </div>
-
-          <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-            <div style={{ color: "#94a3b8", fontSize: 13 }}>
-              Maximum Risk
-            </div>
-            <div style={{ color: "#f87171", fontSize: 28, fontWeight: "bold" }}>
-              {digitalTwin.summary?.maximum_risk ?? 0}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 20
-          }}
-        >
-          <div
-            style={{
-              padding: 18,
-              background: "#111827",
-              borderRadius: 10
-            }}
-          >
-            <h3 style={{ color: "#fff", marginTop: 0 }}>
-              Asset Types
-            </h3>
-
-            {Object.entries(
-              digitalTwin.summary?.asset_types || {}
-            ).map(([type, count]) => (
-              <div
-                key={type}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "7px 0",
-                  borderBottom: "1px solid #1e293b"
-                }}
-              >
-                <span style={{ color: "#cbd5e1" }}>
-                  {type}
-                </span>
-
-                <span style={{ color: "#00ffc8", fontWeight: "bold" }}>
-                  {count}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div
-            style={{
-              padding: 18,
-              background: "#111827",
-              borderRadius: 10
-            }}
-          >
-            <h3 style={{ color: "#fff", marginTop: 0 }}>
-              Risk Overview
-            </h3>
-
-            <div style={{ color: "#f87171", marginBottom: 8 }}>
-              Critical: {digitalTwin.risk?.critical_assets ?? 0}
-            </div>
-
-            <div style={{ color: "#fb923c", marginBottom: 8 }}>
-              High Risk: {digitalTwin.risk?.high_risk_assets ?? 0}
-            </div>
-
-            <div style={{ color: "#facc15", marginBottom: 8 }}>
-              Medium Risk: {digitalTwin.risk?.medium_risk_assets ?? 0}
-            </div>
-
-            <div style={{ color: "#94a3b8" }}>
-              Total Assets: {digitalTwin.risk?.total_assets ?? 0}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            marginTop: 20,
-            padding: 18,
-            background: "#111827",
-            borderRadius: 10
-          }}
-        >
-          <h3 style={{ color: "#fff", marginTop: 0 }}>
-            High-Risk Assets
-          </h3>
-
-          {digitalTwin.high_risk_assets?.length > 0 ? (
-            digitalTwin.high_risk_assets.map((asset, index) => (
-              <div
-                key={asset.id || asset.asset_id || index}
-                style={{
-                  padding: 12,
-                  marginBottom: 8,
-                  background: "#1f2937",
-                  borderLeft: "3px solid #ef4444",
-                  borderRadius: 6
-                }}
-              >
-                <div style={{ color: "#fff", fontWeight: "bold" }}>
-                  {asset.name || asset.id || asset.asset_id || "Unknown Asset"}
-                </div>
-
-                <div style={{ color: "#f87171", marginTop: 4 }}>
-                  Risk: {asset.risk_score ?? asset.risk ?? 0}
-                </div>
-
-                <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 3 }}>
-                  Type: {asset.asset_type || asset.type || "Unknown"}
-                </div>
-              </div>
-            ))
-          ) : (
-            <p style={{ color: "#94a3b8", marginBottom: 0 }}>
-              No high-risk assets detected.
-            </p>
-          )}
-        </div>
-      </>
-    )}
     </div>
-
-  {/* DIGITAL TWIN ↔ ATTACK GRAPH CORRELATION */}
-  <div
-    style={{
-      marginTop: 25,
-      marginBottom: 25,
-      padding: 20,
-      background: "#0f172a",
-      border: "1px solid #1e293b",
-      borderRadius: 12
-    }}
-  >
-    <h2 style={{ color: "#00ffc8", marginTop: 0 }}>
-      🧬 Digital Twin ↔ Live Attack Graph
-    </h2>
-
-    <p style={{ color: "#94a3b8", marginTop: 0 }}>
-      Correlation between enterprise assets, incidents and live attack paths.
-    </p>
-
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        gap: 12
-      }}
-    >
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>Twin Assets</div>
-        <div style={{ color: "#fff", fontSize: 28, fontWeight: "bold" }}>
-          {digitalTwin.summary?.assets ?? 0}
-        </div>
-      </div>
-
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>
-          Twin Relationships
-        </div>
-        <div style={{ color: "#fff", fontSize: 28, fontWeight: "bold" }}>
-          {digitalTwin.summary?.relationships ?? 0}
-        </div>
-      </div>
-
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>
-          Attack Graph Nodes
-        </div>
-        <div style={{ color: "#60a5fa", fontSize: 28, fontWeight: "bold" }}>
-          {graphData?.nodes?.length ?? 0}
-        </div>
-      </div>
-
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>
-          Attack Graph Connections
-        </div>
-        <div style={{ color: "#facc15", fontSize: 28, fontWeight: "bold" }}>
-          {graphData?.links?.length ?? 0}
-        </div>
-      </div>
-    </div>
-
-    <div
-      style={{
-        marginTop: 18,
-        padding: 15,
-        background: "#111827",
-        borderRadius: 10,
-        border: "1px solid #1e293b"
-      }}
-    >
-      <h3 style={{ color: "#fff", marginTop: 0 }}>
-        🔗 Correlation Status
-      </h3>
-
-      <div style={{ color: "#22c55e", fontWeight: "bold" }}>
-        ● DIGITAL TWIN LINKED TO ATTACK GRAPH
-      </div>
-
-      <div style={{ color: "#94a3b8", marginTop: 8 }}>
-        Live attack nodes are correlated with the enterprise Digital Twin
-        asset model.
-      </div>
-    </div>
-
-    <div style={{ marginTop: 18 }}>
-      <h3 style={{ color: "#fff" }}>
-        🧠 Active Twin Relationships
-      </h3>
-
-      {digitalTwin.relationships?.length > 0 ? (
-        digitalTwin.relationships.slice(0, 20).map((rel, index) => (
-          <div
-            key={index}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "9px 12px",
-              marginBottom: 6,
-              background: "#111827",
-              borderRadius: 6,
-              borderLeft: "2px solid #00ffc8"
-            }}
-          >
-            <span style={{ color: "#60a5fa" }}>
-              {rel.source || rel.from || rel.source_id || "Unknown"}
-            </span>
-
-            <span style={{ color: "#64748b" }}>→</span>
-
-            <span style={{ color: "#f87171" }}>
-              {rel.target || rel.to || rel.target_id || "Unknown"}
-            </span>
-
-            {rel.relationship && (
-              <span
-                style={{
-                  marginLeft: "auto",
-                  color: "#94a3b8",
-                  fontSize: 12
-                }}
-              >
-                {rel.relationship}
-              </span>
-            )}
-          </div>
-        ))
-      ) : (
-        <p style={{ color: "#94a3b8" }}>
-          No Digital Twin relationships available.
-        </p>
-      )}
-    </div>
-  </div>
-
-  </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

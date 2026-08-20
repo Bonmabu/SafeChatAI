@@ -1,21 +1,10 @@
-﻿import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
-const getTenantId = () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) return null;
-
-  try {
-    return JSON.parse(atob(token.split(".")[1])).tenant_id;
-  } catch {
-    return null;
-  }
-};
-const getAuthConfig = () => ({
+const authConfig = {
   headers: {
     Authorization: `Bearer ${localStorage.getItem("token")}`
   }
-});
+};
 import CustomerNav from "./CustomerNav";
 import ForceGraph2D from "react-force-graph-2d";
 import AttackMap from "../components/AttackMap";
@@ -51,7 +40,7 @@ fontSize: 28 }}>
   );
 }
 export default function CustomerDashboard() {
-  const tenantId = getTenantId();
+  const tenantId = "demo";
   const graphRef = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +49,6 @@ export default function CustomerDashboard() {
   const [alerts, setAlerts] = useState([]);
 const [campaign, setCampaign] = useState(null);
 const [iocs, setIocs] = useState([]);
-const [threatDNA, setThreatDNA] = useState([]);
 const [responseTimeline, setResponseTimeline] = useState([]);
 const [replayIndex, setReplayIndex] = useState(0);
 const [replayData, setReplayData] = useState([]);
@@ -75,17 +63,6 @@ const [isPaused, setIsPaused] = useState(false);
 const replayIntervalRef = useRef(null);
 const [replayProgress, setReplayProgress] = useState(0);
 const [highestRiskNode, setHighestRiskNode] = useState(null);
-
-const [digitalTwin, setDigitalTwin] = useState({
-  summary: null,
-  risk: null,
-  assets: [],
-  relationships: [],
-  high_risk_assets: []
-});
-
-const [digitalTwinLoading, setDigitalTwinLoading] = useState(false);
-const [digitalTwinError, setDigitalTwinError] = useState(null);
 const [currentThreatLevel, setCurrentThreatLevel] = useState("LOW");
 const [threatStats, setThreatStats] = useState({
   Critical: 0,
@@ -104,68 +81,58 @@ const [chatLoading, setChatLoading] = useState(false);
 const [streamingText, setStreamingText] = useState("");
 function startReplay() {
   if (!replayData || replayData.length === 0) return;
-
-  clearInterval(replayIntervalRef.current);
-
-  setReplayIndex(0);
-  setReplayProgress(0);
   setIsReplaying(true);
   setIsPaused(false);
-
-  let i = 0;
-
+  let i = replayIndex;
   replayIntervalRef.current = setInterval(() => {
-    setIsPaused((paused) => {
-      if (paused) return paused;
+    if (isPaused) return;
 
-      if (i >= replayData.length) {
-        clearInterval(replayIntervalRef.current);
-        setIsReplaying(false);
-        return paused;
-      }
+    if (i >= replayData.length) {
+      clearInterval(replayIntervalRef.current);
+      setIsReplaying(false);
+      return;
+    }
 
-      const current = replayData[i];
+    setReplayProgress(((i + 1) / replayData.length) * 100);
 
-      if (current) {
-        setReplayIndex(i);
+    const current = replayData[i];
+    setGraphData(current);
 
-        /*
-         * Backend replay events are individual security events.
-         * If the event already contains graph data, display it.
-         * Otherwise keep the current graph and update the replay state.
-         */
-        if (current.nodes && current.links) {
-          setGraphData({
-            nodes: current.nodes,
-            links: current.links
-          });
-        }
 
-        setReplayProgress(
-          ((i + 1) / replayData.length) * 100
-        );
-      }
+    const focusNode = current.nodes?.[current.nodes.length - 1];
 
-      i++;
+    if (focusNode && graphRef.current) {
+      setTimeout(() => {
+        graphRef.current.centerAt(focusNode.x || 0, focusNode.y || 0, 800);
+        graphRef.current.zoom(4, 800);
+      }, 100);
+    }
 
-      return paused;
-    });
+    i++;
+
+setReplayIndex(i);
   }, replaySpeed);
 }
+
 function togglePauseReplay() {
   setIsPaused((prev) => !prev);
 }
 function stopReplay() {
   clearInterval(replayIntervalRef.current);
-  replayIntervalRef.current = null;
-
   setIsReplaying(false);
   setIsPaused(false);
-  setReplayIndex(0);
-  setReplayProgress(0);
 
-  if (replayData.length > 0) {
-    setGraphData(replayData[0]);
+  const current = replayData[replayIndex];
+
+if (!current) return;
+
+setGraphData(current);
+
+// pause-on-critical logic
+const node = current.nodes?.[current.nodes.length - 1];
+
+if (node?.score >= 85) {
+  setIsPaused(true);
   }
 }
   const [summary, setSummary] = useState({});
@@ -188,22 +155,13 @@ useEffect(() => {
   loadGraph();
   loadAttackTrend();
   loadIOCs();
-  loadDigitalTwin();
-  loadThreatDNA();
-  // Do not preload the entire 500-event replay.
-// Replay is loaded only when a correlation ID is selected.
-setReplayData([]);
-setReplayIndex(-1);
-setReplayProgress(0);
 
   const ws = startLiveStream();
 
   const interval = setInterval(() => {
-  loadDashboard();
-  loadSummary();
-  loadIOCs();
-  loadDigitalTwin();
-  loadThreatDNA();
+    loadDashboard();
+    loadSummary();
+    loadIOCs();
 }, 5000);
 
   return () => {
@@ -214,50 +172,9 @@ setReplayProgress(0);
     }
   };
 }, []);
-async function loadDigitalTwin() {
-  try {
-    setDigitalTwinLoading(true);
-    setDigitalTwinError(null);
-
-    const res = await axios.get(
-      `${API}/digital-twin`,
-      getAuthConfig()
-    );
-
-    console.log("DIGITAL TWIN DATA =", res.data);
-
-    if (res.data?.success) {
-      setDigitalTwin(res.data.digital_twin || {
-        summary: null,
-        risk: null,
-        assets: [],
-        relationships: [],
-        high_risk_assets: []
-      });
-    } else {
-      setDigitalTwinError(
-        res.data?.error || "DIGITAL_TWIN_ERROR"
-      );
-    }
-  } catch (error) {
-    console.error("DIGITAL TWIN LOAD ERROR =", error);
-
-    setDigitalTwinError(
-      error.response?.data?.detail ||
-      error.response?.data?.error ||
-      error.message ||
-      "DIGITAL_TWIN_ERROR"
-    );
-  } finally {
-    setDigitalTwinLoading(false);
-  }
-}
 async function loadSummary() {
   try {
-    const res = await axios.get(
-      `${API}/soc-summary`,
-      getAuthConfig()
-    );
+    const res = await axios.get(`${API}/soc-summary`);
 setSocSummary(res.data);
   } catch (err) {
     console.error("SOC SUMMARY ERROR:", err);
@@ -268,16 +185,16 @@ setSocSummary(res.data);
     try {
       const res = await axios.get(
   `${API}/customer/dashboard`,
-  getAuthConfig()
+  authConfig
 );
 
       console.log("Dashboard API Response:", res.data);
 setSummary(res.data);
 const incidents = await axios.get(
   `${API}/incidents`,
-  getAuthConfig()
+  authConfig
 );
-
+const token = localStorage.getItem("token");
 const stats = {
     Critical: 0,
     High: 0,
@@ -321,7 +238,10 @@ async function loadAttackTrend() {
     );
 
    const res = await axios.get(`${API}/customer/attack-trend`, {
-  headers: getAuthConfig().headers
+  params: {
+    tenant_id: tenantId
+  },
+  headers: authConfig.headers
 });
 
     console.log("TREND DATA =", res.data);
@@ -352,193 +272,6 @@ async function loadIOCs() {
 
   } catch (err) {
     console.error("IOC LOAD ERROR:", err);
-  }
-}
-async function loadThreatDNA() {
-  try {
-    const res = await axios.get(
-  `${API}/threat-dna`,
-  getAuthConfig()
-);
-
-    setThreatDNA(res.data?.fingerprints || []);
-
-  } catch (err) {
-    console.error("THREAT DNA LOAD ERROR:", err);
-  }
-}
-async function loadReplay(correlationId = null) {
-  try {
-    const url = correlationId
-      ? `${API}/attack-replay?correlation_id=${encodeURIComponent(correlationId)}`
-      : `${API}/attack-replay`;
-
-    const res = await axios.get(
-      url,
-      getAuthConfig()
-    );
-
-    console.log("REPLAY API RESPONSE =", res.data);
-
-    const events = Array.isArray(res.data)
-      ? res.data
-      : (res.data?.events || []);
-
-    const detectedCorrelationId =
-      correlationId ||
-      res.data?.correlation_id ||
-      events.find(
-        (event) => event?.correlation_id
-      )?.correlation_id ||
-      null;
-
-    console.log(
-      "DETECTED REPLAY CORRELATION ID =",
-      detectedCorrelationId
-    );
-
-    const frames = [];
-
-const replayEvents = correlationId
-  ? events.filter(
-      (event) =>
-        event?.correlation_id === correlationId
-    )
-  : events;
-
-console.log(
-  "REPLAY EVENTS AFTER CORRELATION FILTER =",
-  replayEvents.length
-);
-
-const cumulativeNodes = [];
-const cumulativeLinks = [];
-
-replayEvents.forEach((event, index) => {
-  const eventCorrelationId =
-    event?.correlation_id ||
-    detectedCorrelationId ||
-    "";
-
-  const eventNodeId = `replay-${index}`;
-
-  const node = {
-    id: eventNodeId,
-
-    category:
-      event?.category || "Unknown",
-
-    score:
-      Number(event?.score ?? 0),
-
-    stage:
-      event?.stage || "",
-
-    mitre:
-      event?.mitre || "",
-
-    correlation_id:
-      eventCorrelationId,
-
-    source_ip:
-      event?.source ||
-      event?.source_ip ||
-      "",
-
-    hostname:
-      event?.hostname ||
-      "",
-
-    target:
-      event?.target ||
-      "",
-
-    event_type:
-      event?.event_type ||
-      "THREAT",
-
-    time:
-      event?.time || ""
-  };
-
-  cumulativeNodes.push(node);
-
-  /*
-   * Connect this event to the previous replay event.
-   * Both nodes already exist in cumulativeNodes.
-   */
-  if (index > 0) {
-    cumulativeLinks.push({
-      source: `replay-${index - 1}`,
-      target: eventNodeId,
-      relationship: "REPLAY_SEQUENCE"
-    });
-  }
-
-  const frame = {
-    nodes: [...cumulativeNodes],
-    links: [...cumulativeLinks],
-
-    correlation_id:
-      detectedCorrelationId,
-
-    event: node
-  };
-
-  frames.push(frame);
-});
-
-console.log(
-  "REPLAY FRAMES =",
-  frames
-);
-
-console.log(
-  "FIRST REPLAY NODE =",
-  frames[0]?.nodes?.[0]
-);
-
-console.log(
-  "FIRST REPLAY CORRELATION ID =",
-  frames[0]?.nodes?.[0]?.correlation_id
-);
-
-console.log(
-  "FINAL REPLAY GRAPH =",
-  frames[frames.length - 1]
-);
-
-    setReplayData(frames);
-    setReplayIndex(0);
-    setReplayProgress(0);
-
-    if (frames.length > 0) {
-      setGraphData(frames[0]);
-    } else {
-      setGraphData({
-        nodes: [],
-        links: []
-      });
-    }
-
-    return frames;
-
-  } catch (error) {
-    console.error(
-      "LOAD REPLAY ERROR =",
-      error
-    );
-
-    setReplayData([]);
-    setReplayIndex(0);
-    setReplayProgress(0);
-
-    setGraphData({
-      nodes: [],
-      links: []
-    });
-
-    return [];
   }
 }
 async function generateIncidentSummary() {
@@ -578,11 +311,7 @@ const payload = {
       }))
     };
 
-    const res = await axios.post(
-  `${API}/soc-ai`,
-  payload,
-  getAuthConfig()
-);
+    const res = await axios.post(`${API}/soc-ai`, payload);
 console.log(res.data);
 
 console.log("SOC AI RESPONSE =", res.data);
@@ -613,7 +342,7 @@ async function loadGraph() {
   try {
     const res = await axios.get(
   `${API}/incidents`,
- getAuthConfig()
+  authConfig
 );
 
     const incidents = res.data || [];
@@ -623,21 +352,14 @@ console.log("INCIDENTS:", incidents);
   id: `incident-${item.id}`,
   category: item.category || "Unknown",
   score: Number(item.risk_score ?? 50),
-
   stage: getAttackStage({
     category: item.category,
     score: Number(item.risk_score ?? 50)
   }),
-
   mitre: getMitreTechnique({
     category: item.category,
     score: Number(item.risk_score ?? 50)
-  }),
-
-  correlation_id: item.correlation_id || "",
-  source_ip: item.source_ip || "",
-  target: item.target || "",
-  hostname: item.hostname || ""
+  })
 }));
 if (nodes.length > 0 && !rootNode) {
   setRootNode(nodes[0]); // first infected = root cause
@@ -702,7 +424,7 @@ function getAttackStage(node) {
 }
 function startLiveStream() {
 const WS_URL =
-  import.meta.env.VITE_WS_URL || "ws://127.0.0.1:8000/ws/soc";
+  `${import.meta.env.VITE_WS_BASE || "ws://127.0.0.1:8000"}/ws/soc`;
   const ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
@@ -771,22 +493,7 @@ const WS_URL =
 }
 
 break;
-        case "executive_dashboard":
 
-    console.log("Executive dashboard event received");
-
-    // This event is broadcast globally by the SOC engine.
-    // Customer Dashboard does not need to process it.
-    break;
-        case "threat_intelligence":
-
-    console.log("Threat intelligence event received");
-
-    // Global SOC intelligence event.
-    // Customer Dashboard does not need to process it directly.
-    break;
-
-        
         case "dashboard_update":
 
     loadDashboard();
@@ -811,7 +518,7 @@ break;
 
     break;
 
-                case "response_timeline":
+        case "response_timeline":
         case "auto_response_event":
 
             setResponseTimeline(prev => [
@@ -820,26 +527,6 @@ break;
                     level: msg.data?.level || "UNKNOWN",
                     actions: msg.data?.actions || [],
                     escalation: msg.data?.escalation || false
-                },
-                ...prev
-            ].slice(0,20));
-
-            break;
-
-
-        case "ai_decision_event":
-
-            console.log("AI decision event received", msg);
-
-            setResponseTimeline(prev => [
-                {
-                    time: msg.timestamp || new Date().toLocaleTimeString(),
-                    level: msg.data?.decision?.recommended_action?.level || "AI",
-                    actions:
-                        msg.data?.decision?.recommended_action?.actions || [],
-                    escalation:
-                        msg.data?.decision?.recommended_action?.escalation || false,
-                    source: "SOC AI"
                 },
                 ...prev
             ].slice(0,20));
@@ -863,169 +550,57 @@ break;
 
             break;
 
-                case "attack_graph_live":
+        case "attack_graph_live":
 
-          setGraphData(prev => {
+setGraphData(prev => {
 
-            const incomingNode = msg.node;
+    const nodes = [
+        ...prev.nodes.filter(
+            n => n.id !== msg.node?.id
+        ),
+        msg.node
+    ].filter(Boolean);
 
-            if (!incomingNode?.id) {
-              return prev;
-            }
 
-            const existingNode = prev.nodes.find(
-              n => n.id === incomingNode.id
-            );
+    const links = (msg.links || []).filter(link => {
 
-            const liveNode = {
-              ...(existingNode || {}),
-              ...incomingNode,
+        if (!link) return false;
 
-              correlation_id:
-                incomingNode.correlation_id ||
-                existingNode?.correlation_id ||
-                msg.correlation_id ||
-                "",
 
-              source_ip:
-                incomingNode.source_ip ||
-                existingNode?.source_ip ||
-                "",
+        const source =
+            typeof link.source === "object"
+            ? link.source?.id
+            : link.source;
 
-              target:
-                incomingNode.target ||
-                existingNode?.target ||
-                "",
 
-              hostname:
-                incomingNode.hostname ||
-                existingNode?.hostname ||
-                ""
-            };
+        const target =
+            typeof link.target === "object"
+            ? link.target?.id
+            : link.target;
 
-            /*
-             * Keep every existing node and add/update
-             * the new live attack node.
-             */
-            const nodes = [
-              ...prev.nodes.filter(
-                n => n.id !== liveNode.id
-              ),
-              liveNode
-            ];
 
-            /*
-             * Keep existing edges.
-             */
-            const existingLinks = [...(prev.links || [])];
+        if (!source || !target) {
+            return false;
+        }
 
-            /*
-             * Add incoming links from backend.
-             */
-            const incomingLinks = (msg.links || [])
-              .filter(Boolean)
-              .map(link => {
 
-                const source =
-                  typeof link.source === "object"
-                    ? link.source?.id
-                    : link.source;
+        return (
+            nodes.some(n => n.id === source) &&
+            nodes.some(n => n.id === target)
+        );
 
-                const target =
-                  typeof link.target === "object"
-                    ? link.target?.id
-                    : link.target;
+    });
 
-                if (!source || !target) {
-                  return null;
-                }
 
-                return {
-                  ...link,
-                  source,
-                  target
-                };
-              })
-              .filter(Boolean);
+    return {
+        nodes,
+        links
+    };
 
-            /*
-             * Automatically connect the previous live node
-             * to the new node when the backend provides no edge.
-             */
-            let autoLink = null;
+});
 
-            if (
-              incomingLinks.length === 0 &&
-              prev.nodes.length > 0
-            ) {
 
-              const previousNode =
-                [...prev.nodes]
-                  .filter(n => n.id !== liveNode.id)
-                  .pop();
-
-              if (previousNode?.id) {
-                autoLink = {
-                  source: previousNode.id,
-                  target: liveNode.id,
-                  type: "attack_chain",
-                  live: true
-                };
-              }
-            }
-
-            const allLinks = [
-              ...existingLinks,
-              ...incomingLinks,
-              ...(autoLink ? [autoLink] : [])
-            ];
-
-            /*
-             * Remove duplicate edges.
-             */
-            const uniqueLinks = Array.from(
-              new Map(
-                allLinks
-                  .filter(link => link.source && link.target)
-                  .map(link => [
-                    `${link.source}->${link.target}`,
-                    link
-                  ])
-              ).values()
-            );
-
-            /*
-             * IMPORTANT:
-             * Only keep links whose source and target
-             * actually exist in the graph.
-             */
-            const nodeIds = new Set(
-              nodes.map(n => n.id)
-            );
-
-            const validLinks = uniqueLinks.filter(
-              link =>
-                nodeIds.has(link.source) &&
-                nodeIds.has(link.target)
-            );
-
-            console.log(
-              "LIVE ATTACK GRAPH:",
-              {
-                node: liveNode,
-                nodes,
-                links: validLinks
-              }
-            );
-
-            return {
-              ...prev,
-              nodes,
-              links: validLinks
-            };
-          });
-
-          break;
+break;
 
         default:
             console.log("Unknown websocket event",msg);
@@ -1070,7 +645,7 @@ break;
           textShadow: "0 0 15px rgba(0,255,255,0.5)"
         }}
       >
-        &#128737; Customer Security Dashboard
+        🛡 Customer Security Dashboard
       </h1>
 {alerts.length > 0 && (
   <div
@@ -1085,7 +660,7 @@ break;
     }}
   >
     <h3 style={{ color: "#ef4444", marginBottom: 10 }}>
-      [INCIDENT] LIVE ALERTS
+      🚨 LIVE ALERTS
     </h3>
 
     {alerts.map((a) => (
@@ -1134,7 +709,7 @@ break;
   }}
 >
   <h2 style={{ color: "#fff" }}>
-    &#128200; Live Attack Trend
+    📈 Live Attack Trend
   </h2>
 
   <div
@@ -1253,7 +828,7 @@ break;
     </div>
   </div>
 </div>
-        <h2 style={{ color: "#fff" }}>&#128737; Security Status</h2>
+        <h2 style={{ color: "#fff" }}>🛡 Security Status</h2>
 <div
   style={{
     marginBottom: 20,
@@ -1345,7 +920,7 @@ break;
 
     {aiSummary.soc_brain.recommended_action.actions.map(
       (action, i) => (
-        <div key={i}>&#9989; {action}</div>
+        <div key={i}>✅ {action}</div>
       )
     )}
   </>
@@ -1353,7 +928,7 @@ break;
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h3 style={{ color: "#00ffc8" }}>
-  [ALERT] Threat Heat Map
+  🔥 Threat Heat Map
 </h3>
 
 <div
@@ -1443,7 +1018,7 @@ break;
 <div style={{ marginBottom: 10 }}>
   <button
     onClick={startReplay}
-    disabled={isReplaying || replayData.length === 0}
+    disabled={isReplaying || timelineData.length === 0}
     style={{
       padding: "8px 14px",
       background: "#00ffc8",
@@ -1453,7 +1028,7 @@ break;
       fontWeight: "bold"
     }}
   >
-    [PLAY] Replay Attack Timeline
+    ▶ Replay Attack Timeline
   </button>
 </div>
 
@@ -1497,7 +1072,7 @@ break;
     }}
   />
 
-{/* [ALERT] ADD STREAM OUTPUT RIGHT HERE */}
+{/* 🔥 ADD STREAM OUTPUT RIGHT HERE */}
 <div style={{
   marginTop: 10,
   padding: 10,
@@ -1531,21 +1106,15 @@ onClick={async () => {
             }
         ]);
 
-        const token = localStorage.getItem("token");
-
         const res = await fetch(`${API}/soc-ai-stream`, {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-    },
-    body: JSON.stringify({
-    text: userInput,
-    username: "testuser2",
-    hostname: "TEST-WORKSTATION-01",
-    source_ip: "10.10.20.15"
-})
-});
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                text: userInput
+            })
+        });
 
         const response = await res.json();
 
@@ -1625,7 +1194,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    [AI] Autonomous Response Timeline
+    🤖 Autonomous Response Timeline
   </h2>
 
   {responseTimeline.length === 0 ? (
@@ -1657,7 +1226,7 @@ onClick={async () => {
 
     <div style={{ marginTop: 8 }}>
       {item.actions?.map((action, i) => (
-        <div key={i}>&#9989; {action}</div>
+        <div key={i}>✅ {action}</div>
       ))}
     </div>
 
@@ -1669,7 +1238,7 @@ onClick={async () => {
           fontWeight: "bold"
         }}
       >
-        [INCIDENT] Escalated to SOC
+        🚨 Escalated to SOC
       </div>
     )}
   </div>
@@ -1686,7 +1255,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    [INCIDENT] Live Incident Queue
+    🚨 Live Incident Queue
   </h2>
 
   <table
@@ -1753,11 +1322,11 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    &#127758; Global Attack Map
+    🌍 Global Attack Map
   </h2>
 
   <AttackMap nodes={graphData.nodes} />
-</div>{/* THREAT INTELLIGENCE / IOC SECTION */}
+</div>
 <div
   style={{
     background: "rgba(17,24,39,.75)",
@@ -1768,7 +1337,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    &#129525; Threat Intelligence (IOCs)
+    🧬 Threat Intelligence (IOCs)
   </h2>
 
   <table
@@ -1802,177 +1371,7 @@ onClick={async () => {
   </table>
 </div>
 
-{/* THREAT DNA SECTION */}
-<div
-  style={{
-    marginTop: 25,
-    marginBottom: 25,
-    padding: 20,
-    background: "#0f172a",
-    border: "1px solid #1e293b",
-    borderRadius: 12
-  }}
->
-  <h2 style={{ color: "#00ffc8", marginBottom: 15 }}>
-    &#129525; Threat DNA
-  </h2>
-
-  {threatDNA.length === 0 ? (
-    <p style={{ color: "#94a3b8" }}>
-      No Threat DNA fingerprints detected yet.
-    </p>
-  ) : (
-    threatDNA.map((dna) => {
-      const latestEvent =
-  dna.events?.[dna.events.length - 1] || dna;
-
-      return (
-        <div
-          key={dna.fingerprint}
-          style={{
-            marginBottom: 15,
-            padding: 16,
-            background: "#020617",
-            border: "1px solid #334155",
-            borderRadius: 10
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 12
-            }}
-          >
-            <h3 style={{ color: "#38bdf8", margin: 0 }}>
-              &#129525; {dna.fingerprint}
-            </h3>
-
-            <span
-              style={{
-                padding: "5px 10px",
-                borderRadius: 6,
-                background:
-                  dna.risk_band === "HIGH"
-                    ? "#7f1d1d"
-                    : dna.risk_band === "MEDIUM"
-                    ? "#854d0e"
-                    : "#14532d",
-                color: "#fff",
-                fontWeight: "bold",
-                fontSize: 12
-              }}
-            >
-              {dna.risk_band || "UNKNOWN"}
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 10,
-              color: "#cbd5e1"
-            }}
-          >
-            <div>
-              <b>Category:</b>
-              <br />
-              {dna.category || "-"}
-            </div>
-
-            <div>
-              <b>MITRE:</b>
-              <br />
-              {dna.mitre || "-"}
-            </div>
-
-            <div>
-              <b>Occurrences:</b>
-              <br />
-              {dna.occurrences ?? 0}
-            </div>
-
-            <div>
-              <b>First Seen:</b>
-              <br />
-              {dna.first_seen || "-"}
-            </div>
-
-            <div>
-              <b>Last Seen:</b>
-              <br />
-              {dna.last_seen || "-"}
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: 15,
-              padding: 12,
-              background: "#0f172a",
-              borderRadius: 8
-            }}
-          >
-            <b style={{ color: "#00ffc8" }}>
-              Behavioral Signature
-            </b>
-
-            <pre
-              style={{
-                marginTop: 8,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                color: "#94a3b8",
-                fontSize: 12
-              }}
-            >
-              {latestEvent.behavior_signature ??
-                latestEvent.behavioral_signature ??
-                latestEvent.signature ??
-                "No behavioral signature available"}
-            </pre>
-          </div>
-
-          <div
-            style={{
-              marginTop: 12,
-              padding: 12,
-              background: "#0f172a",
-              borderRadius: 8
-            }}
-          >
-            <b style={{ color: "#00ffc8" }}>
-              IOC Profile
-            </b>
-
-            <pre
-              style={{
-                marginTop: 8,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                color: "#94a3b8",
-                fontSize: 12
-              }}
-            >
-              {JSON.stringify(
-                latestEvent.iocs ??
-                  latestEvent.ioc_profile ??
-                  {},
-                null,
-                2
-              )}
-            </pre>
-          </div>
-        </div>
-      );
-    })
-  )}
-</div>
-
-{/* GRAPH SECTION */}
+      {/* GRAPH SECTION */}
       <div
         style={{
           background: "rgba(17,24,39,0.75)",
@@ -1982,10 +1381,10 @@ onClick={async () => {
         }}
       >
 <div style={{ marginBottom: 10, color: "#9ca3af" }}>
-  &#129525; Kill Chain Tracking Enabled
+  🧬 Kill Chain Tracking Enabled
 </div>
         <h2 style={{ color: "#fff", marginBottom: 10 }}>
-          &#127758; Live Attack Graph
+          🌐 Live Attack Graph
         </h2>
 <div
   style={{
@@ -2036,7 +1435,7 @@ onClick={async () => {
       fontWeight: "bold"
     }}
   >
-    [SEARCH] Locate
+    🔍 Locate
   </button>
 </div>
 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
@@ -2065,85 +1464,27 @@ onClick={async () => {
 </div>
 
   <button
-    onClick={async () => {
-  const correlationId =
-    selectedNode?.correlation_id ||
-    selectedNode?.correlationId ||
-    replayData?.find(
-      frame => frame?.correlation_id
-    )?.correlation_id ||
-    replayData?.find(
-      frame => frame?.nodes?.[0]?.correlation_id
-    )?.nodes?.[0]?.correlation_id ||
-    "";
+    onClick={() => {
+      setIsReplaying(true);
+setReplayIndex(0);
+setReplayProgress(0);
 
-  console.log(
-    "START REPLAY - SELECTED NODE =",
-    selectedNode
-  );
+      if (playbackTimer.current)
+        clearInterval(playbackTimer.current);
 
-  console.log(
-    "START REPLAY - CORRELATION ID =",
-    correlationId
-  );
+      setPlaybackIndex(0);
 
-  if (!correlationId) {
-    console.warn(
-      "NO CORRELATION ID FOR SELECTED NODE:",
-      selectedNode
-    );
-    return;
-  }
-
-  if (playbackTimer.current) {
-    clearInterval(playbackTimer.current);
-    playbackTimer.current = null;
-  }
-
-  const frames = await loadReplay(correlationId);
-
-  if (!frames || frames.length === 0) {
-    console.warn(
-      "NO REPLAY EVENTS FOR:",
-      correlationId
-    );
-    setIsReplaying(false);
-    return;
-  }
-
-  setReplayIndex(0);
-
-  setReplayProgress(
-    frames.length === 1
-      ? 100
-      : (1 / frames.length) * 100
-  );
-
-  setGraphData(frames[0]);
-  setIsReplaying(true);
-
-  let index = 0;
-
-  playbackTimer.current = setInterval(() => {
-    index += 1;
-
-    if (index >= frames.length) {
-      clearInterval(playbackTimer.current);
-      playbackTimer.current = null;
-      setIsReplaying(false);
-      return;
-    }
-
-    setReplayIndex(index);
-
-    setReplayProgress(
-      ((index + 1) / frames.length) * 100
-    );
-
-    setGraphData(frames[index]);
-
-  }, 700);
-}}
+      playbackTimer.current = setInterval(() => {
+        setPlaybackIndex(prev => {
+          if (prev >= replayData[replayIndex]?.nodes.length - 1) {
+            clearInterval(playbackTimer.current);
+            setIsReplaying(false);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 700);
+    }}
     style={{
       padding: "10px 16px",
       background: "#22c55e",
@@ -2153,7 +1494,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    [PLAY] Start Replay
+    ▶ Start Replay
   </button>
 
   <button
@@ -2167,7 +1508,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    &#9208; Pause
+    ⏸ Pause
   </button>
 
   <button
@@ -2185,7 +1526,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    &#9209; Stop
+    ⏹ Stop
   </button>
 
 </div>
@@ -2204,7 +1545,7 @@ onClick={async () => {
     <h4 style={{ color: "#00ffc8" }}>🧠 AI Incident Summary</h4>
 {aiSummary?.campaign && (
   <div className="ai-card">
-    <h3>[TARGET] Attack Campaign Intelligence</h3>
+    <h3>🎯 Attack Campaign Intelligence</h3>
 
     <p>
       <b>Campaign:</b> {aiSummary.campaign}
@@ -2222,7 +1563,7 @@ onClick={async () => {
 <SOCAssistant />
 {aiSummary?.attack_story && (
   <div className="ai-card">
-    <h3>&#128214; Attack Narrative</h3>
+    <h3>📖 Attack Narrative</h3>
     <p>{aiSummary.attack_story}</p>
   </div>
 )}
@@ -2253,7 +1594,7 @@ onClick={async () => {
 
     <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
-    <h4 style={{ color: "#22c55e" }}>&#127758; Root Cause Analysis</h4>
+    <h4 style={{ color: "#22c55e" }}>🌱 Root Cause Analysis</h4>
 
     <p><b>Patient Zero:</b> {aiSummary.root_cause?.id}</p>
 
@@ -2267,7 +1608,7 @@ onClick={async () => {
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h4 style={{ color: "#60a5fa" }}>
-  &#128214; AI Attack Narrative
+  📖 AI Attack Narrative
 </h4>
 
 <div
@@ -2285,7 +1626,7 @@ onClick={async () => {
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h4 style={{ color: "#facc15" }}>
-  [SHIELD] MITRE ATT&CK Timeline
+  🛡 MITRE ATT&CK Timeline
 </h4>
 
 <div
@@ -2321,7 +1662,7 @@ onClick={async () => {
   ))}
 </div>
 <h4 style={{ color: "#38bdf8", marginTop: 20 }}>
-    [SHIELD] MITRE ATT&CK Timeline
+    🛡 MITRE ATT&CK Timeline
 </h4>
 
 <div
@@ -2384,7 +1725,7 @@ onClick={async () => {
     <hr style={{ margin: "20px 0", borderColor: "#334155" }} />
 
     <h4 style={{ color: "#38bdf8" }}>
-      [TARGET] Attack Campaign
+      🎯 Attack Campaign
     </h4>
 
     <div
@@ -2456,7 +1797,7 @@ onClick={async () => {
   }}
 >
   <h3 style={{color:"#00ffff"}}>
-    [PLAY] Replay Event {playbackIndex + 1}
+    ▶ Replay Event {playbackIndex + 1}
   </h3>
 
   <p>
@@ -2567,7 +1908,7 @@ MITRE: ${node.mitre || "Unknown"}`
   return Math.max(4, (node.score || 10) / 5);
 }}
 
-  // [ALERT] NEW: professional glow + labels
+  // 🔥 NEW: professional glow + labels
   nodeCanvasObject={(node, ctx, globalScale) => {
     const size = Math.max(4, (node.score || 10) / 4);
 
@@ -2634,27 +1975,16 @@ MITRE: ${node.mitre || "Unknown"}`
     setHighlightLinks(links);
 
     setSelectedNode({
-  ...node,
+      ...node,
+      attackPath: graphData.links.filter((l) => {
+        const source =
+          typeof l.source === "object" ? l.source.id : l.source;
+        const target =
+          typeof l.target === "object" ? l.target.id : l.target;
 
-  correlation_id:
-    node.correlation_id ||
-    node.correlationId ||
-    node.campaign_id ||
-    (isReplaying
-      ? replayData[replayIndex]?.correlation_id
-      : "") ||
-    "",
-
-  attackPath: graphData.links.filter((l) => {
-    const source =
-      typeof l.source === "object" ? l.source.id : l.source;
-
-    const target =
-      typeof l.target === "object" ? l.target.id : l.target;
-
-    return source === node.id || target === node.id;
-  })
-});
+        return source === node.id || target === node.id;
+      })
+    });
 
     graphRef.current?.centerAt(node.x, node.y, 800);
     graphRef.current?.zoom(4, 800);
@@ -2675,11 +2005,11 @@ MITRE: ${node.mitre || "Unknown"}`
           >
             <h3 style={{ color: "#00ffc8" }}>Selected Asset</h3>
 
-<p><b>ID:</b> {selectedNode.id}</p>
-<p><b>Type:</b> {selectedNode.category}</p>
-<p><b>Risk:</b> {selectedNode.score}</p>
-<p><b>Attack Stage:</b> {selectedNode.stage}</p>
-<p><b>MITRE Technique:</b> {selectedNode.mitre}</p>
+            <p><b>ID:</b> {selectedNode.id}</p>
+            <p><b>Type:</b> {selectedNode.category}</p>
+            <p><b>Risk:</b> {selectedNode.score}</p>
+            <p><b>Attack Stage:</b> {selectedNode.stage}</p>
+            <p><b>MITRE Technique:</b> {selectedNode.mitre}</p>
 
             {selectedNode.attackPath?.length > 0 && (
               <div style={{ marginTop: 10, color: "#9ca3af" }}>
@@ -2688,7 +2018,7 @@ MITRE: ${node.mitre || "Unknown"}`
                 {selectedNode.attackPath.map((a, i) => (
   <div key={i}>
     {typeof a.source === "object" ? a.source.id : a.source}
-    {" &#8594; "}
+    {" → "}
     {typeof a.target === "object" ? a.target.id : a.target}
   </div>
 ))}
@@ -2697,343 +2027,6 @@ MITRE: ${node.mitre || "Unknown"}`
           </div>
         )}
       </div>   
-      {/* DIGITAL TWIN PANEL */}
-  <div
-    style={{
-      marginTop: 25,
-      marginBottom: 25,
-      padding: 20,
-      background: "#0f172a",
-      border: "1px solid #1e293b",
-      borderRadius: 12
-    }}
-  >
-    <h2 style={{ color: "#00ffc8", marginBottom: 15 }}>
-      🧬 Digital Twin
-    </h2>
-
-    {digitalTwinLoading ? (
-      <p style={{ color: "#94a3b8" }}>
-        Loading enterprise digital twin...
-      </p>
-    ) : digitalTwinError ? (
-      <p style={{ color: "#f87171" }}>
-        Digital Twin error: {digitalTwinError}
-      </p>
-    ) : (
-      <>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: 12,
-            marginBottom: 20
-          }}
-        >
-          <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-            <div style={{ color: "#94a3b8", fontSize: 13 }}>
-              Assets
-            </div>
-            <div style={{ color: "#fff", fontSize: 28, fontWeight: "bold" }}>
-              {digitalTwin.summary?.assets ?? 0}
-            </div>
-          </div>
-
-          <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-            <div style={{ color: "#94a3b8", fontSize: 13 }}>
-              Relationships
-            </div>
-            <div style={{ color: "#fff", fontSize: 28, fontWeight: "bold" }}>
-              {digitalTwin.summary?.relationships ?? 0}
-            </div>
-          </div>
-
-          <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-            <div style={{ color: "#94a3b8", fontSize: 13 }}>
-              Average Risk
-            </div>
-            <div style={{ color: "#facc15", fontSize: 28, fontWeight: "bold" }}>
-              {digitalTwin.summary?.average_risk ?? 0}
-            </div>
-          </div>
-
-          <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-            <div style={{ color: "#94a3b8", fontSize: 13 }}>
-              Maximum Risk
-            </div>
-            <div style={{ color: "#f87171", fontSize: 28, fontWeight: "bold" }}>
-              {digitalTwin.summary?.maximum_risk ?? 0}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 20
-          }}
-        >
-          <div
-            style={{
-              padding: 18,
-              background: "#111827",
-              borderRadius: 10
-            }}
-          >
-            <h3 style={{ color: "#fff", marginTop: 0 }}>
-              Asset Types
-            </h3>
-
-            {Object.entries(
-              digitalTwin.summary?.asset_types || {}
-            ).map(([type, count]) => (
-              <div
-                key={type}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "7px 0",
-                  borderBottom: "1px solid #1e293b"
-                }}
-              >
-                <span style={{ color: "#cbd5e1" }}>
-                  {type}
-                </span>
-
-                <span style={{ color: "#00ffc8", fontWeight: "bold" }}>
-                  {count}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div
-            style={{
-              padding: 18,
-              background: "#111827",
-              borderRadius: 10
-            }}
-          >
-            <h3 style={{ color: "#fff", marginTop: 0 }}>
-              Risk Overview
-            </h3>
-
-            <div style={{ color: "#f87171", marginBottom: 8 }}>
-              Critical: {digitalTwin.risk?.critical_assets ?? 0}
-            </div>
-
-            <div style={{ color: "#fb923c", marginBottom: 8 }}>
-              High Risk: {digitalTwin.risk?.high_risk_assets ?? 0}
-            </div>
-
-            <div style={{ color: "#facc15", marginBottom: 8 }}>
-              Medium Risk: {digitalTwin.risk?.medium_risk_assets ?? 0}
-            </div>
-
-            <div style={{ color: "#94a3b8" }}>
-              Total Assets: {digitalTwin.risk?.total_assets ?? 0}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            marginTop: 20,
-            padding: 18,
-            background: "#111827",
-            borderRadius: 10
-          }}
-        >
-          <h3 style={{ color: "#fff", marginTop: 0 }}>
-            High-Risk Assets
-          </h3>
-
-          {digitalTwin.high_risk_assets?.length > 0 ? (
-            digitalTwin.high_risk_assets.map((asset, index) => (
-              <div
-                key={asset.id || asset.asset_id || index}
-                style={{
-                  padding: 12,
-                  marginBottom: 8,
-                  background: "#1f2937",
-                  borderLeft: "3px solid #ef4444",
-                  borderRadius: 6
-                }}
-              >
-                <div style={{ color: "#fff", fontWeight: "bold" }}>
-                  {asset.name || asset.id || asset.asset_id || "Unknown Asset"}
-                </div>
-
-                <div style={{ color: "#f87171", marginTop: 4 }}>
-                  Risk: {asset.risk_score ?? asset.risk ?? 0}
-                </div>
-
-                <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 3 }}>
-                  Type: {asset.asset_type || asset.type || "Unknown"}
-                </div>
-              </div>
-            ))
-          ) : (
-            <p style={{ color: "#94a3b8", marginBottom: 0 }}>
-              No high-risk assets detected.
-            </p>
-          )}
-        </div>
-      </>
-    )}
     </div>
-
-  {/* DIGITAL TWIN ↔ ATTACK GRAPH CORRELATION */}
-  <div
-    style={{
-      marginTop: 25,
-      marginBottom: 25,
-      padding: 20,
-      background: "#0f172a",
-      border: "1px solid #1e293b",
-      borderRadius: 12
-    }}
-  >
-    <h2 style={{ color: "#00ffc8", marginTop: 0 }}>
-      🧬 Digital Twin ↔ Live Attack Graph
-    </h2>
-
-    <p style={{ color: "#94a3b8", marginTop: 0 }}>
-      Correlation between enterprise assets, incidents and live attack paths.
-    </p>
-
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-        gap: 12
-      }}
-    >
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>Twin Assets</div>
-        <div style={{ color: "#fff", fontSize: 28, fontWeight: "bold" }}>
-          {digitalTwin.summary?.assets ?? 0}
-        </div>
-      </div>
-
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>
-          Twin Relationships
-        </div>
-        <div style={{ color: "#fff", fontSize: 28, fontWeight: "bold" }}>
-          {digitalTwin.summary?.relationships ?? 0}
-        </div>
-      </div>
-
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>
-          Attack Graph Nodes
-        </div>
-        <div style={{ color: "#60a5fa", fontSize: 28, fontWeight: "bold" }}>
-          {graphData?.nodes?.length ?? 0}
-        </div>
-      </div>
-
-      <div style={{ padding: 15, background: "#111827", borderRadius: 10 }}>
-        <div style={{ color: "#94a3b8", fontSize: 13 }}>
-          Attack Graph Connections
-        </div>
-        <div style={{ color: "#facc15", fontSize: 28, fontWeight: "bold" }}>
-          {graphData?.links?.length ?? 0}
-        </div>
-      </div>
-    </div>
-
-    <div
-      style={{
-        marginTop: 18,
-        padding: 15,
-        background: "#111827",
-        borderRadius: 10,
-        border: "1px solid #1e293b"
-      }}
-    >
-      <h3 style={{ color: "#fff", marginTop: 0 }}>
-        🔗 Correlation Status
-      </h3>
-
-      <div style={{ color: "#22c55e", fontWeight: "bold" }}>
-        ● DIGITAL TWIN LINKED TO ATTACK GRAPH
-      </div>
-
-      <div style={{ color: "#94a3b8", marginTop: 8 }}>
-        Live attack nodes are correlated with the enterprise Digital Twin
-        asset model.
-      </div>
-    </div>
-
-    <div style={{ marginTop: 18 }}>
-      <h3 style={{ color: "#fff" }}>
-        🧠 Active Twin Relationships
-      </h3>
-
-      {digitalTwin.relationships?.length > 0 ? (
-        digitalTwin.relationships.slice(0, 20).map((rel, index) => (
-          <div
-            key={index}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "9px 12px",
-              marginBottom: 6,
-              background: "#111827",
-              borderRadius: 6,
-              borderLeft: "2px solid #00ffc8"
-            }}
-          >
-            <span style={{ color: "#60a5fa" }}>
-              {rel.source || rel.from || rel.source_id || "Unknown"}
-            </span>
-
-            <span style={{ color: "#64748b" }}>→</span>
-
-            <span style={{ color: "#f87171" }}>
-              {rel.target || rel.to || rel.target_id || "Unknown"}
-            </span>
-
-            {rel.relationship && (
-              <span
-                style={{
-                  marginLeft: "auto",
-                  color: "#94a3b8",
-                  fontSize: 12
-                }}
-              >
-                {rel.relationship}
-              </span>
-            )}
-          </div>
-        ))
-      ) : (
-        <p style={{ color: "#94a3b8" }}>
-          No Digital Twin relationships available.
-        </p>
-      )}
-    </div>
-  </div>
-
-  </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
