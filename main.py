@@ -4431,20 +4431,28 @@ async def soc_ai_stream(
 
     result = await analyze(request, user)
 
-    print("SOC-AI-STREAM ANALYZE RESULT =", result)
+    # Always establish ai before any later processing.
+    if not isinstance(result, dict):
+        return {
+            "success": False,
+            "error": "INVALID_ANALYZE_RESPONSE",
+            "details": str(result)
+        }
 
     if not result.get("success", True):
         return result
 
-    if "data" not in result:
-        print("SOC-AI-STREAM ERROR: analyze() returned no data")
+    ai = result.get("data")
+
+    if not isinstance(ai, dict):
+        print("SOC-AI-STREAM ERROR: analyze() returned no valid data")
         return {
             "success": False,
-            "error": "ANALYZE_RETURNED_NO_DATA",
+            "error": "ANALYZE_RETURNED_NO_VALID_DATA",
             "details": result
         }
 
-    ai = result["data"]
+    print("SOC-AI DATA INITIALIZED =", ai)
 
     # ==========================================
     # DIGITAL TWIN INGESTION
@@ -7939,6 +7947,7 @@ def digital_twin_risk(
             "error": "DIGITAL_TWIN_RISK_ERROR",
             "details": str(e)
         }
+
 
 
 
