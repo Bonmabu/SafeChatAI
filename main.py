@@ -4439,12 +4439,12 @@ async def soc_ai_stream(
     if "data" not in result:
         print("SOC-AI-STREAM ERROR: analyze() returned no data")
         return {
-        "success": False,
-        "error": "ANALYZE_RETURNED_NO_DATA",
-        "details": result
-    }
+            "success": False,
+            "error": "ANALYZE_RETURNED_NO_DATA",
+            "details": result
+        }
 
-        ai = result["data"]
+    ai = result["data"]
 
     # ==========================================
     # DIGITAL TWIN INGESTION
@@ -4507,7 +4507,7 @@ async def soc_ai_stream(
     if ai["category"] == "Safe":
 
         reply = f"""
-âœ… Threat Assessment Complete
+\u2705 Threat Assessment Complete
 
 I analyzed your message and found no indicators of phishing, malware, credential theft, fraud, or social engineering.
 
@@ -4521,10 +4521,10 @@ Risk Level:
 {risk}
 
 Reasoning:
-â€¢ No suspicious keywords detected.
-â€¢ No malicious IOC indicators were extracted.
-â€¢ No known attack patterns matched.
-â€¢ No MITRE ATT&CK technique was triggered.
+\u2022 No suspicious keywords detected.
+\u2022 No malicious IOC indicators were extracted.
+\u2022 No known attack patterns matched.
+\u2022 No MITRE ATT&CK technique was triggered.
 
 Recommended Action:
 Continue normal operations.
@@ -4536,7 +4536,7 @@ Confidence:
     else:
 
         reply = f"""
-ðŸš¨ Threat Assessment Complete
+\U0001F6A8 Threat Assessment Complete
 
 This communication appears malicious.
 
@@ -4550,9 +4550,9 @@ Risk Level:
 {risk}
 
 Why I believe this is malicious:
-â€¢ Threat classification engine matched known attack patterns.
-â€¢ Risk score exceeded the detection threshold.
-â€¢ SOC Brain classified the event as {risk}.
+\u2022 Threat classification engine matched known attack patterns.
+\u2022 Risk score exceeded the detection threshold.
+\u2022 SOC Brain classified the event as {risk}.
 """
 
         if ai["mitre"]:
@@ -4590,10 +4590,10 @@ Suspicious IPs:
         reply += """
 
 Recommended Actions:
-â€¢ Isolate the affected endpoint.
-â€¢ Block identified indicators.
-â€¢ Review authentication logs.
-â€¢ Notify the SOC team.
+\u2022 Isolate the affected endpoint.
+\u2022 Block identified indicators.
+\u2022 Review authentication logs.
+\u2022 Notify the SOC team.
 
 Confidence:
 96%
@@ -7939,4 +7939,6 @@ def digital_twin_risk(
             "error": "DIGITAL_TWIN_RISK_ERROR",
             "details": str(e)
         }
+
+
 
