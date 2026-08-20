@@ -2,11 +2,22 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import CustomerNav from "./CustomerNav";
 
-const API =
-  import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+const getTenantId = () => {
+  const token = localStorage.getItem("token");
+
+  if (!token) return null;
+
+  try {
+    return JSON.parse(atob(token.split(".")[1])).tenant_id;
+  } catch {
+    return null;
+  }
+};
+
+const API = import.meta.env.VITE_API_BASE;
 
 export default function CustomerTimeline() {
-  const tenantId = "demo";
+  const tenantId = getTenantId();
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
@@ -17,13 +28,20 @@ export default function CustomerTimeline() {
 
   async function loadTimeline() {
     try {
+      const token = localStorage.getItem("token");
+
+      const authConfig = {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        params: {
+          tenant_id: tenantId
+        }
+      };
+
       const [alertsRes, incidentsRes] = await Promise.all([
-        axios.get(`${API}/customer/alerts`, {
-          params: { tenant_id: tenantId }
-        }),
-        axios.get(`${API}/customer/incidents`, {
-          params: { tenant_id: tenantId }
-        })
+        axios.get(`${API}/customer/alerts`, authConfig),
+        axios.get(`${API}/customer/incidents`, authConfig)
       ]);
 
       const alertEvents = alertsRes.data.map(a => ({
