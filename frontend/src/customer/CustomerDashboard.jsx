@@ -200,7 +200,10 @@ useEffect(() => {
 }, []);
 async function loadSummary() {
   try {
-    const res = await axios.get(`${API}/soc-summary`);
+    const res = await axios.get(
+      `${API}/soc-summary`,
+      getAuthConfig()
+    );
 setSocSummary(res.data);
   } catch (err) {
     console.error("SOC SUMMARY ERROR:", err);
@@ -299,7 +302,10 @@ async function loadIOCs() {
 }
 async function loadThreatDNA() {
   try {
-    const res = await axios.get(`${API}/threat-dna`);
+    const res = await axios.get(
+  `${API}/threat-dna`,
+  getAuthConfig()
+);
 
     setThreatDNA(res.data?.fingerprints || []);
 
@@ -309,7 +315,10 @@ async function loadThreatDNA() {
 }
 async function loadReplay() {
   try {
-    const res = await axios.get(`${API}/attack-replay`);
+    const res = await axios.get(
+  `${API}/attack-replay`,
+  getAuthConfig()
+);
 
     const replay = Array.isArray(res.data)
   ? res.data
@@ -389,7 +398,11 @@ const payload = {
       }))
     };
 
-    const res = await axios.post(`${API}/soc-ai`, payload);
+    const res = await axios.post(
+  `${API}/soc-ai`,
+  payload,
+  getAuthConfig()
+);
 console.log(res.data);
 
 console.log("SOC AI RESPONSE =", res.data);
