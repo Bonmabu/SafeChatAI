@@ -17,8 +17,19 @@ import {
   Legend
 } from "recharts";
 
-const API =
-  import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+const getTenantId = () => {
+  const token = localStorage.getItem("token");
+
+  if (!token) return null;
+
+  try {
+    return JSON.parse(atob(token.split(".")[1])).tenant_id;
+  } catch {
+    return null;
+  }
+};
+
+const API = import.meta.env.VITE_API_BASE;
 
 const COLORS = [
   "#2563eb",
@@ -30,8 +41,7 @@ const COLORS = [
 ];
 
 export default function CustomerAnalytics() {
-
-  const tenantId = "demo";
+  const tenantId = getTenantId();
 
   const [trends, setTrends] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -47,106 +57,119 @@ export default function CustomerAnalytics() {
   }, []);
 
   async function loadAnalytics() {
-
     try {
+      const token = localStorage.getItem("token");
+
+      if (!token || !tenantId) {
+        console.error("Missing authentication token or tenant ID");
+        return;
+      }
+
+      const authConfig = {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        params: {
+          tenant_id: tenantId
+        }
+      };
 
       const [
-  dashboardRes,
-  trendRes,
-  categoryRes,
-  statusRes
-] = await Promise.all([
-axios.get(`${API}/customer/dashboard`, {
-  params: { tenant_id: tenantId }
-}),
-
-        axios.get(`${API}/customer/trends`, {
-          params: { tenant_id: tenantId }
-        }),
-
-        axios.get(`${API}/customer/categories`, {
-          params: { tenant_id: tenantId }
-        }),
-
-        axios.get(`${API}/customer/status`, {
-          params: { tenant_id: tenantId }
-        })
-
+        dashboardRes,
+        trendRes,
+        categoryRes,
+        statusRes
+      ] = await Promise.all([
+        axios.get(`${API}/customer/dashboard`, authConfig),
+        axios.get(`${API}/customer/trends`, authConfig),
+        axios.get(`${API}/customer/categories`, authConfig),
+        axios.get(`${API}/customer/status`, authConfig)
       ]);
-setDashboard(dashboardRes.data);
 
+      setDashboard(dashboardRes.data);
       setTrends(trendRes.data);
       setCategories(categoryRes.data);
       setStatus(statusRes.data);
 
     } catch (err) {
-      console.error(err);
+      console.error("Customer Analytics error:", err);
     }
   }
 
   return (
-    <div style={{ padding:30 }}>
+    <div style={{ padding: 30 }}>
 
       <h1>📊 Customer Threat Analytics</h1>
-<CustomerNav />
-<div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(4,1fr)",
-    gap: 20,
-    margin: "25px 0"
-  }}
->
-  <MetricCard
-    title="Security Score"
-    value={`${dashboard.security_score ?? 100}%`}
-  />
 
-  <MetricCard
-    title="Open Incidents"
-    value={dashboard.open_incidents ?? 0}
-  />
-
-  <MetricCard
-    title="Alerts"
-    value={dashboard.total_alerts ?? 0}
-  />
-
-  <MetricCard
-    title="Scans"
-    value={dashboard.total_scans ?? 0}
-  />
-</div>
+      <CustomerNav />
 
       <div
         style={{
-          display:"grid",
-          gridTemplateColumns:"1fr 1fr",
-          gap:25
+          display: "grid",
+          gridTemplateColumns: "repeat(4,1fr)",
+          gap: 20,
+          margin: "25px 0"
+        }}
+      >
+        <MetricCard
+          title="Security Score"
+          value={`${dashboard.security_score ?? 100}%`}
+        />
+
+        <MetricCard
+          title="Open Incidents"
+          value={dashboard.open_incidents ?? 0}
+        />
+
+        <MetricCard
+          title="Alerts"
+          value={dashboard.total_alerts ?? 0}
+        />
+
+        <MetricCard
+          title="Scans"
+          value={dashboard.total_scans ?? 0}
+        />
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 25
         }}
       >
 
         <div
           style={{
-            background:"#111827",
-            padding:20,
-            borderRadius:10
+            background: "#111827",
+            padding: 20,
+            borderRadius: 10
           }}
         >
-          <h2 style={{color:"white"}}>Daily Threat Trend</h2>
+          <h2 style={{ color: "white" }}>
+            Daily Threat Trend
+          </h2>
 
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={trends}>
+
               <CartesianGrid strokeDasharray="3 3" />
+
               <XAxis dataKey="day" />
+
               <YAxis />
+
               <Tooltip />
+
               <Legend />
+
               <Line
                 type="monotone"
                 dataKey="count"
                 stroke="#2563eb"
               />
+
             </LineChart>
           </ResponsiveContainer>
 
@@ -154,13 +177,15 @@ setDashboard(dashboardRes.data);
 
         <div
           style={{
-            background:"#111827",
-            padding:20,
-            borderRadius:10
+            background: "#111827",
+            padding: 20,
+            borderRadius: 10
           }}
         >
 
-          <h2 style={{color:"white"}}>Threat Categories</h2>
+          <h2 style={{ color: "white" }}>
+            Threat Categories
+          </h2>
 
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
@@ -172,7 +197,7 @@ setDashboard(dashboardRes.data);
                 outerRadius={110}
                 label
               >
-                {categories.map((entry,index)=>(
+                {categories.map((entry, index) => (
                   <Cell
                     key={index}
                     fill={COLORS[index % COLORS.length]}
@@ -180,7 +205,7 @@ setDashboard(dashboardRes.data);
                 ))}
               </Pie>
 
-              <Tooltip/>
+              <Tooltip />
 
             </PieChart>
           </ResponsiveContainer>
@@ -189,28 +214,30 @@ setDashboard(dashboardRes.data);
 
         <div
           style={{
-            background:"#111827",
-            padding:20,
-            borderRadius:10,
-            gridColumn:"span 2"
+            background: "#111827",
+            padding: 20,
+            borderRadius: 10,
+            gridColumn: "span 2"
           }}
         >
 
-          <h2 style={{color:"white"}}>Incident Status</h2>
+          <h2 style={{ color: "white" }}>
+            Incident Status
+          </h2>
 
           <ResponsiveContainer width="100%" height={320}>
 
             <BarChart data={status}>
 
-              <CartesianGrid strokeDasharray="3 3"/>
+              <CartesianGrid strokeDasharray="3 3" />
 
-              <XAxis dataKey="status"/>
+              <XAxis dataKey="status" />
 
-              <YAxis/>
+              <YAxis />
 
-              <Tooltip/>
+              <Tooltip />
 
-              <Legend/>
+              <Legend />
 
               <Bar
                 dataKey="count"
@@ -227,8 +254,8 @@ setDashboard(dashboardRes.data);
 
     </div>
   );
-
 }
+
 function MetricCard({ title, value }) {
   return (
     <div
