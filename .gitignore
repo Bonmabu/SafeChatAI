@@ -47,3 +47,6 @@ Thumbs.db
 .coverage
 htmlcov/
 Releases/Beta_v1/*.zip
+
+# Local database backups
+*.db.backup
