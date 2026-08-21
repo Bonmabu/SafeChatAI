@@ -1,219 +1,376 @@
-import sqlite3
-
 import os
 from dotenv import load_dotenv
+import psycopg
+from psycopg.rows import dict_row
 
 load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 DATABASE_PATH = os.getenv(
     "DATABASE_PATH",
     os.path.join(BASE_DIR, "SafeChatAI.db")
 )
 
+
 def get_conn():
+    if DATABASE_URL:
+        return psycopg.connect(
+            DATABASE_URL,
+            row_factory=dict_row
+        )
+
+    import sqlite3
+
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
+
+def db_sql(sql):
+    """Use SQLite ? placeholders locally and PostgreSQL %s placeholders when DATABASE_URL is set."""
+    if DATABASE_URL:
+        return sql.replace("?", "%s")
+    return sql
+
+
+def db_date(column):
+    """Return portable SQL expression for extracting a date."""
+    if DATABASE_URL:
+        return f"DATE({column})"
+    return f"DATE({column})"
+
+
+def db_week(column):
+    """Return portable SQL expression for year-week grouping."""
+    if DATABASE_URL:
+        return f"TO_CHAR({column}, 'IYYY-IW')"
+    return f"strftime('%Y-%W', {column})"
+
+
+def db_age_days(column):
+    """Return portable SQL expression for age in days."""
+    if DATABASE_URL:
+        return f"EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - {column})) / 86400.0"
+    return f"julianday('now') - julianday({column})"
+
+
+def db_recent_hours(column, hours):
+    """Return portable SQL expression for recent-hour filtering."""
+    if DATABASE_URL:
+        return f"{column} >= CURRENT_TIMESTAMP - INTERVAL '{hours} hours'"
+    return f"datetime({column}) >= datetime('now', '-{hours} hour')"
+
+
 def init_db():
-    
+
     conn = get_conn()
     cursor = conn.cursor()
-    
 
-    # scans table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS scans (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        message TEXT,
-        category TEXT,
-        risk_score REAL,
-        status TEXT,
-        user TEXT,
-        tenant_id TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
+    if DATABASE_URL:
 
-    # alerts table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS alerts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        message TEXT,
-        level TEXT,
-        tenant_id TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-            # tenants table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS tenants (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tenant_id TEXT UNIQUE,
-        company_name TEXT,
-        industry TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    # users table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        full_name TEXT,
-        email TEXT UNIQUE,
-        password_hash TEXT NOT NULL,
-        role TEXT DEFAULT 'customer',
-        tenant_id TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-    # Password reset fields
-    try:
-        cursor.execute(
-            "ALTER TABLE users ADD COLUMN reset_token TEXT"
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS scans (
+            id BIGSERIAL PRIMARY KEY,
+            message TEXT,
+            category TEXT,
+            risk_score DOUBLE PRECISION,
+            status TEXT,
+            "user" TEXT,
+            tenant_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    except sqlite3.OperationalError:
-        pass
+        """)
 
-    try:
-        cursor.execute(
-            "ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP"
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS alerts (
+            id BIGSERIAL PRIMARY KEY,
+            message TEXT,
+            level TEXT,
+            tenant_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    except sqlite3.OperationalError:
-        pass
-        # threat IOC table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS threat_iocs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ioc TEXT UNIQUE,
-        ioc_type TEXT,
-        reputation TEXT,
-        risk_score INTEGER,
-        sources TEXT,
-        first_seen TEXT,
-        last_seen TEXT,
-        sightings INTEGER DEFAULT 1
-    )
-    """)
+        """)
 
-    # incidents table (FIXED)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS incidents (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    scan_id INTEGER,
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tenants (
+            id BIGSERIAL PRIMARY KEY,
+            tenant_id TEXT UNIQUE,
+            company_name TEXT,
+            industry TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
 
-    tenant_id TEXT,
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id BIGSERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            full_name TEXT,
+            email TEXT UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'customer',
+            tenant_id TEXT NOT NULL,
+            reset_token TEXT,
+            reset_token_expires TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
 
-    message TEXT,
-    category TEXT,
-    threat_type TEXT,
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_iocs (
+            id BIGSERIAL PRIMARY KEY,
+            ioc TEXT UNIQUE,
+            ioc_type TEXT,
+            reputation TEXT,
+            risk_score INTEGER,
+            sources TEXT,
+            first_seen TEXT,
+            last_seen TEXT,
+            sightings INTEGER DEFAULT 1
+        )
+        """)
 
-    risk_score REAL DEFAULT 0,
-    severity TEXT,
-    priority TEXT DEFAULT 'MEDIUM',
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS incidents (
+            id BIGSERIAL PRIMARY KEY,
+            scan_id BIGINT,
+            tenant_id TEXT,
+            message TEXT,
+            category TEXT,
+            threat_type TEXT,
+            risk_score DOUBLE PRECISION DEFAULT 0,
+            severity TEXT,
+            priority TEXT DEFAULT 'MEDIUM',
+            stage TEXT DEFAULT 'UNKNOWN',
+            mitre TEXT DEFAULT 'TA0000 - Unknown',
+            status TEXT DEFAULT 'OPEN',
+            assigned_to TEXT,
+            notes TEXT,
+            threat_intel TEXT,
+            correlation_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
 
-    stage TEXT DEFAULT 'UNKNOWN',
-    mitre TEXT DEFAULT 'TA0000 - Unknown',
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id BIGSERIAL PRIMARY KEY,
+            action TEXT,
+            "user" TEXT,
+            message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
 
-    status TEXT DEFAULT 'OPEN',
-    assigned_to TEXT,
-    notes TEXT,
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_intelligence (
+            id BIGSERIAL PRIMARY KEY,
+            tenant_id TEXT DEFAULT 'demo',
+            indicator TEXT UNIQUE,
+            category TEXT,
+            score DOUBLE PRECISION DEFAULT 0,
+            sightings INTEGER DEFAULT 1,
+            confidence DOUBLE PRECISION DEFAULT 50,
+            campaign TEXT,
+            trend TEXT DEFAULT 'NEW',
+            first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
 
-    threat_intel TEXT,
-    correlation_id TEXT,
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_hunts (
+            id BIGSERIAL PRIMARY KEY,
+            timestamp TEXT,
+            analyst TEXT,
+            category TEXT,
+            severity TEXT,
+            keyword TEXT,
+            result_count INTEGER,
+            risk TEXT
+        )
+        """)
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-    """)
-    for sql in [
-        "ALTER TABLE incidents ADD COLUMN threat_type TEXT",
-        "ALTER TABLE incidents ADD COLUMN risk_score REAL DEFAULT 0",
-        "ALTER TABLE incidents ADD COLUMN stage TEXT DEFAULT 'UNKNOWN'",
-        "ALTER TABLE incidents ADD COLUMN mitre TEXT DEFAULT 'TA0000 - Unknown'",
-        "ALTER TABLE incidents ADD COLUMN correlation_id TEXT",
-        "ALTER TABLE incidents ADD COLUMN IF NOT EXISTS threat_intel TEXT"
-    ]:
-        try:
-            cursor.execute(sql)
-        except sqlite3.OperationalError:
-            pass
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_dna (
+            id BIGSERIAL PRIMARY KEY,
+            fingerprint TEXT UNIQUE NOT NULL,
+            category TEXT,
+            risk_band TEXT,
+            mitre TEXT,
+            behavior_signature TEXT,
+            urls INTEGER DEFAULT 0,
+            emails INTEGER DEFAULT 0,
+            ips INTEGER DEFAULT 0,
+            score DOUBLE PRECISION DEFAULT 0,
+            first_seen TEXT,
+            last_seen TEXT,
+            occurrences INTEGER DEFAULT 0
+        )
+        """)
 
-    # audit logs
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS audit_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        action TEXT,
-        user TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
+    else:
 
-    # threat intelligence
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS threat_intelligence (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tenant_id TEXT DEFAULT 'demo',
-        indicator TEXT UNIQUE,
-        category TEXT,
-        score REAL DEFAULT 0,
-        sightings INTEGER DEFAULT 1,
-        confidence REAL DEFAULT 50,
-        campaign TEXT,
-        trend TEXT DEFAULT 'NEW',
-        first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
+        import sqlite3
 
-    # threat hunts
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS threat_hunts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT,
-        analyst TEXT,
-        category TEXT,
-        severity TEXT,
-        keyword TEXT,
-        result_count INTEGER,
-        risk TEXT
-    )
-    """)
-    # Threat DNA persistence
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS threat_dna (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fingerprint TEXT UNIQUE NOT NULL,
-        category TEXT,
-        risk_band TEXT,
-        mitre TEXT,
-        behavior_signature TEXT,
-        urls INTEGER DEFAULT 0,
-        emails INTEGER DEFAULT 0,
-        ips INTEGER DEFAULT 0,
-        score REAL DEFAULT 0,
-        first_seen TEXT,
-        last_seen TEXT,
-        occurrences INTEGER DEFAULT 0
-    )
-    """)
-    
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS scans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message TEXT,
+            category TEXT,
+            risk_score REAL,
+            status TEXT,
+            user TEXT,
+            tenant_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message TEXT,
+            level TEXT,
+            tenant_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tenants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT UNIQUE,
+            company_name TEXT,
+            industry TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            full_name TEXT,
+            email TEXT UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'customer',
+            tenant_id TEXT NOT NULL,
+            reset_token TEXT,
+            reset_token_expires TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_iocs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ioc TEXT UNIQUE,
+            ioc_type TEXT,
+            reputation TEXT,
+            risk_score INTEGER,
+            sources TEXT,
+            first_seen TEXT,
+            last_seen TEXT,
+            sightings INTEGER DEFAULT 1
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS incidents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scan_id INTEGER,
+            tenant_id TEXT,
+            message TEXT,
+            category TEXT,
+            threat_type TEXT,
+            risk_score REAL DEFAULT 0,
+            severity TEXT,
+            priority TEXT DEFAULT 'MEDIUM',
+            stage TEXT DEFAULT 'UNKNOWN',
+            mitre TEXT DEFAULT 'TA0000 - Unknown',
+            status TEXT DEFAULT 'OPEN',
+            assigned_to TEXT,
+            notes TEXT,
+            threat_intel TEXT,
+            correlation_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            action TEXT,
+            user TEXT,
+            message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_intelligence (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT DEFAULT 'demo',
+            indicator TEXT UNIQUE,
+            category TEXT,
+            score REAL DEFAULT 0,
+            sightings INTEGER DEFAULT 1,
+            confidence REAL DEFAULT 50,
+            campaign TEXT,
+            trend TEXT DEFAULT 'NEW',
+            first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_hunts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            analyst TEXT,
+            category TEXT,
+            severity TEXT,
+            keyword TEXT,
+            result_count INTEGER,
+            risk TEXT
+        )
+        """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_dna (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fingerprint TEXT UNIQUE NOT NULL,
+            category TEXT,
+            risk_band TEXT,
+            mitre TEXT,
+            behavior_signature TEXT,
+            urls INTEGER DEFAULT 0,
+            emails INTEGER DEFAULT 0,
+            ips INTEGER DEFAULT 0,
+            score REAL DEFAULT 0,
+            first_seen TEXT,
+            last_seen TEXT,
+            occurrences INTEGER DEFAULT 0
+        )
+        """)
+
     conn.commit()
     conn.close()
+
 
 def calculate_risk_score(category, base_score):
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
+    cur.execute(db_sql("""
         SELECT COUNT(*) AS sightings
         FROM threat_intelligence
         WHERE category = ?
-    """, (category,))
+    """), (category,))
 
     row = cur.fetchone()
     conn.close()
@@ -268,11 +425,11 @@ def create_alert(message, level, tenant_id="demo"):
     cursor = conn.cursor()
 
     # prevent duplicates
-    cursor.execute("""
+    cursor.execute(db_sql("""
         SELECT id FROM alerts
         WHERE message = ? AND level = ?
         ORDER BY id DESC LIMIT 1
-    """, (message, level))
+    """), (message, level))
 
     exists = cursor.fetchone()
 
@@ -280,14 +437,14 @@ def create_alert(message, level, tenant_id="demo"):
         conn.close()
         return
 
-    cursor.execute("""
+    cursor.execute(db_sql("""
     INSERT INTO alerts (
         message,
         level,
         tenant_id
     )
     VALUES (?, ?, ?)
-""", (
+"""), (
     message,
     level,
     tenant_id
@@ -299,24 +456,14 @@ def create_audit_log(action=None, user=None, message=None):
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS audit_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            action TEXT,
-            user TEXT,
-            message TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
     # normalize inputs (VERY IMPORTANT FIX)
     if message and not action:
         action = message
 
-    cursor.execute("""
+    cursor.execute(db_sql("""
         INSERT INTO audit_logs (action, user, message)
         VALUES (?, ?, ?)
-    """, (action, user, message))
+    """), (action, user, message))
 
     conn.commit()
     conn.close()
@@ -346,7 +493,7 @@ def create_incident(
     if threat_intel is None:
         threat_intel = intel
 
-    cursor.execute("""
+    cursor.execute(db_sql("""
         INSERT INTO incidents
         (
             scan_id,
@@ -366,7 +513,7 @@ def create_incident(
             correlation_id
         )
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    """,
+    """),
     (
         scan_id,
         tenant_id,
@@ -385,7 +532,16 @@ def create_incident(
         correlation_id
     ))
 
-    incident_id = cursor.lastrowid
+    cursor.execute(db_sql("""
+    SELECT id
+    FROM incidents
+    WHERE correlation_id = ?
+    ORDER BY id DESC
+    LIMIT 1
+"""), (correlation_id,))
+
+    row = cursor.fetchone()
+    incident_id = row["id"] if row else None
 
     conn.commit()
     conn.close()
@@ -395,27 +551,36 @@ def get_executive_kpis():
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM scans")
-    total_scans = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM alerts")
-    total_alerts = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM incidents")
-    total_incidents = cursor.fetchone()[0]
+    cursor.execute("""
+        SELECT COUNT(*) AS total
+        FROM scans
+    """)
+    total_scans = cursor.fetchone()["total"]
 
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS total
+        FROM alerts
+    """)
+    total_alerts = cursor.fetchone()["total"]
+
+    cursor.execute("""
+        SELECT COUNT(*) AS total
+        FROM incidents
+    """)
+    total_incidents = cursor.fetchone()["total"]
+
+    cursor.execute("""
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE status='OPEN'
     """)
-    open_incidents = cursor.fetchone()[0]
+    open_incidents = cursor.fetchone()["total"]
 
     cursor.execute("""
-        SELECT AVG(risk_score)
+        SELECT AVG(risk_score) AS average
         FROM scans
     """)
-    avg_risk = cursor.fetchone()[0] or 0
+    avg_risk = cursor.fetchone()["average"] or 0
 
     security_score = round(max(0, 100 - avg_risk), 2)
     enterprise_risk = round(avg_risk, 2)
@@ -429,7 +594,6 @@ def get_executive_kpis():
     """)
 
     row = cursor.fetchone()
-
     top_threat = row["category"] if row else "None"
 
     conn.close()
@@ -448,7 +612,7 @@ def get_incidents(tenant_id="demo"):
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(db_sql("""
 SELECT
     incidents.id,
     incidents.scan_id,
@@ -474,7 +638,7 @@ ON incidents.scan_id = scans.id
 WHERE incidents.tenant_id = ?
 
 ORDER BY incidents.id DESC
-""", (tenant_id,))
+"""), (tenant_id,))
 
     rows = cursor.fetchall()
     conn.close()
@@ -486,43 +650,57 @@ def get_total_scans():
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT COUNT(*) FROM scans")
-    total = cur.fetchone()[0]
+    cur.execute("""
+        SELECT COUNT(*) AS total
+        FROM scans
+    """)
+    total = cur.fetchone()["total"]
 
     conn.close()
-
     return total
+
 
 def get_total_alerts():
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT COUNT(*) FROM alerts")
-    total = cur.fetchone()[0]
+    cur.execute("""
+        SELECT COUNT(*) AS total
+        FROM alerts
+    """)
+    total = cur.fetchone()["total"]
 
     conn.close()
-
     return total
+
 
 def get_total_incidents():
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT COUNT(*) FROM incidents")
-    total = cur.fetchone()[0]
+    cur.execute("""
+        SELECT COUNT(*) AS total
+        FROM incidents
+    """)
+    total = cur.fetchone()["total"]
 
     conn.close()
-
     return total
+
 
 def get_open_incident_count():
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM incidents WHERE status = 'OPEN'")
-    total = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT COUNT(*) AS total
+        FROM incidents
+        WHERE status = 'OPEN'
+    """)
+    total = cursor.fetchone()["total"]
+
     conn.close()
     return total
-
 def update_threat_trends():
     pass
 
@@ -535,13 +713,13 @@ def update_incident_status(
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
+    cur.execute(db_sql("""
         UPDATE incidents
         SET
             status = ?,
             notes = ?
         WHERE id = ?
-    """, (
+    """), (
         status,
         notes,
         incident_id
@@ -563,11 +741,11 @@ def assign_incident(incident_id, analyst):
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
+    cur.execute(db_sql("""
         UPDATE incidents
         SET assigned_to = ?
         WHERE id = ?
-    """, (analyst, incident_id))
+    """), (analyst, incident_id))
 
     conn.commit()
 
@@ -601,11 +779,11 @@ def get_risk_score():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT AVG(risk_score)
-        FROM scans
-    """)
+    SELECT AVG(risk_score) AS average
+    FROM scans
+""")
 
-    row = cur.fetchone()[0]
+    row = cur.fetchone()["average"]
 
     conn.close()
 
@@ -624,37 +802,44 @@ def get_risk_score():
         "level": level
     }
 def get_executive_summary():
-
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT COUNT(*) FROM scans")
-    total_scans = cur.fetchone()[0]
-
     cur.execute("""
-        SELECT COUNT(*)
-        FROM scans
-        WHERE status IN ('High Risk','Critical')
-    """)
-    critical_threats = cur.fetchone()[0]
-
-    cur.execute("""
-        SELECT AVG(risk_score)
+        SELECT COUNT(*) AS total
         FROM scans
     """)
-    avg_risk = cur.fetchone()[0] or 0
-
-    cur.execute("SELECT COUNT(*) FROM incidents")
-    total_incidents = cur.fetchone()[0]
+    total_scans = cur.fetchone()["total"]
 
     cur.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS total
+        FROM scans
+        WHERE status IN ('High Risk', 'Critical')
+    """)
+    critical_threats = cur.fetchone()["total"]
+
+    cur.execute("""
+        SELECT AVG(risk_score) AS average
+        FROM scans
+    """)
+    avg_risk = cur.fetchone()["average"] or 0
+
+    cur.execute("""
+        SELECT COUNT(*) AS total
         FROM incidents
-        WHERE status='RESOLVED'
     """)
-    resolved = cur.fetchone()[0]
+    total_incidents = cur.fetchone()["total"]
+
+    cur.execute("""
+        SELECT COUNT(*) AS total
+        FROM incidents
+        WHERE status = 'RESOLVED'
+    """)
+    resolved = cur.fetchone()["total"]
 
     conn.close()
+
+    avg_risk = round(float(avg_risk), 2)
 
     resolution_rate = 0
 
@@ -667,7 +852,7 @@ def get_executive_summary():
     return {
         "total_scans": total_scans,
         "critical_threats": critical_threats,
-        "average_risk": round(avg_risk, 2),
+        "average_risk": avg_risk,
         "resolution_rate": resolution_rate
     }
 def get_top_threat():
@@ -696,11 +881,11 @@ def get_daily_threats():
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT DATE(created_at) as day,
+    cur.execute(f"""
+        SELECT {db_date("created_at")} as day,
                COUNT(*) as total
         FROM scans
-        GROUP BY DATE(created_at)
+        GROUP BY {db_date("created_at")}
         ORDER BY day DESC
         LIMIT 30
     """)
@@ -713,8 +898,8 @@ def get_weekly_threats():
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT strftime('%Y-%W', created_at) as week,
+    cur.execute(f"""
+        SELECT {db_week("created_at")} as week,
                COUNT(*) as total
         FROM scans
         GROUP BY week
@@ -746,10 +931,10 @@ def get_incident_lifecycle_metrics():
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT 
+    cur.execute(f"""
+        SELECT
             status,
-            julianday('now') - julianday(created_at) as age_days
+            {db_age_days("created_at")} as age_days
         FROM incidents
     """)
 
@@ -776,6 +961,7 @@ def get_incident_lifecycle_metrics():
         "open_1_3_days": open_1_3,
         "open_3_plus_days": open_3_plus
     }
+
 import datetime
 
 def get_threat_velocity():
@@ -786,7 +972,7 @@ def get_threat_velocity():
     cur.execute("""
         SELECT created_at
         FROM scans
-        WHERE datetime(created_at) >= datetime('now', '-1 hour')
+        WHERE {db_recent_hours("created_at", 1)}
     """)
 
     rows = cur.fetchall()
@@ -815,18 +1001,20 @@ def get_threat_anomaly_score():
     cur = conn.cursor()
 
     # last 1 hour
-    cur.execute("""
-        SELECT COUNT(*) FROM scans
-        WHERE datetime(created_at) >= datetime('now', '-1 hour')
-    """)
-    last_hour = cur.fetchone()[0]
+    cur.execute(f"""
+    SELECT COUNT(*) AS total
+    FROM scans
+    WHERE {db_recent_hours("created_at", 1)}
+""")
+    last_hour = cur.fetchone()["total"]
 
     # last 24 hours baseline
-    cur.execute("""
-        SELECT COUNT(*) FROM scans
-        WHERE datetime(created_at) >= datetime('now', '-24 hour')
+    cur.execute(f"""
+        SELECT COUNT(*) AS total
+        FROM scans
+        WHERE {db_recent_hours("created_at", 24)}
     """)
-    last_24h = cur.fetchone()[0]
+    last_24h = cur.fetchone()["total"]
 
     conn.close()
 
@@ -867,28 +1055,31 @@ def get_soc_intelligence_core():
     # 2. Critical threats
     # --------------------------
     cur.execute("""
-        SELECT COUNT(*) FROM scans
-        WHERE status IN ('High Risk', 'Critical')
-    """)
-    critical = cur.fetchone()[0]
+    SELECT COUNT(*) AS total
+    FROM scans
+    WHERE status IN ('High Risk', 'Critical')
+""")
+    critical = cur.fetchone()["total"]
 
     # --------------------------
     # 3. Velocity (last 1 hour)
     # --------------------------
-    cur.execute("""
-        SELECT COUNT(*) FROM scans
-        WHERE datetime(created_at) >= datetime('now', '-1 hour')
-    """)
-    velocity = cur.fetchone()[0]
+    cur.execute(f"""
+    SELECT COUNT(*) AS total
+    FROM scans
+    WHERE {db_recent_hours("created_at", 1)}
+""")
+    velocity = cur.fetchone()["total"]
 
     # --------------------------
     # 4. Anomaly (last 1 hour vs baseline)
     # --------------------------
-    cur.execute("""
-        SELECT COUNT(*) FROM scans
-        WHERE datetime(created_at) >= datetime('now', '-24 hour')
-    """)
-    last_24h = cur.fetchone()[0]
+    cur.execute(f"""
+    SELECT COUNT(*) AS total
+    FROM scans
+    WHERE {db_recent_hours("created_at", 24)}
+""")
+    last_24h = cur.fetchone()["total"]
 
     conn.close()
 
@@ -1052,12 +1243,12 @@ def auto_escalate_incident(incident_id, risk_score, category):
         status = "LOW"
         assigned = "Monitoring"
 
-    cur.execute("""
+    cur.execute(db_sql("""
         UPDATE incidents
         SET status = ?,
             assigned_to = ?
         WHERE id = ?
-    """, (status, assigned, incident_id))
+    """), (status, assigned, incident_id))
 
     if cur.rowcount == 0:
         conn.close()
@@ -1083,29 +1274,66 @@ def create_scan(
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
-    INSERT INTO scans (
-    message,
-    category,
-    risk_score,
-    status,
-    user,
-    tenant_id
-)
-VALUES (?, ?, ?, ?, ?, ?)
-""", (
-    message,
-    category,
-    risk_score,
-    status,
-    user,
-    tenant_id
-))
+    if DATABASE_URL:
+        cur.execute("""
+            INSERT INTO scans (
+                message,
+                category,
+                risk_score,
+                status,
+                user,
+                tenant_id
+            )
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            message,
+            category,
+            risk_score,
+            status,
+            user,
+            tenant_id
+        ))
+
+        row = cur.fetchone()
+        scan_id = row["id"] if row else None
+
+    else:
+        cur.execute(db_sql("""
+        INSERT INTO scans (
+            message,
+            category,
+            risk_score,
+            status,
+            user,
+            tenant_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+    """), (
+        message,
+        category,
+        risk_score,
+        status,
+        user,
+        tenant_id
+    ))
+
+    cur.execute(db_sql("""
+        SELECT id
+        FROM scans
+        WHERE tenant_id = ?
+          AND message = ?
+        ORDER BY id DESC
+        LIMIT 1
+    """), (
+        tenant_id,
+        message
+    ))
+
+    row = cur.fetchone()
+    scan_id = row["id"] if row else None
 
     conn.commit()
-
-    scan_id = cur.lastrowid
-
     conn.close()
 
     return scan_id
@@ -1130,7 +1358,7 @@ def save_threat_hunt(
             result_count,
             risk
         )
-        VALUES(datetime('now'),
+        VALUES(CURRENT_TIMESTAMP,
                ?,?,?,?,?,?)
     """, (
         analyst,
@@ -1151,11 +1379,11 @@ def upsert_threat_intelligence(indicator, category, score):
     from datetime import datetime
     now = datetime.now().isoformat()
 
-    cur.execute("""
+    cur.execute(db_sql("""
         SELECT sightings
         FROM threat_intelligence
         WHERE indicator=?
-    """, (indicator,))
+    """), (indicator,))
 
     row = cur.fetchone()
 
@@ -1164,7 +1392,7 @@ def upsert_threat_intelligence(indicator, category, score):
         sightings = row["sightings"] + 1
         confidence = min(100, 50 + sightings * 5)
 
-        cur.execute("""
+        cur.execute(db_sql("""
             UPDATE threat_intelligence
             SET
                 sightings=?,
@@ -1172,7 +1400,7 @@ def upsert_threat_intelligence(indicator, category, score):
                 score=?,
                 last_seen=?
             WHERE indicator=?
-        """, (
+        """), (
             sightings,
             confidence,
             score,
@@ -1182,7 +1410,7 @@ def upsert_threat_intelligence(indicator, category, score):
 
     else:
 
-        cur.execute("""
+        cur.execute(db_sql("""
             INSERT INTO threat_intelligence(
                 indicator,
                 category,
@@ -1194,7 +1422,7 @@ def upsert_threat_intelligence(indicator, category, score):
                 last_seen
             )
             VALUES(?,?,?,?,?,?,?,?)
-        """, (
+        """), (
             indicator,
             category,
             score,
@@ -1207,11 +1435,11 @@ def upsert_threat_intelligence(indicator, category, score):
 
     conn.commit()
 
-    cur.execute("""
+    cur.execute(db_sql("""
         SELECT *
         FROM threat_intelligence
         WHERE indicator=?
-    """, (indicator,))
+    """), (indicator,))
 
     intel = cur.fetchone()
 
@@ -1224,7 +1452,7 @@ def save_threat_ioc(data):
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(db_sql("""
     INSERT INTO threat_iocs
     (
         ioc,
@@ -1244,7 +1472,7 @@ def save_threat_ioc(data):
         risk_score=excluded.risk_score,
         last_seen=excluded.last_seen,
         sightings=sightings+1
-    """,
+    """),
     (
         data["ioc"],
         data["type"],
@@ -1261,55 +1489,53 @@ def add_threat_intel_column():
     conn = get_conn()
     cursor = conn.cursor()
 
-    # Add threat_intel to incidents if missing
+    # Add threat_intel to incidents if missing.
+    # IF NOT EXISTS works with both SQLite and PostgreSQL.
     try:
         cursor.execute("""
             ALTER TABLE incidents
-            ADD COLUMN threat_intel TEXT
+            ADD COLUMN IF NOT EXISTS threat_intel TEXT
         """)
-        print("✅ threat_intel column added to incidents")
-    except sqlite3.OperationalError as e:
-        if "duplicate column name" in str(e).lower():
-            print("ℹ️ incidents.threat_intel already exists")
-        else:
-            print(f"⚠️ incidents migration: {e}")
+        print("threat_intel column verified/added to incidents")
+    except Exception as e:
+        print(f"incidents migration: {e}")
 
-    # Add tenant_id to threat_intelligence if missing
+    # Add tenant_id to threat_intelligence if missing.
     try:
         cursor.execute("""
             ALTER TABLE threat_intelligence
-            ADD COLUMN tenant_id TEXT DEFAULT 'demo'
+            ADD COLUMN IF NOT EXISTS tenant_id TEXT DEFAULT 'demo'
         """)
-        print("✅ tenant_id column added to threat_intelligence")
-    except sqlite3.OperationalError as e:
-        if "duplicate column name" in str(e).lower():
-            print("ℹ️ threat_intelligence.tenant_id already exists")
-        else:
-            print(f"⚠️ threat_intelligence migration: {e}")
+        print("tenant_id column verified/added to threat_intelligence")
+    except Exception as e:
+        print(f"threat_intelligence migration: {e}")
 
     conn.commit()
 
-    # Verify the column actually exists
-    cursor.execute("PRAGMA table_info(threat_intelligence)")
-    columns = [row[1] for row in cursor.fetchall()]
-
-    if "tenant_id" in columns:
-        print("✅ VERIFIED: threat_intelligence.tenant_id exists")
-    else:
-        print("❌ ERROR: threat_intelligence.tenant_id is missing")
+        
+    try:
+        cursor.execute(db_sql("""
+            SELECT tenant_id
+            FROM threat_intelligence
+            LIMIT 1
+        """))
+        print("VERIFIED: threat_intelligence.tenant_id exists")
+    except Exception as e:
+        print(f"ERROR: threat_intelligence.tenant_id verification failed: {e}")
 
     conn.close()
+
 def get_category_distribution(tenant_id="demo"):
 
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(db_sql("""
         SELECT category, COUNT(*) as count
         FROM scans
         WHERE tenant_id = ?
         GROUP BY category
-    """, (tenant_id,))
+    """), (tenant_id,))
 
     rows = cursor.fetchall()
 
@@ -1326,7 +1552,7 @@ def save_incident(category, score, status, mitre=None):
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(db_sql("""
         INSERT INTO incidents
         (
             category,
@@ -1335,7 +1561,7 @@ def save_incident(category, score, status, mitre=None):
             mitre
         )
         VALUES (?, ?, ?, ?)
-    """, (
+    """), (
         category,
         score,
         status,
@@ -1412,14 +1638,15 @@ def create_default_tenant():
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        INSERT OR IGNORE INTO tenants (
+    cursor.execute(db_sql("""
+        INSERT INTO tenants (
             tenant_id,
             company_name,
             industry
         )
         VALUES (?, ?, ?)
-    """, (
+        ON CONFLICT (tenant_id) DO NOTHING
+    """), (
         "demo",
         "SafeChat AI Demo",
         "Cyber Security"
@@ -1427,8 +1654,6 @@ def create_default_tenant():
 
     conn.commit()
     conn.close()
-
-
 init_db()
 create_default_tenant()
 def save_threat_dna(dna):
@@ -1437,18 +1662,18 @@ def save_threat_dna(dna):
 
     fingerprint = dna["fingerprint"]
 
-    cursor.execute("""
+    cursor.execute(db_sql("""
         SELECT *
         FROM threat_dna
         WHERE fingerprint = ?
-    """, (fingerprint,))
+    """), (fingerprint,))
 
     existing = cursor.fetchone()
 
     ioc_profile = dna.get("ioc_profile", {})
 
     if existing:
-        cursor.execute("""
+        cursor.execute(db_sql("""
             UPDATE threat_dna
             SET
                 category = ?,
@@ -1462,7 +1687,7 @@ def save_threat_dna(dna):
                 last_seen = ?,
                 occurrences = occurrences + 1
             WHERE fingerprint = ?
-        """, (
+        """), (
             dna["category"],
             dna["risk_band"],
             dna["mitre"],
@@ -1475,7 +1700,7 @@ def save_threat_dna(dna):
             fingerprint
         ))
     else:
-        cursor.execute("""
+        cursor.execute(db_sql("""
             INSERT INTO threat_dna (
                 fingerprint,
                 category,
@@ -1491,7 +1716,7 @@ def save_threat_dna(dna):
                 occurrences
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-        """, (
+        """), (
             fingerprint,
             dna["category"],
             dna["risk_band"],
@@ -1507,11 +1732,11 @@ def save_threat_dna(dna):
 
     conn.commit()
 
-    cursor.execute("""
+    cursor.execute(db_sql("""
         SELECT *
         FROM threat_dna
         WHERE fingerprint = ?
-    """, (fingerprint,))
+    """), (fingerprint,))
 
     row = cursor.fetchone()
 

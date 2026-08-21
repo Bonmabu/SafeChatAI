@@ -311,23 +311,7 @@ setAnalytics(analyticsRes.data);
     const graphRes = await axios.get(
       `${API_BASE}/attack-graph`
     );
-if (!aiSummary) {
-  const token = localStorage.getItem("token");
 
-  const aiRes = await axios.post(
-    `${API_BASE}/soc-ai`,
-    {
-      text: "incident threat pattern health"
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    }
-  );
-
-  setAiSummary(aiRes.data.analysis);
-}
 console.log("GRAPH RESPONSE");
 console.log(graphRes.data);
 
