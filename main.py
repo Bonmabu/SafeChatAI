@@ -1209,68 +1209,109 @@ def update_ioc_database(iocs):
             else:
                 IOC_DATABASE[category][value]["count"] += 1
 
-            # Update database
-            cursor.execute("""
-                SELECT id, sightings
-                FROM threat_intelligence
-                WHERE indicator=?
-            """, (value,))
+            # ---------------------------------
+            # FIND EXISTING IOC
+            # ---------------------------------
+            cursor.execute(
+                db_sql("""
+                    SELECT id, sightings
+                    FROM threat_intelligence
+                    WHERE indicator = ?
+                """),
+                (value,)
+            )
 
             row = cursor.fetchone()
 
             if row:
 
-                cursor.execute("""
-                    UPDATE threat_intelligence
-                    SET sightings=sightings+1,
-                        last_seen=datetime('now')
-                    WHERE id=?
-                """, (row["id"],))
+                # ---------------------------------
+                # UPDATE EXISTING IOC
+                # ---------------------------------
+                cursor.execute(
+                    db_sql("""
+                        UPDATE threat_intelligence
+                        SET sightings = sightings + 1,
+                            last_seen = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """),
+                    (row["id"],)
+                )
 
-                cursor.execute("""
-                    SELECT *
-                    FROM threat_intelligence
-                    WHERE id=?
-                """, (row["id"],))
+                cursor.execute(
+                    db_sql("""
+                        SELECT *
+                        FROM threat_intelligence
+                        WHERE id = ?
+                    """),
+                    (row["id"],)
+                )
 
-                data = dict(cursor.fetchone())
+                result = cursor.fetchone()
+                data = dict(result) if result else {}
 
             else:
 
-                cursor.execute("""
-                    INSERT INTO threat_intelligence
+                # ---------------------------------
+                # INSERT NEW IOC
+                # ---------------------------------
+                cursor.execute(
+                    db_sql("""
+                        INSERT INTO threat_intelligence
+                        (
+                            indicator,
+                            category,
+                            score,
+                            confidence,
+                            sightings,
+                            campaign,
+                            first_seen,
+                            last_seen
+                        )
+                        VALUES
+                        (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """),
                     (
-                        indicator,
-                        category,
-                        score,
-                        confidence,
-                        sightings,
-                        campaign,
-                        first_seen,
-                        last_seen
+                        value,
+                        category.title(),
+                        85,
+                        90,
+                        1,
+                        "Unknown"
                     )
-                    VALUES
-                    (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-                """, (
-                    value,
-                    category.title(),
-                    85,
-                    90,
-                    1,
-                    "Unknown"
-                ))
+                )
 
                 conn.commit()
 
-                cursor.execute("""
-                    SELECT *
-                    FROM threat_intelligence
-                    WHERE id=last_insert_rowid()
-                """)
+                # ---------------------------------
+                # GET INSERTED IOC
+                # ---------------------------------
+                if DATABASE_URL:
+                    cursor.execute(
+                        db_sql("""
+                            SELECT *
+                            FROM threat_intelligence
+                            WHERE indicator = ?
+                            ORDER BY id DESC
+                            LIMIT 1
+                        """),
+                        (value,)
+                    )
+                else:
+                    cursor.execute(
+                        db_sql("""
+                            SELECT *
+                            FROM threat_intelligence
+                            WHERE id = last_insert_rowid()
+                        """)
+                    )
 
-                data = dict(cursor.fetchone())
+                result = cursor.fetchone()
+                data = dict(result) if result else {}
 
-                        # Broadcast live IOC
+            # ---------------------------------
+            # BROADCAST LIVE IOC
+            # ---------------------------------
             import asyncio
 
             asyncio.create_task(
@@ -1282,7 +1323,6 @@ def update_ioc_database(iocs):
 
     conn.commit()
     conn.close()
-
 def update_threat_intelligence(category, text, score):
 
     global THREAT_INTELLIGENCE
