@@ -3642,7 +3642,10 @@ async def soc_live_loop():
             )
 
         except Exception as e:
-            print("SOC LOOP ERROR:", e)
+            print("SOC LOOP ERROR TYPE:", type(e).__name__)
+            print("SOC LOOP ERROR VALUE:", repr(e))
+            import traceback
+            traceback.print_exc()
 
         await asyncio.sleep(5)
 # =========================
@@ -5841,6 +5844,56 @@ def customer_status(
     conn.close()
 
     return [dict(r) for r in rows]
+@app.get("/debug/alerts-schema")
+def debug_alerts_schema():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
+        if DATABASE_URL:
+            cur.execute("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_name = 'alerts'
+                ORDER BY ordinal_position
+            """)
+            columns = [
+                {
+                    "column": row["column_name"],
+                    "type": row["data_type"]
+                }
+                for row in cur.fetchall()
+            ]
+
+            cur.execute("SELECT COUNT(*) AS total FROM alerts")
+            total = cur.fetchone()["total"]
+
+            return {
+                "database": "postgresql",
+                "alerts_columns": columns,
+                "alert_count": total
+            }
+
+        cur.execute("PRAGMA table_info(alerts)")
+        columns = [
+            {
+                "column": row["name"],
+                "type": row["type"]
+            }
+            for row in cur.fetchall()
+        ]
+
+        cur.execute("SELECT COUNT(*) AS total FROM alerts")
+        total = cur.fetchone()["total"]
+
+        return {
+            "database": "sqlite",
+            "alerts_columns": columns,
+            "alert_count": total
+        }
+
+    finally:
+        conn.close()
 
 
 @app.get("/customer/alerts")
