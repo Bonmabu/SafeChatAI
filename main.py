@@ -111,6 +111,7 @@ MODEL = IsolationForest(contamination=0.05)
 from db import create_scan
 
 from db import (
+    db_sql,
     init_db,
     get_conn,
     create_incident,
@@ -5326,48 +5327,88 @@ def customer_dashboard(
     user=Depends(get_current_user)
 ):
     tenant_id = user["tenant_id"]
+
     conn = get_conn()
     cursor = conn.cursor()
 
+    # ---------------------------------
+    # TOTAL SCANS
+    # ---------------------------------
     cursor.execute(
-    db_sql("SELECT COUNT(*) FROM scans WHERE tenant_id = ?"),
-    (tenant_id,)
-)
+        db_sql("SELECT COUNT(*) FROM scans WHERE tenant_id = ?"),
+        (tenant_id,)
+    )
     total_scans = cursor.fetchone()[0]
 
-    cursor.execute(db_sql("""
-    SELECT
-        id,
-        message,
-        level,
-        created_at
-    FROM alerts
-    WHERE tenant_id = ?
-    ORDER BY id DESC
-    LIMIT 5
-"""), (tenant_id,))
-
+    # ---------------------------------
+    # RECENT ALERTS
+    # ---------------------------------
     cursor.execute(
-    db_sql("SELECT COUNT(*) FROM alerts WHERE tenant_id = ?"),
-    (tenant_id,)
-)
+        db_sql("""
+            SELECT
+                id,
+                message,
+                level,
+                created_at
+            FROM alerts
+            WHERE tenant_id = ?
+            ORDER BY id DESC
+            LIMIT 5
+        """),
+        (tenant_id,)
+    )
+    alerts = cursor.fetchall()
 
+    # ---------------------------------
+    # TOTAL ALERTS
+    # ---------------------------------
     cursor.execute(
-    db_sql("SELECT COUNT(*) FROM incidents WHERE tenant_id = ?"),
-    (tenant_id,)
-)
+        db_sql("SELECT COUNT(*) FROM alerts WHERE tenant_id = ?"),
+        (tenant_id,)
+    )
+    total_alerts = cursor.fetchone()[0]
 
+    # ---------------------------------
+    # TOTAL INCIDENTS
+    # ---------------------------------
     cursor.execute(
-    db_sql("""
-        SELECT COUNT(*)
-        FROM incidents
-        WHERE tenant_id = ? AND status = 'OPEN'
-    """),
-    (tenant_id,)
-)
+        db_sql("SELECT COUNT(*) FROM incidents WHERE tenant_id = ?"),
+        (tenant_id,)
+    )
+    total_incidents = cursor.fetchone()[0]
+
+    # ---------------------------------
+    # OPEN INCIDENTS
+    # ---------------------------------
+    cursor.execute(
+        db_sql("""
+            SELECT COUNT(*)
+            FROM incidents
+            WHERE tenant_id = ? AND status = 'OPEN'
+        """),
+        (tenant_id,)
+    )
     open_incidents = cursor.fetchone()[0]
 
-    score = max(0, 100 - open_incidents * 10)
+    # ---------------------------------
+    # SECURITY SCORE
+    # ---------------------------------
+    cursor.execute(
+        db_sql("""
+            SELECT
+                COALESCE(AVG(risk_score), 0)
+            FROM scans
+            WHERE tenant_id = ?
+        """),
+        (tenant_id,)
+    )
+
+    avg_risk = cursor.fetchone()[0] or 0
+
+    # Security posture is based on actual threat risk,
+    # not simply the number of open incidents.
+    score = max(0, min(100, 100 - float(avg_risk)))
+    score = round(score, 1)
 
     conn.close()
 
@@ -5381,6 +5422,7 @@ def customer_dashboard(
         "alerts": alerts,
         "recent_alerts": alerts
     }
+
 @app.get("/executive/dashboard")
 def executive_dashboard():
 
@@ -7962,6 +8004,10 @@ def digital_twin_risk(
             "error": "DIGITAL_TWIN_RISK_ERROR",
             "details": str(e)
         }
+
+
+
+
 
 
 
