@@ -10,6 +10,7 @@ import { lazy, Suspense } from "react";
 
 import Login from "./Login";
 import ProtectedRoute from "./ProtectedRoute";
+import OverviewDashboard from "./OverviewDashboard";
 import AdminSOC from "./AdminSOC";
 
 const CustomerDashboard = lazy(
@@ -184,26 +185,9 @@ export default function Router() {
               />
             }
           />
-
           <Route
             path="overview"
-            element={
-              <div
-                style={{
-                  padding: 30,
-                  textAlign: "center",
-                }}
-              >
-                <h1 style={{ color: "#00ffc8" }}>
-                  SafeChat AI Security Operations Center
-                </h1>
-
-                <p style={{ color: "#94a3b8" }}>
-                  Unified Admin, Customer and Executive
-                  security operations dashboard.
-                </p>
-              </div>
-            }
+            element={<OverviewDashboard />}
           />
 
           <Route
