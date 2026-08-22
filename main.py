@@ -5209,13 +5209,13 @@ def get_reports():
 
     for row in rows:
         reports.append({
-            "id": row[0],
-            "created_at": row[1],
-            "category": row[2],
-            "severity": row[3],
-            "status": row[4],
-            "assigned_to": row[5]
-        })
+        "id": row["id"],
+        "created_at": row["created_at"],
+        "category": row["category"],
+        "severity": row["severity"],
+        "status": row["status"],
+        "assigned_to": row["assigned_to"]
+    })
 
     return reports
 @app.get("/reports/pdf")
