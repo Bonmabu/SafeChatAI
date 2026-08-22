@@ -1510,27 +1510,27 @@ def soc_metrics():
     # -------------------------
     # CORE COUNTS
     # -------------------------
-    cur.execute("SELECT COUNT(*) FROM scans")
-    scans = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) AS total FROM scans")
+    scans = cur.fetchone()["total"] or 0
 
-    cur.execute("SELECT COUNT(*) FROM alerts")
-    alerts = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) AS total FROM alerts")
+    alerts = cur.fetchone()["total"] or 0
 
-    cur.execute("SELECT COUNT(*) FROM incidents")
-    incidents = cur.fetchone()[0] or 0
+    cur.execute("SELECT COUNT(*) AS total FROM incidents")
+    incidents = cur.fetchone()["total"] or 0
 
     cur.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE status = 'OPEN'
     """)
-    open_incidents = cur.fetchone()[0] or 0
+    open_incidents = cur.fetchone()["total"] or 0
 
     # -------------------------
     # RISK ENGINE
     # -------------------------
-    cur.execute("SELECT AVG(risk_score) FROM scans")
-    avg_risk = cur.fetchone()[0]
+    cur.execute("SELECT AVG(risk_score) AS average FROM scans")
+    avg_risk = cur.fetchone()["average"]
 
     try:
         avg_risk = float(avg_risk or 0)
@@ -1543,11 +1543,11 @@ def soc_metrics():
     # CRITICAL THREATS
     # -------------------------
     cur.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS total
         FROM scans
         WHERE risk_score >= 80
     """)
-    critical_threats = cur.fetchone()[0] or 0
+    critical_threats = cur.fetchone()["total"] or 0
 
     conn.close()
 
