@@ -5355,39 +5355,39 @@ def analytics():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT category, COUNT(*)
-        FROM incidents
-        GROUP BY category
-    """)
+    SELECT category, COUNT(*) AS count
+    FROM incidents
+    GROUP BY category
+""")
     categories = cur.fetchall()
 
     cur.execute("""
-        SELECT severity, COUNT(*)
-        FROM incidents
-        GROUP BY severity
-    """)
+    SELECT severity, COUNT(*) AS count
+    FROM incidents
+    GROUP BY severity
+""")
     severities = cur.fetchall()
 
     cur.execute("""
-        SELECT status, COUNT(*)
-        FROM incidents
-        GROUP BY status
-    """)
+    SELECT status, COUNT(*) AS count
+    FROM incidents
+    GROUP BY status
+""")
     statuses = cur.fetchall()
 
     conn.close()
 
     return {
     "categories": [
-        {"name": c["category"], "count": c["COUNT(*)"]}
+        {"name": c["category"], "count": c["count"]}
         for c in categories
     ],
     "severities": [
-        {"name": s["severity"], "count": s["COUNT(*)"]}
+        {"name": s["severity"], "count": s["count"]}
         for s in severities
     ],
     "statuses": [
-        {"name": s["status"], "count": s["COUNT(*)"]}
+        {"name": s["status"], "count": s["count"]}
         for s in statuses
     ]
 }
