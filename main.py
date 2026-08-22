@@ -5335,10 +5335,14 @@ def customer_dashboard(
     # TOTAL SCANS
     # ---------------------------------
     cursor.execute(
-        db_sql("SELECT COUNT(*) FROM scans WHERE tenant_id = ?"),
+        db_sql("""
+            SELECT COUNT(*) AS total
+            FROM scans
+            WHERE tenant_id = ?
+        """),
         (tenant_id,)
     )
-    total_scans = cursor.fetchone()[0]
+    total_scans = cursor.fetchone()["total"]
 
     # ---------------------------------
     # RECENT ALERTS
@@ -5363,47 +5367,55 @@ def customer_dashboard(
     # TOTAL ALERTS
     # ---------------------------------
     cursor.execute(
-        db_sql("SELECT COUNT(*) FROM alerts WHERE tenant_id = ?"),
+        db_sql("""
+            SELECT COUNT(*) AS total
+            FROM alerts
+            WHERE tenant_id = ?
+        """),
         (tenant_id,)
     )
-    total_alerts = cursor.fetchone()[0]
+    total_alerts = cursor.fetchone()["total"]
 
     # ---------------------------------
     # TOTAL INCIDENTS
     # ---------------------------------
     cursor.execute(
-        db_sql("SELECT COUNT(*) FROM incidents WHERE tenant_id = ?"),
+        db_sql("""
+            SELECT COUNT(*) AS total
+            FROM incidents
+            WHERE tenant_id = ?
+        """),
         (tenant_id,)
     )
-    total_incidents = cursor.fetchone()[0]
+    total_incidents = cursor.fetchone()["total"]
 
     # ---------------------------------
     # OPEN INCIDENTS
     # ---------------------------------
     cursor.execute(
         db_sql("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) AS total
             FROM incidents
-            WHERE tenant_id = ? AND status = 'OPEN'
+            WHERE tenant_id = ?
+              AND status = 'OPEN'
         """),
         (tenant_id,)
     )
-    open_incidents = cursor.fetchone()[0]
+    open_incidents = cursor.fetchone()["total"]
 
     # ---------------------------------
     # SECURITY SCORE
     # ---------------------------------
     cursor.execute(
         db_sql("""
-            SELECT
-                COALESCE(AVG(risk_score), 0)
+            SELECT COALESCE(AVG(risk_score), 0) AS avg_risk
             FROM scans
             WHERE tenant_id = ?
         """),
         (tenant_id,)
     )
 
-    avg_risk = cursor.fetchone()[0] or 0
+    avg_risk = cursor.fetchone()["avg_risk"] or 0
 
     # Security posture is based on actual threat risk,
     # not simply the number of open incidents.
@@ -5422,7 +5434,6 @@ def customer_dashboard(
         "alerts": alerts,
         "recent_alerts": alerts
     }
-
 @app.get("/executive/dashboard")
 def executive_dashboard():
 
