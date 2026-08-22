@@ -202,7 +202,6 @@ setReplayProgress(0);
   loadDashboard();
   loadSummary();
   loadIOCs();
-  loadDigitalTwin();
   loadThreatDNA();
 }, 5000);
 
@@ -216,7 +215,6 @@ setReplayProgress(0);
 }, []);
 async function loadDigitalTwin() {
   try {
-    setDigitalTwinLoading(true);
     setDigitalTwinError(null);
 
     const res = await axios.get(
@@ -248,8 +246,6 @@ async function loadDigitalTwin() {
       error.message ||
       "DIGITAL_TWIN_ERROR"
     );
-  } finally {
-    setDigitalTwinLoading(false);
   }
 }
 async function loadSummary() {
