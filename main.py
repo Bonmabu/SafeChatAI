@@ -5601,21 +5601,30 @@ def customer_attack_trend(
     user=Depends(get_current_user)
 ):
     tenant_id = user["tenant_id"]
+
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT
-            strftime('%H:00', incidents.created_at) AS hour,
-            COUNT(*) AS attacks,
-            AVG(scans.risk_score) AS avg_score
-        FROM incidents
-        JOIN scans
-            ON incidents.scan_id = scans.id
-        WHERE incidents.tenant_id = ?
-        GROUP BY hour
-        ORDER BY hour ASC
-    """, (tenant_id,))
+    if DATABASE_URL:
+        hour_expression = "TO_CHAR(incidents.created_at, 'HH24:00')"
+    else:
+        hour_expression = "strftime('%H:00', incidents.created_at)"
+
+    cursor.execute(
+        db_sql(f"""
+            SELECT
+                {hour_expression} AS hour,
+                COUNT(*) AS attacks,
+                AVG(scans.risk_score) AS avg_score
+            FROM incidents
+            JOIN scans
+                ON incidents.scan_id = scans.id
+            WHERE incidents.tenant_id = ?
+            GROUP BY {hour_expression}
+            ORDER BY {hour_expression} ASC
+        """),
+        (tenant_id,)
+    )
 
     rows = cursor.fetchall()
 
@@ -5627,11 +5636,10 @@ def customer_attack_trend(
         trend.append({
             "time": row["hour"],
             "attacks": row["attacks"],
-            "score": round(row["avg_score"], 2)
+            "score": round(float(row["avg_score"] or 0), 2)
         })
 
     return trend
-
 @app.get("/customer/incidents")
 def customer_incidents(
     user=Depends(get_current_user)
