@@ -1,37 +1,14 @@
-export default function SOCHeader({ onLogout }) {
+﻿import { } from "react";
+
+export default function SOCHeader() {
   return (
     <div
       style={{
         display: "flex",
-        justifyContent: "space-between",
+        justifyContent: "flex-end",
         alignItems: "center",
-        marginBottom: "20px",
-        width: "100%"
+        marginBottom: 20,
       }}
-    >
-      <h1
-        style={{
-          color: "#ffffff",
-          margin: 0
-        }}
-      >
-        🛡️ SafeChat AI SOC Command Center
-      </h1>
-
-      <button
-        onClick={onLogout}
-        style={{
-          background: "#ef4444",
-          color: "white",
-          border: "none",
-          padding: "10px 16px",
-          borderRadius: 8,
-          cursor: "pointer",
-          fontWeight: "bold"
-        }}
-      >
-        Logout
-      </button>
-    </div>
+    />
   );
 }
