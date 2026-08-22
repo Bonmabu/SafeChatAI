@@ -77,15 +77,24 @@ export default function Router() {
           }
         />
 
-        {/* VIEWER */}
-        <Route
-          path="/executive"
-          element={
-            <ProtectedRoute allowedRoles={["viewer"]}>
-              <ExecutiveDashboard />
-            </ProtectedRoute>
-          }
-        />
+        {/* EXECUTIVE / IT SECURITY */}
+<Route
+  path="/executive"
+  element={
+    <ProtectedRoute allowedRoles={["viewer"]}>
+      <ExecutiveDashboard />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/executive-it"
+  element={
+    <ProtectedRoute allowedRoles={["viewer"]}>
+      <ExecutiveDashboard />
+    </ProtectedRoute>
+  }
+/>
 
         {/* UNKNOWN ROUTES */}
         <Route

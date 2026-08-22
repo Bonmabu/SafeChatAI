@@ -343,19 +343,19 @@ if (data.type === "new_threat") {
 
 }, []);
 const loadExecutivePosture = async () => {
-    try {
-        const posture = await axios.get(
-            `${API}/executive/posture`
-        );
+  try {
+    const posture = await axios.get(
+      `${API}/executive/posture`
+    );
 
-        setExecutivePosture(posture.data);
+    setSecurityPosture(posture.data);
 
-    } catch (error) {
-        console.error(
-            "Executive posture error:",
-            error
-        );
-    }
+  } catch (error) {
+    console.error(
+      "Executive posture error:",
+      error
+    );
+  }
 };
 useEffect(() => {
   loadExecutivePosture();
@@ -706,10 +706,10 @@ const dashboardRes = await axios.get(
 );
 
 setActiveIncidents(
-    dashboardRes.data.active_incidents || 0
+  dashboardRes.data.active_incidents ??
+  dashboardRes.data.active ??
+  0
 );
-
-setActiveIncidents(dashboardRes.data.active || 0);
 const recommendationRes = await axios.get(
     `${API}/executive/recommendations`
 );
