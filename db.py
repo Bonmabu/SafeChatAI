@@ -1281,7 +1281,7 @@ def create_scan(
                 category,
                 risk_score,
                 status,
-                user,
+                "user",
                 tenant_id
             )
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -1291,7 +1291,7 @@ def create_scan(
             category,
             risk_score,
             status,
-            user,
+            "user",
             tenant_id
         ))
 
@@ -1305,7 +1305,7 @@ def create_scan(
             category,
             risk_score,
             status,
-            user,
+            "user",
             tenant_id
         )
         VALUES (?, ?, ?, ?, ?, ?)
