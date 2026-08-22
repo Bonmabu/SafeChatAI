@@ -5582,7 +5582,7 @@ def executive_risk_trend():
     cursor.execute("""
         SELECT
             DATE(created_at) AS day,
-            ROUND(AVG(risk_score),2) AS risk
+            ROUND(AVG(risk_score)::numeric, 2) AS risk
         FROM scans
         GROUP BY DATE(created_at)
         ORDER BY day
