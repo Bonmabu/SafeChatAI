@@ -969,7 +969,7 @@ def get_threat_velocity():
     cur = conn.cursor()
 
     # last 1 hour data
-    cur.execute("""
+    cur.execute(f"""
         SELECT created_at
         FROM scans
         WHERE {db_recent_hours("created_at", 1)}
@@ -1759,3 +1759,4 @@ def get_all_threat_dna():
     conn.close()
 
     return [dict(row) for row in rows]
+
