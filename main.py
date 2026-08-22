@@ -113,6 +113,7 @@ from db import create_scan
 from db import (
     db_sql,
     init_db,
+    DATABASE_URL,
     get_conn,
     create_incident,
     update_incident_status,
