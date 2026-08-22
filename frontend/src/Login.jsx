@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -175,28 +175,9 @@ const requestPasswordReset = async () => {
       }
 
       // ============================================================
-      // ROLE ROUTING
-      // ============================================================
-      switch (res.data.role) {
-        case "admin":
-          navigate("/");
-          break;
-
-        case "customer":
-          navigate("/customer");
-          break;
-
-        case "analyst":
-          navigate("/customer");
-          break;
-
-        case "viewer":
-          navigate("/executive");
-          break;
-
-        default:
-          navigate("/login");
-      }
+// SINGLE DASHBOARD ROUTING
+// ============================================================
+navigate("/dashboard");
 
     } catch (err) {
       console.error("AUTH ERROR:", err);
@@ -266,7 +247,7 @@ const requestPasswordReset = async () => {
         <div className="login-brand">
 
           <div className="brand-icon">
-            🛡
+            🛡️
           </div>
 
           <div>
@@ -302,7 +283,7 @@ const requestPasswordReset = async () => {
 
     {error && (
       <div className="login-error">
-        <span>⚠</span>
+        <span>âš </span>
         <span>{error}</span>
       </div>
     )}
@@ -351,7 +332,7 @@ const requestPasswordReset = async () => {
           setError("");
         }}
       >
-        ← Back to sign in
+        â† Back to sign in
       </button>
 
     </div>
@@ -389,7 +370,7 @@ const requestPasswordReset = async () => {
           ====================================================== */}
           {error && (
             <div className="login-error">
-              <span>⚠</span>
+              <span>âš </span>
               <span>{error}</span>
             </div>
           )}
@@ -407,7 +388,7 @@ const requestPasswordReset = async () => {
                 <div className="input-wrapper">
 
                   <span className="input-icon">
-                    ◉
+                    👤
                   </span>
 
                   <input
@@ -432,7 +413,7 @@ const requestPasswordReset = async () => {
                 <div className="input-wrapper">
 
                   <span className="input-icon">
-                    ◈
+                    â—ˆ
                   </span>
 
                   <input
@@ -457,7 +438,7 @@ const requestPasswordReset = async () => {
                 <div className="input-wrapper">
 
                   <span className="input-icon">
-                    ◆
+                    🔒
                   </span>
 
                   <select
@@ -544,7 +525,7 @@ const requestPasswordReset = async () => {
             <div className="input-wrapper">
 
               <span className="input-icon">
-                ◉
+                👤
               </span>
 
               <input
@@ -571,7 +552,7 @@ const requestPasswordReset = async () => {
             <div className="input-wrapper">
 
               <span className="input-icon">
-                ◆
+                🔒
               </span>
 
               <input
@@ -621,7 +602,7 @@ const requestPasswordReset = async () => {
               <div className="input-wrapper">
 
                 <span className="input-icon">
-                  ◆
+                  🔒
                 </span>
 
                 <input
@@ -770,7 +751,7 @@ const requestPasswordReset = async () => {
 
           <span>SAFECHAT AI SOC</span>
 
-          <span>•</span>
+          <span>â€¢</span>
 
           <span>SECURE ACCESS</span>
 

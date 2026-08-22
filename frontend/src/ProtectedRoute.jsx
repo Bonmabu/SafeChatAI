@@ -1,5 +1,5 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 
 export default function ProtectedRoute({
   children,
@@ -7,32 +7,37 @@ export default function ProtectedRoute({
 }) {
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
+  const location = useLocation();
 
   if (!token) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location.pathname }}
+      />
+    );
   }
 
   if (
     allowedRoles.length > 0 &&
     !allowedRoles.includes(role)
   ) {
-    if (role === "customer") {
-      return <Navigate to="/customer" replace />;
-    }
-
-    if (role === "admin") {
-      return <Navigate to="/" replace />;
-    }
-
-    if (role === "viewer") {
-      return <Navigate to="/executive" replace />;
-    }
-
-    if (role === "analyst") {
-      return <Navigate to="/customer" replace />;
-    }
-
-    return <Navigate to="/login" replace />;
+    return (
+      <div
+        style={{
+          padding: 40,
+          color: "white",
+          background: "#0f172a",
+          minHeight: "100vh",
+        }}
+      >
+        <h2>Access Restricted</h2>
+        <p>
+          Your current account does not have permission to open this section.
+        </p>
+      </div>
+    );
   }
 
   return children;

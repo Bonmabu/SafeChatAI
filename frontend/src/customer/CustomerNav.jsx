@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+﻿import { useLocation, useNavigate } from "react-router-dom";
 
 export default function CustomerNav() {
   const location = useLocation();
@@ -7,65 +7,74 @@ export default function CustomerNav() {
   const linkStyle = (path) => ({
     color: location.pathname === path ? "#22d3ee" : "white",
     textDecoration: "none",
-    padding: "10px 18px",
+    fontWeight: 600,
+    padding: "8px 12px",
     borderRadius: 8,
     background:
-      location.pathname === path ? "#1e293b" : "transparent",
-    fontWeight: "bold"
+      location.pathname === path
+        ? "rgba(34,211,238,0.10)"
+        : "transparent",
   });
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("tenant_id");
-
-    navigate("/login", { replace: true });
-  };
 
   return (
     <div
       style={{
         display: "flex",
-        gap: 15,
-        padding: 15,
-        marginBottom: 25,
-        background: "#111827",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 20,
+        padding: "10px 14px",
+        background: "#0f172a",
+        border: "1px solid #1e293b",
         borderRadius: 10,
-        alignItems: "center"
       }}
     >
-      <Link to="/customer" style={linkStyle("/customer")}>
-        🛡️ Dashboard
-      </Link>
-
-      <Link
-        to="/customer/analytics"
-        style={linkStyle("/customer/analytics")}
-      >
-        📊 Analytics
-      </Link>
-
-      <Link
-        to="/customer/timeline"
-        style={linkStyle("/customer/timeline")}
-      >
-        📜 Timeline
-      </Link>
-
       <button
-        onClick={handleLogout}
+        type="button"
+        onClick={() => navigate("/dashboard/customer")}
         style={{
-          marginLeft: "auto",
-          padding: "10px 20px",
-          borderRadius: 8,
-          border: "1px solid #ef4444",
-          background: "#0f172a",
-          color: "#ef4444",
-          fontWeight: "bold",
-          cursor: "pointer"
+          ...linkStyle("/dashboard/customer"),
+          border: "none",
+          cursor: "pointer",
+          background:
+            location.pathname === "/dashboard/customer"
+              ? "rgba(34,211,238,0.10)"
+              : "transparent",
         }}
       >
-        Logout
+        🛡️ Dashboard
+      </button>
+
+      <button
+        type="button"
+        onClick={() => navigate("/dashboard/customer/analytics")}
+        style={{
+          ...linkStyle("/dashboard/customer/analytics"),
+          border: "none",
+          cursor: "pointer",
+          background:
+            location.pathname === "/dashboard/customer/analytics"
+              ? "rgba(34,211,238,0.10)"
+              : "transparent",
+        }}
+      >
+        📊 Analytics
+      </button>
+
+      <button
+        type="button"
+        onClick={() => navigate("/dashboard/customer/timeline")}
+        style={{
+          ...linkStyle("/dashboard/customer/timeline"),
+          border: "none",
+          cursor: "pointer",
+          background:
+            location.pathname === "/dashboard/customer/timeline"
+              ? "rgba(34,211,238,0.10)"
+              : "transparent",
+        }}
+      >
+        📜 Timeline
       </button>
     </div>
   );

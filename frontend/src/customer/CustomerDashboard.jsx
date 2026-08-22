@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState, useRef } from "react";
 import axios from "axios";
+import CustomerNav from "./CustomerNav";
 const getTenantId = () => {
   const token = localStorage.getItem("token");
 
@@ -16,7 +17,7 @@ const getAuthConfig = () => ({
     Authorization: `Bearer ${localStorage.getItem("token")}`
   }
 });
-import CustomerNav from "./CustomerNav";
+
 import ForceGraph2D from "react-force-graph-2d";
 import AttackMap from "../components/AttackMap";
 import SOCAssistant from "./SOCAssistant";
@@ -782,7 +783,7 @@ break;
     // Customer Dashboard does not need to process it directly.
     break;
 
-        
+
         case "dashboard_update":
 
     loadDashboard();
@@ -1055,6 +1056,9 @@ break;
     >
       <CustomerNav />
 
+
+
+
       {/* HEADER */}
       <h1
         style={{
@@ -1119,7 +1123,7 @@ break;
     </span>
   }
 />
-        
+
       </div>
 <div
   style={{
@@ -2036,7 +2040,7 @@ onClick={async () => {
   </button>
 </div>
 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-  
+
 </div>
 
   <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
@@ -2657,7 +2661,7 @@ MITRE: ${node.mitre || "Unknown"}`
   }}
 />
 </div>
-      
+
 {/* SELECTED NODE */}
 {selectedNode && (
           <div
@@ -2692,7 +2696,7 @@ MITRE: ${node.mitre || "Unknown"}`
             )}
           </div>
         )}
-      </div>   
+      </div>
       {/* DIGITAL TWIN PANEL */}
   <div
     style={{
@@ -3018,18 +3022,3 @@ MITRE: ${node.mitre || "Unknown"}`
   </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
