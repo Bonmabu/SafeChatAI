@@ -3161,7 +3161,7 @@ async def analyze(
         stage=stage,
         mitre=mitre,
         tenant_id=user["tenant_id"],
-        threat_intel=json.dumps(intel),
+        threat_intel=json.dumps(jsonable_encoder(intel)),
         correlation_id=corr_id
     )
 
