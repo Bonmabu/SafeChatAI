@@ -210,14 +210,23 @@ def status():
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT COUNT(*) FROM scans")
-    scans = cur.fetchone()[0]
+    cur.execute(db_sql("""
+        SELECT COUNT(*) AS total
+        FROM scans
+    """))
+    scans = cur.fetchone()["total"]
 
-    cur.execute("SELECT COUNT(*) FROM alerts")
-    alerts = cur.fetchone()[0]
+    cur.execute(db_sql("""
+        SELECT COUNT(*) AS total
+        FROM alerts
+    """))
+    alerts = cur.fetchone()["total"]
 
-    cur.execute("SELECT COUNT(*) FROM incidents")
-    incidents = cur.fetchone()[0]
+    cur.execute(db_sql("""
+        SELECT COUNT(*) AS total
+        FROM incidents
+    """))
+    incidents = cur.fetchone()["total"]
 
     conn.close()
 
@@ -228,7 +237,6 @@ def status():
         "alerts": alerts,
         "incidents": incidents
     }
-
 
 active_connections = []
 
@@ -1770,29 +1778,29 @@ def build_executive_payload():
     conn = get_conn()
     cursor = conn.cursor()
 
-    # Active threats
+        # Active threats
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE status='OPEN'
     """)
-    active_threats = cursor.fetchone()[0]
+    active_threats = cursor.fetchone()["total"]
 
     # Critical alerts
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS total
         FROM scans
         WHERE risk_score >= 90
     """)
-    critical_alerts = cursor.fetchone()[0]
+    critical_alerts = cursor.fetchone()["total"]
 
     # Blocked attacks
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE status='BLOCKED'
     """)
-    blocked_attacks = cursor.fetchone()[0]
+    blocked_attacks = cursor.fetchone()["total"]
 
     conn.close()
 
@@ -2573,19 +2581,19 @@ def login(request: LoginRequest):
     try:
 
         cursor.execute(
-            """
-            SELECT
-                username,
-                full_name,
-                email,
-                password_hash,
-                role,
-                tenant_id
-            FROM users
-            WHERE username = ?
-            """,
-            (username,)
-        )
+    db_sql("""
+        SELECT
+            username,
+            full_name,
+            email,
+            password_hash,
+            role,
+            tenant_id
+        FROM users
+        WHERE username = ?
+    """),
+    (username,)
+)
 
         user = cursor.fetchone()
 
@@ -2690,13 +2698,13 @@ def forgot_password(request: ForgotPasswordRequest):
         cursor = conn.cursor()
 
         cursor.execute(
-            """
-            SELECT id
-            FROM users
-            WHERE LOWER(email) = ?
-            """,
-            (email,)
-        )
+    db_sql("""
+        SELECT id
+        FROM users
+        WHERE LOWER(email) = ?
+    """),
+    (email,)
+)
 
         user = cursor.fetchone()
 
@@ -2718,19 +2726,18 @@ def forgot_password(request: ForgotPasswordRequest):
         expires_at = datetime.utcnow() + timedelta(minutes=30)
 
         cursor.execute(
-            """
-            UPDATE users
-            SET reset_token = ?,
-                reset_token_expires = ?
-            WHERE id = ?
-            """,
-            (
-                reset_token,
-                expires_at.isoformat(),
-                user["id"]
-            )
-        )
-
+    db_sql("""
+        UPDATE users
+        SET reset_token = ?,
+            reset_token_expires = ?
+        WHERE id = ?
+    """),
+    (
+        reset_token,
+        expires_at.isoformat(),
+        user["id"]
+    )
+)
         conn.commit()
 
         print(
@@ -2788,17 +2795,17 @@ def reset_password(request: ResetPasswordRequest):
         cursor = conn.cursor()
 
         cursor.execute(
-            """
-            SELECT id
-            FROM users
-            WHERE reset_token = ?
-              AND reset_token_expires > ?
-            """,
-            (
-                token,
-                datetime.utcnow().isoformat()
-            )
-        )
+    db_sql("""
+        SELECT id
+        FROM users
+        WHERE reset_token = ?
+          AND reset_token_expires > ?
+    """),
+    (
+        token,
+        datetime.utcnow().isoformat()
+    )
+)
 
         user = cursor.fetchone()
 
@@ -2812,19 +2819,18 @@ def reset_password(request: ResetPasswordRequest):
         new_password_hash = hash_password(new_password)
 
         cursor.execute(
-            """
-            UPDATE users
-            SET password_hash = ?,
-                reset_token = NULL,
-                reset_token_expires = NULL
-            WHERE id = ?
-            """,
-            (
-                new_password_hash,
-                user["id"]
-            )
-        )
-
+    db_sql("""
+        UPDATE users
+        SET password_hash = ?,
+            reset_token = NULL,
+            reset_token_expires = NULL
+        WHERE id = ?
+    """),
+    (
+        new_password_hash,
+        user["id"]
+    )
+)
         conn.commit()
 
         return {
@@ -3390,32 +3396,42 @@ def resolve_incident(incident_id: int):
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
-        UPDATE incidents
-        SET status='RESOLVED'
-        WHERE id=?
-    """, (incident_id,))
+    cur.execute(
+        db_sql("""
+            UPDATE incidents
+            SET status='RESOLVED'
+            WHERE id=?
+        """),
+        (incident_id,)
+    )
 
     conn.commit()
     conn.close()
 
     return {"success": True}
+
+
 @app.put("/incidents/{incident_id}/investigate")
 def investigate_incident(incident_id: int):
 
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
-        UPDATE incidents
-        SET status='INVESTIGATING'
-        WHERE id=?
-    """, (incident_id,))
+    cur.execute(
+        db_sql("""
+            UPDATE incidents
+            SET status='INVESTIGATING'
+            WHERE id=?
+        """),
+        (incident_id,)
+    )
 
     conn.commit()
     conn.close()
 
     return {"success": True}
+
+
 class AssignRequest(BaseModel):
     assigned_to: str
 
@@ -3426,11 +3442,17 @@ def assign_incident(incident_id: int, request: AssignRequest):
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
-        UPDATE incidents
-        SET assigned_to = ?
-        WHERE id = ?
-    """, (request.assigned_to, incident_id))
+    cur.execute(
+        db_sql("""
+            UPDATE incidents
+            SET assigned_to = ?
+            WHERE id = ?
+        """),
+        (
+            request.assigned_to,
+            incident_id
+        )
+    )
 
     conn.commit()
     conn.close()
@@ -3439,8 +3461,6 @@ def assign_incident(incident_id: int, request: AssignRequest):
         "success": True,
         "assigned_to": request.assigned_to
     }
-
-
 @app.get("/incidents/open")
 def open_incidents():
     conn = get_conn()
@@ -4458,12 +4478,12 @@ async def soc_chat(payload: dict):
         }
 
     # ---------------------------------
-# Default AI Copilot
-# ---------------------------------
+    # Default AI Copilot
+    # ---------------------------------
     result = soc_copilot(
-    query,
-    incidents,
-    iocs
+        query,
+        incidents,
+        iocs
 )
 
     if result.get("action") == "resolve":
@@ -4789,7 +4809,7 @@ async def threat_hunt(request: ThreatHuntRequest):
 
     query += " ORDER BY timestamp DESC LIMIT 100"
 
-    cur.execute(query, params)
+    cur.execute(db_sql(query), params)
 
     rows = cur.fetchall()
 
@@ -5486,38 +5506,50 @@ def executive_dashboard():
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM scans")
-    total_scans = cursor.fetchone()[0]
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
+        FROM scans
+    """))
+    total_scans = cursor.fetchone()["total"]
 
-    cursor.execute("SELECT COUNT(*) FROM alerts")
-    total_alerts = cursor.fetchone()[0]
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
+        FROM alerts
+    """))
+    total_alerts = cursor.fetchone()["total"]
 
-    cursor.execute("SELECT COUNT(*) FROM incidents")
-    total_incidents = cursor.fetchone()[0]
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
+        FROM incidents
+    """))
+    total_incidents = cursor.fetchone()["total"]
 
-    cursor.execute("""
-        SELECT COUNT(*)
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE status='OPEN'
-    """)
-    open_incidents = cursor.fetchone()[0]
+    """))
+    open_incidents = cursor.fetchone()["total"]
 
-    cursor.execute("""
-        SELECT AVG(risk_score)
+    cursor.execute(db_sql("""
+        SELECT AVG(risk_score) AS avg_risk
         FROM scans
-    """)
-    avg_risk = cursor.fetchone()[0] or 0
+    """))
+    avg_risk = cursor.fetchone()["avg_risk"] or 0
 
-    # Executive-only user/account metrics
-    cursor.execute("SELECT COUNT(*) FROM users")
-    total_users = cursor.fetchone()[0]
+        # Executive-only user/account metrics
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
+        FROM users
+    """))
+    total_users = cursor.fetchone()["total"]
 
-    cursor.execute("""
-        SELECT COUNT(*)
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
         FROM users
         WHERE DATE(created_at) = DATE('now')
-    """)
-    new_accounts = cursor.fetchone()[0]
+    """))
+    new_accounts = cursor.fetchone()["total"]
 
     active_users = len(ACTIVE_SESSIONS)
 
@@ -5747,12 +5779,12 @@ def incident_intel(
     cursor = conn.cursor()
 
     cursor.execute(
-        """
+    db_sql("""
         SELECT threat_intel
         FROM incidents
         WHERE id=?
         AND tenant_id=?
-        """,
+    """),
         (
             incident_id,
             tenant_id
@@ -5781,7 +5813,8 @@ def customer_trends(
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
+    cur.execute(
+    db_sql("""
         SELECT
             DATE(created_at) AS day,
             COUNT(*) AS count
@@ -5789,7 +5822,9 @@ def customer_trends(
         WHERE tenant_id=?
         GROUP BY DATE(created_at)
         ORDER BY day
-    """, (tenant_id,))
+    """),
+    (tenant_id,)
+)
 
     rows = cur.fetchall()
     conn.close()
@@ -5806,7 +5841,8 @@ def customer_categories(
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
+    cur.execute(
+    db_sql("""
         SELECT
             category,
             COUNT(*) AS count
@@ -5814,7 +5850,9 @@ def customer_categories(
         WHERE tenant_id=?
         GROUP BY category
         ORDER BY count DESC
-    """, (tenant_id,))
+    """),
+    (tenant_id,)
+)
 
     rows = cur.fetchall()
     conn.close()
@@ -5831,14 +5869,17 @@ def customer_status(
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
+    cur.execute(
+    db_sql("""
         SELECT
             status,
             COUNT(*) AS count
         FROM incidents
         WHERE tenant_id=?
         GROUP BY status
-    """, (tenant_id,))
+    """),
+    (tenant_id,)
+)
 
     rows = cur.fetchall()
     conn.close()
@@ -5905,13 +5946,22 @@ def customer_alerts(
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT *
-        FROM alerts
-        WHERE tenant_id=?
-        ORDER BY id DESC
-        LIMIT 20
-    """, (tenant_id,))
+    if DATABASE_URL:
+        cur.execute("""
+            SELECT *
+            FROM alerts
+            WHERE tenant_id = %s
+            ORDER BY id DESC
+            LIMIT 20
+        """, (tenant_id,))
+    else:
+        cur.execute("""
+            SELECT *
+            FROM alerts
+            WHERE tenant_id = ?
+            ORDER BY id DESC
+            LIMIT 20
+        """, (tenant_id,))
 
     rows = cur.fetchall()
     conn.close()
@@ -5922,14 +5972,23 @@ def debug_customer(tenant_id: str):
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT COUNT(*) FROM scans WHERE tenant_id=?", (tenant_id,))
-    scans = cur.fetchone()[0]
+    cur.execute(
+        db_sql("SELECT COUNT(*) AS total FROM scans WHERE tenant_id=?"),
+        (tenant_id,)
+    )
+    scans = cur.fetchone()["total"]
 
-    cur.execute("SELECT COUNT(*) FROM alerts WHERE tenant_id=?", (tenant_id,))
-    alerts = cur.fetchone()[0]
+    cur.execute(
+        db_sql("SELECT COUNT(*) AS total FROM alerts WHERE tenant_id=?"),
+        (tenant_id,)
+    )
+    alerts = cur.fetchone()["total"]
 
-    cur.execute("SELECT COUNT(*) FROM incidents WHERE tenant_id=?", (tenant_id,))
-    incidents = cur.fetchone()[0]
+    cur.execute(
+        db_sql("SELECT COUNT(*) AS total FROM incidents WHERE tenant_id=?"),
+        (tenant_id,)
+    )
+    incidents = cur.fetchone()["total"]
 
     conn.close()
 
@@ -6228,13 +6287,13 @@ def executive_summary():
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT COUNT(*)
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE risk_score >= 90
-    """)
+    """))
 
-    critical = cursor.fetchone()[0]
+    critical = cursor.fetchone()["total"]
 
     conn.close()
 
@@ -6279,13 +6338,13 @@ def executive_threat_intelligence():
 
     threats = cursor.fetchall()
 
-    cursor.execute("""
-        SELECT COUNT(*)
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE risk_score >= 80
-    """)
+    """))
 
-    high_risk = cursor.fetchone()[0]
+    high_risk = cursor.fetchone()["total"]
 
     conn.close()
 
@@ -6330,12 +6389,12 @@ def executive_prediction():
     row = cursor.fetchone()
 
 
-    cursor.execute("""
-        SELECT AVG(risk_score)
+    cursor.execute(db_sql("""
+        SELECT AVG(risk_score) AS avg_risk
         FROM incidents
-    """)
+    """))
 
-    avg = cursor.fetchone()[0] or 0
+    avg = cursor.fetchone()["avg_risk"] or 0
 
     conn.close()
 
@@ -6417,11 +6476,14 @@ def executive_incident_detail(incident_id: int):
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+    db_sql("""
         SELECT *
         FROM incidents
         WHERE id = ?
-    """, (incident_id,))
+    """),
+    (incident_id,)
+)
 
     incident = cursor.fetchone()
 
@@ -6472,21 +6534,21 @@ def executive_compliance():
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT COUNT(*)
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE status = 'OPEN'
-    """)
+    """))
 
-    open_incidents = cursor.fetchone()[0]
+    open_incidents = cursor.fetchone()["total"]
 
 
-    cursor.execute("""
-        SELECT COUNT(*)
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
         FROM alerts
-    """)
+    """))
 
-    alerts = cursor.fetchone()[0]
+    alerts = cursor.fetchone()["total"]
 
 
     conn.close()
@@ -6530,22 +6592,22 @@ def executive_scorecard():
     cursor = conn.cursor()
 
 
-    cursor.execute("""
-        SELECT COUNT(*)
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE risk_score >= 80
-    """)
+    """))
 
-    high_risk = cursor.fetchone()[0]
+    high_risk = cursor.fetchone()["total"]
 
 
-    cursor.execute("""
-        SELECT COUNT(*)
+    cursor.execute(db_sql("""
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE status != 'OPEN'
-    """)
+    """))
 
-    resolved = cursor.fetchone()[0]
+    resolved = cursor.fetchone()["total"]
 
 
     conn.close()
@@ -6614,12 +6676,12 @@ def executive_strategy():
     threats = cursor.fetchall()
 
 
-    cursor.execute("""
-        SELECT AVG(risk_score)
+    cursor.execute(db_sql("""
+        SELECT AVG(risk_score) AS avg_risk
         FROM incidents
-    """)
+    """))
 
-    avg_risk = cursor.fetchone()[0] or 0
+    avg_risk = cursor.fetchone()["avg_risk"] or 0
 
 
     conn.close()
@@ -6983,13 +7045,13 @@ def approve_action(incident_id: int):
     cursor = conn.cursor()
 
     cursor.execute(
-        """
+    db_sql("""
         UPDATE incidents
         SET status='Contained'
         WHERE id=?
-        """,
-        (incident_id,)
-    )
+    """),
+    (incident_id,)
+)
 
     conn.commit()
     conn.close()
@@ -7235,7 +7297,7 @@ def seed_incidents():
     """)
     for ioc in iocs:
         cursor.execute(
-        """
+    db_sql("""
         INSERT INTO threat_intel(
             incident_id,
             ioc,
@@ -7244,15 +7306,15 @@ def seed_incidents():
             risk_score
         )
         VALUES (?,?,?,?,?)
-        """,
-        (
-            incident_id,
-            ioc["ioc"],
-            ioc["type"],
-            ioc.get("reputation","UNKNOWN"),
-            ioc.get("risk_score",0)
-        )
+    """),
+    (
+        incident_id,
+        ioc["ioc"],
+        ioc["type"],
+        ioc.get("reputation", "UNKNOWN"),
+        ioc.get("risk_score", 0)
     )
+)
 
     conn.commit()
     conn.close()
@@ -7340,95 +7402,94 @@ def executive_users():
         # ---------------------------------
         # TOTAL SCANS
         # ---------------------------------
-        cursor.execute("""
-            SELECT COUNT(*)
+        cursor.execute(db_sql("""
+            SELECT COUNT(*) AS total
             FROM scans
             WHERE tenant_id = ?
-        """, (tenant_id,))
+        """), (tenant_id,))
 
-        user["total_scans"] = cursor.fetchone()[0] or 0
+        user["total_scans"] = cursor.fetchone()["total"] or 0
 
         # ---------------------------------
         # TOTAL ALERTS
         # ---------------------------------
-        cursor.execute("""
-            SELECT COUNT(*)
+        cursor.execute(db_sql("""
+            SELECT COUNT(*) AS total
             FROM alerts
             WHERE tenant_id = ?
-        """, (tenant_id,))
+        """), (tenant_id,))
 
-        user["total_alerts"] = cursor.fetchone()[0] or 0
+        user["total_alerts"] = cursor.fetchone()["total"] or 0
 
         # ---------------------------------
         # TOTAL INCIDENTS
         # ---------------------------------
-        cursor.execute("""
-            SELECT COUNT(*)
+        cursor.execute(db_sql("""
+            SELECT COUNT(*) AS total
             FROM incidents
             WHERE tenant_id = ?
-        """, (tenant_id,))
+        """), (tenant_id,))
 
-        user["total_incidents"] = cursor.fetchone()[0] or 0
+        user["total_incidents"] = cursor.fetchone()["total"] or 0
 
         # ---------------------------------
         # OPEN INCIDENTS
         # ---------------------------------
-        cursor.execute("""
-            SELECT COUNT(*)
+        cursor.execute(db_sql("""
+            SELECT COUNT(*) AS total
             FROM incidents
             WHERE tenant_id = ?
               AND status = 'OPEN'
-        """, (tenant_id,))
+        """), (tenant_id,))
 
-        user["open_incidents"] = cursor.fetchone()[0] or 0
+        user["open_incidents"] = cursor.fetchone()["total"] or 0
 
         # ---------------------------------
         # HIGH-RISK INCIDENTS
         # ---------------------------------
-        cursor.execute("""
-            SELECT COUNT(*)
+        cursor.execute(db_sql("""
+            SELECT COUNT(*) AS total
             FROM incidents
             WHERE tenant_id = ?
               AND risk_score >= 80
-        """, (tenant_id,))
+        """), (tenant_id,))
 
-        user["high_risk_incidents"] = cursor.fetchone()[0] or 0
+        user["high_risk_incidents"] = cursor.fetchone()["total"] or 0
 
         # ---------------------------------
         # AVERAGE RISK
         # ---------------------------------
-        cursor.execute("""
-            SELECT AVG(risk_score)
+        cursor.execute(db_sql("""
+            SELECT AVG(risk_score) AS avg_risk
             FROM scans
             WHERE tenant_id = ?
-        """, (tenant_id,))
+        """), (tenant_id,))
 
-        avg_risk = cursor.fetchone()[0] or 0
+        avg_risk = cursor.fetchone()["avg_risk"] or 0
 
         user["average_risk"] = round(avg_risk, 2)
 
         # ---------------------------------
         # LAST SCAN
         # ---------------------------------
-        cursor.execute("""
-            SELECT MAX(created_at)
+        cursor.execute(db_sql("""
+            SELECT MAX(created_at) AS last_scan
             FROM scans
             WHERE tenant_id = ?
-        """, (tenant_id,))
+        """), (tenant_id,))
 
-        user["last_scan"] = cursor.fetchone()[0]
+        user["last_scan"] = cursor.fetchone()["last_scan"]
 
         # ---------------------------------
         # LAST INCIDENT
         # ---------------------------------
-        cursor.execute("""
-            SELECT MAX(created_at)
+        cursor.execute(db_sql("""
+            SELECT MAX(created_at) AS last_incident
             FROM incidents
             WHERE tenant_id = ?
-        """, (tenant_id,))
+        """), (tenant_id,))
 
-        user["last_incident"] = cursor.fetchone()[0]
-
+        user["last_incident"] = cursor.fetchone()["last_incident"]
         # ---------------------------------
         # SECURITY STATUS
         # ---------------------------------
