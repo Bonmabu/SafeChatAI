@@ -43,6 +43,7 @@ from dotenv import load_dotenv
 import os
 import logging
 import sqlite3
+import psycopg
 
 load_dotenv()
 
@@ -2365,9 +2366,11 @@ def signup(request: SignupRequest):
     cursor = conn.cursor()
 
     try:
+        # ---------------------------------
         # Check existing username
+        # ---------------------------------
         cursor.execute(
-            "SELECT id FROM users WHERE username = ?",
+            db_sql("SELECT id FROM users WHERE username = ?"),
             (username,)
         )
 
@@ -2377,9 +2380,11 @@ def signup(request: SignupRequest):
                 "message": "Username already exists."
             }
 
+        # ---------------------------------
         # Check existing email
+        # ---------------------------------
         cursor.execute(
-            "SELECT id FROM users WHERE email = ?",
+            db_sql("SELECT id FROM users WHERE email = ?"),
             (email,)
         )
 
@@ -2389,12 +2394,16 @@ def signup(request: SignupRequest):
                 "message": "Email already registered."
             }
 
+        # ---------------------------------
         # Generate unique tenant ID
+        # ---------------------------------
         tenant_id = f"tenant_{username.lower()}"
 
-        # Make sure tenant ID is unique
+        # ---------------------------------
+        # Check tenant ID
+        # ---------------------------------
         cursor.execute(
-            "SELECT id FROM tenants WHERE tenant_id = ?",
+            db_sql("SELECT id FROM tenants WHERE tenant_id = ?"),
             (tenant_id,)
         )
 
@@ -2404,16 +2413,18 @@ def signup(request: SignupRequest):
                 "message": "Unable to create tenant. Please choose another username."
             }
 
+        # ---------------------------------
         # Create tenant
+        # ---------------------------------
         cursor.execute(
-            """
-            INSERT INTO tenants (
-                tenant_id,
-                company_name,
-                industry
-            )
-            VALUES (?, ?, ?)
-            """,
+            db_sql("""
+                INSERT INTO tenants (
+                    tenant_id,
+                    company_name,
+                    industry
+                )
+                VALUES (?, ?, ?)
+            """),
             (
                 tenant_id,
                 company_name,
@@ -2421,22 +2432,26 @@ def signup(request: SignupRequest):
             )
         )
 
+        # ---------------------------------
         # Hash password
+        # ---------------------------------
         password_hash = hash_password(request.password)
 
+        # ---------------------------------
         # Create customer user
+        # ---------------------------------
         cursor.execute(
-            """
-            INSERT INTO users (
-                username,
-                full_name,
-                email,
-                password_hash,
-                role,
-                tenant_id
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
+            db_sql("""
+                INSERT INTO users (
+                    username,
+                    full_name,
+                    email,
+                    password_hash,
+                    role,
+                    tenant_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+            """),
             (
                 username,
                 full_name,
@@ -2447,9 +2462,14 @@ def signup(request: SignupRequest):
             )
         )
 
+        # ---------------------------------
+        # Commit transaction
+        # ---------------------------------
         conn.commit()
 
+        # ---------------------------------
         # Create login token immediately
+        # ---------------------------------
         token = create_access_token(
             {
                 "sub": username,
@@ -2466,7 +2486,8 @@ def signup(request: SignupRequest):
             "tenant_id": tenant_id
         }
 
-    except sqlite3.IntegrityError as e:
+    except (sqlite3.IntegrityError, psycopg.IntegrityError) as e:
+
         conn.rollback()
 
         print(
@@ -2481,6 +2502,7 @@ def signup(request: SignupRequest):
         }
 
     except Exception as e:
+
         conn.rollback()
 
         print(
@@ -2496,8 +2518,6 @@ def signup(request: SignupRequest):
 
     finally:
         conn.close()
-
-
 @app.post("/login")
 def login(request: LoginRequest):
 
@@ -5310,45 +5330,41 @@ def customer_dashboard(
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT COUNT(*) FROM scans WHERE tenant_id = ?",
-        (tenant_id,)
-    )
+    db_sql("SELECT COUNT(*) FROM scans WHERE tenant_id = ?"),
+    (tenant_id,)
+)
     total_scans = cursor.fetchone()[0]
 
-    cursor.execute("""
-        SELECT
-            id,
-            message,
-            level,
-            created_at
-        FROM alerts
-        WHERE tenant_id = ?
-        ORDER BY id DESC
-        LIMIT 5
-    """, (tenant_id,))
-
-    alerts = [dict(r) for r in cursor.fetchall()]
+    cursor.execute(db_sql("""
+    SELECT
+        id,
+        message,
+        level,
+        created_at
+    FROM alerts
+    WHERE tenant_id = ?
+    ORDER BY id DESC
+    LIMIT 5
+"""), (tenant_id,))
 
     cursor.execute(
-        "SELECT COUNT(*) FROM alerts WHERE tenant_id = ?",
-        (tenant_id,)
-    )
-    total_alerts = cursor.fetchone()[0]
+    db_sql("SELECT COUNT(*) FROM alerts WHERE tenant_id = ?"),
+    (tenant_id,)
+)
 
     cursor.execute(
-        "SELECT COUNT(*) FROM incidents WHERE tenant_id = ?",
-        (tenant_id,)
-    )
-    total_incidents = cursor.fetchone()[0]
+    db_sql("SELECT COUNT(*) FROM incidents WHERE tenant_id = ?"),
+    (tenant_id,)
+)
 
     cursor.execute(
-        """
+    db_sql("""
         SELECT COUNT(*)
         FROM incidents
         WHERE tenant_id = ? AND status = 'OPEN'
-        """,
-        (tenant_id,)
-    )
+    """),
+    (tenant_id,)
+)
     open_incidents = cursor.fetchone()[0]
 
     score = max(0, 100 - open_incidents * 10)
@@ -7094,7 +7110,7 @@ def customer_iocs(
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(db_sql("""
 SELECT
     id,
     indicator,
@@ -7105,12 +7121,11 @@ SELECT
     campaign,
     first_seen,
     last_seen
-    FROM threat_intelligence
-    WHERE tenant_id = ?
-    ORDER BY score DESC, confidence DESC
-    LIMIT 50
-""", (tenant_id,))
-
+FROM threat_intelligence
+WHERE tenant_id = ?
+ORDER BY score DESC, confidence DESC
+LIMIT 50
+"""), (tenant_id,))
     rows = cursor.fetchall()
     conn.close()
 
