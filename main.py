@@ -65,6 +65,7 @@ from ai.correlation import correlate_incidents
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Security
@@ -332,17 +333,19 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        print("ðŸ“¡ BROADCAST CALLED")
-        print("ðŸ‘¥ CONNECTIONS:", len(self.active_connections))
+        print("📡 BROADCAST CALLED")
+        print("👥 CONNECTIONS:", len(self.active_connections))
 
         dead = []
 
         for connection in self.active_connections:
             try:
-                await connection.send_json(message)
+                await connection.send_json(
+                    jsonable_encoder(message)
+                )
 
             except Exception as e:
-                print("âŒ SEND FAILED:", e)
+                print("❌ SEND FAILED:", e)
                 dead.append(connection)
 
         for d in dead:
@@ -350,7 +353,6 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
-
 
 # =====================================================
 # Global broadcast wrapper
