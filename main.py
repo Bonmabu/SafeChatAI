@@ -1778,13 +1778,14 @@ def build_executive_payload():
     conn = get_conn()
     cursor = conn.cursor()
 
-        # Active threats
+    # Active threats
     cursor.execute("""
         SELECT COUNT(*) AS total
         FROM incidents
         WHERE status='OPEN'
     """)
-    active_threats = cursor.fetchone()["total"]
+    row = cursor.fetchone()
+    active_threats = row["total"] if isinstance(row, dict) else row[0]
 
     # Critical alerts
     cursor.execute("""
@@ -1792,7 +1793,8 @@ def build_executive_payload():
         FROM scans
         WHERE risk_score >= 90
     """)
-    critical_alerts = cursor.fetchone()["total"]
+    row = cursor.fetchone()
+    critical_alerts = row["total"] if isinstance(row, dict) else row[0]
 
     # Blocked attacks
     cursor.execute("""
@@ -1800,7 +1802,8 @@ def build_executive_payload():
         FROM incidents
         WHERE status='BLOCKED'
     """)
-    blocked_attacks = cursor.fetchone()["total"]
+    row = cursor.fetchone()
+    blocked_attacks = row["total"] if isinstance(row, dict) else row[0]
 
     conn.close()
 
