@@ -5251,13 +5251,13 @@ def reports_pdf():
 
     for r in rows:
         data.append([
-            r[0],
-            str(r[1]),
-            r[2],
-            r[3],
-            r[4],
-            r[5] or "Unassigned"
-        ])
+        r["id"],
+        str(r["created_at"]),
+        r["category"],
+        r["severity"],
+        r["status"],
+        r["assigned_to"] or "Unassigned"
+    ])
 
     pdf = SimpleDocTemplate(filename)
     table = Table(data)
@@ -5338,16 +5338,16 @@ async def hunt(query: str = ""):
     conn.close()
 
     return [
-        {
-            "id": r[0],
-            "category": r[1],
-            "severity": r[2],
-            "status": r[3],
-            "message": r[4],
-            "created_at": r[5]
-        }
-        for r in rows
-    ]
+    {
+        "id": r["id"],
+        "category": r["category"],
+        "severity": r["severity"],
+        "status": r["status"],
+        "message": r["message"],
+        "created_at": r["created_at"]
+    }
+    for r in rows
+]
 @app.get("/analytics")
 def analytics():
 
@@ -5378,19 +5378,19 @@ def analytics():
     conn.close()
 
     return {
-        "categories": [
-            {"name": c[0], "count": c[1]}
-            for c in categories
-        ],
-        "severities": [
-            {"name": s[0], "count": s[1]}
-            for s in severities
-        ],
-        "statuses": [
-            {"name": s[0], "count": s[1]}
-            for s in statuses
-        ]
-    }
+    "categories": [
+        {"name": c["category"], "count": c["COUNT(*)"]}
+        for c in categories
+    ],
+    "severities": [
+        {"name": s["severity"], "count": s["COUNT(*)"]}
+        for s in severities
+    ],
+    "statuses": [
+        {"name": s["status"], "count": s["COUNT(*)"]}
+        for s in statuses
+    ]
+}
 @app.get("/customer/dashboard")
 def customer_dashboard(
     user=Depends(get_current_user)
