@@ -11,8 +11,19 @@ export default function AdminUserDirectory() {
 
   async function loadUsers() {
     try {
+      const token =
+        localStorage.getItem("token") ||
+        localStorage.getItem("access_token");
+
       const res = await axios.get(
-        `${API}/executive/users`
+        `${API}/admin/users`,
+        {
+          headers: token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : {},
+        }
       );
 
       setUsers(res.data?.users || []);
@@ -52,6 +63,147 @@ export default function AdminUserDirectory() {
     return String(user.status || "").toLowerCase() === "active";
   }).length;
 
+  async function resetPassword(userId) {
+    if (!window.confirm("Reset this user's password?")) {
+      return;
+    }
+
+    try {
+      const token =
+        localStorage.getItem("token") ||
+        localStorage.getItem("access_token");
+
+      const res = await axios.post(
+        `${API}/admin/users/${userId}/password-reset`,
+        {},
+        {
+          headers: {
+            Authorization: "Bearer " + token,
+          },
+        }
+      );
+
+      alert(
+        res.data?.message ||
+        "Password reset initiated successfully."
+      );
+    } catch (error) {
+      console.error("Password reset error:", error);
+
+      alert(
+        error.response?.data?.detail ||
+        "Unable to reset password."
+      );
+    }
+  }
+
+  async function changeUserStatus(userId, status) {
+    if (
+      status === "suspended" &&
+      !window.confirm("Suspend this user?")
+    ) {
+      return;
+    }
+
+    if (
+      status === "blocked" &&
+      !window.confirm("Lock/block this user?")
+    ) {
+      return;
+    }
+
+    if (
+      status === "active" &&
+      !window.confirm("Activate this user?")
+    ) {
+      return;
+    }
+
+    try {
+      const token =
+        localStorage.getItem("token") ||
+        localStorage.getItem("access_token");
+
+      await axios.patch(
+        `${API}/admin/users/${userId}/status`,
+        null,
+        {
+          params: {
+            status,
+          },
+          headers: {
+            Authorization: "Bearer " + token,
+          },
+        }
+      );
+
+      await loadUsers();
+    } catch (error) {
+      console.error("User status error:", error);
+
+      alert(
+        error.response?.data?.detail ||
+        "Unable to change user status."
+      );
+    }
+  }
+
+  async function forceLogout(userId) {
+    if (!window.confirm("Force this user to log out?")) {
+      return;
+    }
+
+    try {
+      const token =
+        localStorage.getItem("token") ||
+        localStorage.getItem("access_token");
+
+      await axios.post(
+        `${API}/admin/users/${userId}/force-logout`,
+        {},
+        {
+          headers: {
+            Authorization: "Bearer " + token,
+          },
+        }
+      );
+
+      alert("User sessions have been invalidated.");
+
+      await loadUsers();
+    } catch (error) {
+      console.error("Force logout error:", error);
+
+      alert(
+        error.response?.data?.detail ||
+        "Unable to force logout."
+      );
+    }
+  }
+
+  function getUserStatus(user) {
+    const status = String(
+      user.status || ""
+    ).toLowerCase();
+
+    if (status === "blocked") {
+      return "blocked";
+    }
+
+    if (status === "suspended") {
+      return "suspended";
+    }
+
+    if (
+      user.is_active === false ||
+      user.active === false
+    ) {
+      return "inactive";
+    }
+
+    return "active";
+  }
+
   return (
     <div
       style={{
@@ -63,7 +215,12 @@ export default function AdminUserDirectory() {
         color: "#fff",
       }}
     >
-      <h2 style={{ color: "#00ffc8", marginBottom: 20 }}>
+      <h2
+        style={{
+          color: "#00ffc8",
+          marginBottom: 20,
+        }}
+      >
         Enterprise User Directory
       </h2>
 
@@ -86,6 +243,7 @@ export default function AdminUserDirectory() {
           <div style={{ color: "#94a3b8" }}>
             Total Users
           </div>
+
           <h2 style={{ margin: "8px 0 0" }}>
             {totalUsers}
           </h2>
@@ -101,6 +259,7 @@ export default function AdminUserDirectory() {
           <div style={{ color: "#94a3b8" }}>
             New Accounts
           </div>
+
           <h2 style={{ margin: "8px 0 0" }}>
             {newAccounts}
           </h2>
@@ -116,6 +275,7 @@ export default function AdminUserDirectory() {
           <div style={{ color: "#94a3b8" }}>
             Active Users
           </div>
+
           <h2 style={{ margin: "8px 0 0" }}>
             {activeUsers}
           </h2>
@@ -134,7 +294,7 @@ export default function AdminUserDirectory() {
             style={{
               width: "100%",
               borderCollapse: "collapse",
-              minWidth: 900,
+              minWidth: 1250,
             }}
           >
             <thead>
@@ -148,6 +308,7 @@ export default function AdminUserDirectory() {
                   "Tenant ID",
                   "Created",
                   "Status",
+                  "Actions",
                 ].map((heading) => (
                   <th
                     key={heading}
@@ -157,6 +318,7 @@ export default function AdminUserDirectory() {
                       borderBottom:
                         "1px solid #334155",
                       color: "#94a3b8",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {heading}
@@ -167,11 +329,16 @@ export default function AdminUserDirectory() {
 
             <tbody>
               {users.map((user) => {
+                const status = getUserStatus(user);
+
                 const isActive =
-                  user.active === true ||
-                  user.is_active === true ||
-                  String(user.status || "").toLowerCase() ===
-                    "active";
+                  status === "active";
+
+                const isBlocked =
+                  status === "blocked";
+
+                const isSuspended =
+                  status === "suspended";
 
                 return (
                   <tr key={user.id}>
@@ -214,16 +381,148 @@ export default function AdminUserDirectory() {
                     <td
                       style={{
                         padding: 12,
-                        color: isActive
-                          ? "#22c55e"
-                          : "#94a3b8",
                         fontWeight: 700,
+                        whiteSpace: "nowrap",
+                        color:
+                          isBlocked
+                            ? "#ef4444"
+                            : isSuspended
+                            ? "#f59e0b"
+                            : isActive
+                            ? "#22c55e"
+                            : "#94a3b8",
                       }}
                     >
                       ●{" "}
-                      {isActive
+                      {isBlocked
+                        ? "Blocked"
+                        : isSuspended
+                        ? "Suspended"
+                        : isActive
                         ? "Active"
                         : "Inactive"}
+                    </td>
+
+                    <td style={{ padding: 12 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 8,
+                          minWidth: 360,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            resetPassword(user.id)
+                          }
+                          style={{
+                            padding: "7px 10px",
+                            borderRadius: 7,
+                            border:
+                              "1px solid #475569",
+                            background: "#1e293b",
+                            color: "#fff",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                          }}
+                        >
+                          🔑 Reset Password
+                        </button>
+
+                        {isActive && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              changeUserStatus(
+                                user.id,
+                                "suspended"
+                              )
+                            }
+                            style={{
+                              padding: "7px 10px",
+                              borderRadius: 7,
+                              border:
+                                "1px solid #92400e",
+                              background: "#451a03",
+                              color: "#fbbf24",
+                              cursor: "pointer",
+                              fontWeight: 600,
+                            }}
+                          >
+                            ⏸ Suspend
+                          </button>
+                        )}
+
+                        {(isSuspended ||
+                          isBlocked) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              changeUserStatus(
+                                user.id,
+                                "active"
+                              )
+                            }
+                            style={{
+                              padding: "7px 10px",
+                              borderRadius: 7,
+                              border:
+                                "1px solid #166534",
+                              background: "#052e16",
+                              color: "#4ade80",
+                              cursor: "pointer",
+                              fontWeight: 600,
+                            }}
+                          >
+                            🟢 Activate
+                          </button>
+                        )}
+
+                        {!isBlocked && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              changeUserStatus(
+                                user.id,
+                                "blocked"
+                              )
+                            }
+                            style={{
+                              padding: "7px 10px",
+                              borderRadius: 7,
+                              border:
+                                "1px solid #991b1b",
+                              background: "#450a0a",
+                              color: "#f87171",
+                              cursor: "pointer",
+                              fontWeight: 600,
+                            }}
+                          >
+                            🔒 Lock
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            forceLogout(user.id)
+                          }
+                          style={{
+                            padding: "7px 10px",
+                            borderRadius: 7,
+                            border:
+                              "1px solid #475569",
+                            background: "#0f172a",
+                            color: "#cbd5e1",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                          }}
+                        >
+                          🚪 Force Logout
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -235,3 +534,4 @@ export default function AdminUserDirectory() {
     </div>
   );
 }
+

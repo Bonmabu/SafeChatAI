@@ -1,4 +1,4 @@
-import axios from "axios";
+﻿import axios from "axios";
 import Login from "./Login";
 import ThreatMap from "./components/ThreatMap";
 import { useEffect, useState, useRef } from "react";
@@ -113,7 +113,7 @@ useEffect(() => {
   
 
   ws.onopen = () => {
-    console.log("✅ WS CONNECTED");
+    console.log("âœ… WS CONNECTED");
   };
 
   ws.onmessage = (event) => {
@@ -270,11 +270,11 @@ if (type === "threat_intelligence") {
     links: prev.links
   }));
 
-  return;   // 🔥 ADD THIS (important)
+  return;   // ðŸ”¥ ADD THIS (important)
 }
 };
   ws.onerror = (err) => {
-    console.error("❌ WS ERROR", err);
+    console.error("âŒ WS ERROR", err);
   };
 
   ws.onclose = () => {
@@ -426,7 +426,17 @@ const assignIncident = async (id) => {
 }
 
 return (
-<div
+<>
+<nav style={{display:"flex",alignItems:"center",gap:"24px",padding:"14px 20px",background:"#020617",borderBottom:"1px solid #1e293b",marginBottom:"10px"}}>
+<strong style={{color:"#00ffc8",fontSize:"18px"}}>SafeChat AI SOC</strong>
+<a href="/dashboard/overview">Overview</a>
+<a href="/dashboard/customer">Customer SOC</a>
+<a href="/dashboard/campaigns">Campaigns</a>
+<a href="/dashboard/executive">Executive / IT</a>
+<a href="/dashboard/admin">Admin SOC</a>
+<button onClick={()=>{localStorage.removeItem("token");localStorage.removeItem("role");window.location.href="/";}} style={{marginLeft:"auto",background:"transparent",border:"1px solid #334155",color:"#f8fafc",padding:"8px 14px",borderRadius:"8px",cursor:"pointer"}}>Login</button>
+</nav>
+<divv
 style={{
 background:"#0f172a",
 color:"#f8fafc",
@@ -535,7 +545,7 @@ table td {
   >
 
     <h2 style={{color:"#38bdf8"}}>
-      📈 SOC Metrics
+      ðŸ“ˆ SOC Metrics
     </h2>
 
     <ResponsiveContainer width="100%" height={300}>
@@ -613,7 +623,7 @@ style={{
   fontWeight:"700"
 }}
 >
-🤖 AI Threat Intelligence
+ðŸ¤– AI Threat Intelligence
 </h2>
 
     <div
@@ -674,7 +684,7 @@ style={{
   fontWeight:"700"
 }}
 >
-🧠 AI SOC Analyst
+ðŸ§  AI SOC Analyst
 </h2>
 
     <div
@@ -695,7 +705,7 @@ style={{
             borderBottom: "1px solid #374151"
           }}
         >
-          ✅ {item}
+          âœ… {item}
         </div>
       ))}
     </div>
@@ -760,19 +770,19 @@ style={{
   fontWeight:"700"
 }}
 >
-📄 Incident Reports
+ðŸ“„ Incident Reports
 </h2>
 
           <div>
             <button onClick={() => window.open(`${API_BASE}/reports/pdf`)}>
-              📄 PDF
+              ðŸ“„ PDF
             </button>
 
             <button
               style={{ marginLeft: 10 }}
               onClick={() => window.open(`${API_BASE}/reports/csv`)}
             >
-              📊 CSV
+              ðŸ“Š CSV
             </button>
           </div>
         </div>
@@ -817,7 +827,7 @@ style={{
   fontWeight:"700"
 }}
 >
-🎯 Threat Hunting Workspace
+ðŸŽ¯ Threat Hunting Workspace
 </h2>
 
   <div
@@ -880,7 +890,7 @@ style={{
       border: "1px solid #334155"
     }}
   >
-    <h2>🕵️ Investigation Workspace</h2>
+    <h2>ðŸ•µï¸ Investigation Workspace</h2>
 
     <div
       style={{
@@ -964,19 +974,19 @@ style={{
       }}
     >
       <button onClick={() => assignIncident(selectedIncident.id)}>
-        👤 Assign
+        ðŸ‘¤ Assign
       </button>
 
       <button onClick={() => investigateIncident(selectedIncident.id)}>
-        🔍 Investigate
+        ðŸ” Investigate
       </button>
 
       <button onClick={() => resolveIncident(selectedIncident.id)}>
-        ✅ Resolve
+        âœ… Resolve
       </button>
 
       <button onClick={() => setSelectedIncident(null)}>
-        ❌ Close
+        âŒ Close
       </button>
     </div>
   </div>
@@ -997,7 +1007,7 @@ style={{
         fontWeight: "700"
       }}
     >
-      📊 Security Analytics
+      ðŸ“Š Security Analytics
     </h2>
 
     <div

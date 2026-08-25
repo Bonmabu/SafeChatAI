@@ -1,6 +1,5 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import "./AdminSOC.css";
-import App from "./App";
 import AdminUserMetrics from "./AdminUserMetrics";
 import AdminUserDirectory from "./AdminUserDirectory";
 
@@ -285,7 +284,7 @@ export default function AdminSOC() {
               type="button"
               className="admin-action-button"
               onClick={() =>
-                navigateAdmin("soc-platform")
+                navigateAdmin("identity-operations")
               }
             >
               Open SOC
@@ -312,35 +311,6 @@ export default function AdminSOC() {
             </button>
 
           </div>
-        </div>
-
-      </section>
-
-      {/* SYSTEM CONTROL SURFACE */}
-      <section id="soc-platform" className="admin-section">
-
-        <div className="admin-section-heading">
-          <div>
-            <span className="admin-section-kicker">
-              SYSTEM CONTROL
-            </span>
-
-            <h2>Platform Administration</h2>
-
-            <p>
-              Monitor and manage SafeChat AI security infrastructure,
-              identities and operational controls.
-            </p>
-          </div>
-
-          <div className="admin-section-indicator">
-            <span />
-            LIVE
-          </div>
-        </div>
-
-        <div className="admin-app-panel">
-          <App />
         </div>
 
       </section>
@@ -725,7 +695,7 @@ export default function AdminSOC() {
                 <button
                   className="admin-action-button"
                   type="button"
-                  onClick={() => navigateAdmin("soc-platform")}
+                  onClick={() => navigateAdmin("identity-operations")}
                 >
                   Open SOC
                 </button>
@@ -842,6 +812,9 @@ export default function AdminSOC() {
     </div>
   );
 }
+
+
+
 
 
 

@@ -1,0 +1,4106 @@
+﻿from fastapi import (
+    FastAPI,
+    Header,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    Depends
+)
+from event_correlation import (
+    init_event_correlation,
+    correlate_event,
+    get_event_correlations,
+    get_correlation_cluster,
+    get_correlation_clusters,
+    get_attack_campaign,
+    get_attack_campaigns,
+    get_campaign_timeline,
+)
+from security_fabric import (
+    init_security_fabric,
+    persist_security_event,
+    get_security_events,
+    get_security_event,
+)
+from replay_engine import (
+    add_replay_event,
+    get_replay,
+    build_replay
+)
+from attack_graph import (
+    add_event,
+    get_graph,
+    save_node,
+    save_edge,
+)
+from digital_twin import (
+    ingest_event,
+    get_digital_twin_summary,
+    get_asset_graph,
+    get_asset,
+    recalculate_all_asset_risks,
+    get_high_risk_assets,
+    get_asset_risk_summary,
+)
+from fastapi.responses import FileResponse
+from correlation import correlate_event
+from passlib.context import CryptContext
+from ai.soc_brain import executive_reasoning
+from io import BytesIO
+from compliance import compliance_summary
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle
+)
+from dotenv import load_dotenv
+import os
+import logging
+import sqlite3
+import psycopg
+
+load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
+
+logger = logging.getLogger("SafeChatAI")
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from ai.threat_intel import enrich_iocs
+from ai.threat_intel import enrich_incident
+from ai.threat_intel import analyze_iocs
+from ai.copilot import soc_copilot
+from collections import Counter
+from ai.campaign import detect_campaign as ai_detect_campaign
+from ai.correlation import correlate_incidents
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Security
+from uuid import uuid4
+from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse
+import json
+import time
+import csv
+from reportlab.platypus import SimpleDocTemplate, Table
+from threading import Thread
+from prediction_engine import learn, predict
+from kill_chain import analyze_kill_chain
+from sklearn.linear_model import LinearRegression
+from campaign_engine import detect_campaign as engine_detect_campaign, get_campaigns
+from ai.soc_brain import (
+    analyze_pattern,
+    predict_next_attack,
+    executive_reasoning,
+)
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+import asyncio
+import re
+import numpy as np
+import threading
+import random
+EVENT_STREAM = {
+    "raw_events": [],
+    "alerts": [],
+    "incidents": [],
+    "processed_events": [],
+    "executive": []
+}
+LAST_CORRELATION_ID = None
+
+LOCK = threading.Lock()
+
+from sklearn.ensemble import IsolationForest
+MODEL = IsolationForest(contamination=0.05)
+from db import create_scan
+
+from db import (
+    db_sql,
+    init_db,
+    DATABASE_URL,
+    get_conn,
+    create_incident,
+    update_incident_status,
+    get_incidents,
+    get_audit_logs,
+    get_risk_score,
+    get_top_threat,
+    get_daily_threats,
+    get_weekly_threats,
+    get_executive_kpis,
+    get_category_distribution,
+    get_risk_heatmap,
+    get_total_scans,
+    get_total_alerts,
+    get_total_incidents,
+    get_open_incident_count,
+    get_threat_trends,
+    get_threat_velocity,
+    get_threat_anomaly_score,
+    get_soc_intelligence_core,
+    save_threat_hunt,
+    upsert_threat_intelligence,
+    get_threat_intelligence,
+    create_alert,
+    assign_incident,
+    save_threat_ioc,
+    add_threat_intel_column,
+    migrate_threat_intelligence_unique_constraint,
+    save_incident,
+    save_threat_dna,
+    get_all_threat_dna,
+    get_executive_threat_map
+)
+# =========================
+# APPLICATION CONFIGURATION
+# =========================
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY is missing.")
+
+DATABASE_PATH = os.getenv("DATABASE_PATH", "scams.db")
+
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:5173"
+)
+
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+EXECUTIVE_PASSWORD = os.getenv("EXECUTIVE_PASSWORD")
+ANALYST_PASSWORD = os.getenv("ANALYST_PASSWORD")
+CUSTOMER_PASSWORD = os.getenv("CUSTOMER_PASSWORD")
+VIEWER_PASSWORD = os.getenv("VIEWER_PASSWORD")
+
+# =========================
+# APP INIT
+# =========================
+
+app = FastAPI()
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+    "https://safechatai-1.onrender.com",
+    FRONTEND_URL,
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+security = HTTPBearer()
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto"
+)
+
+init_db()
+init_security_fabric()
+init_event_correlation()
+
+
+@app.get("/status")
+def status():
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute(db_sql("""
+        SELECT COUNT(*) AS total
+        FROM scans
+    """))
+    scans = cur.fetchone()["total"]
+
+    cur.execute(db_sql("""
+        SELECT COUNT(*) AS total
+        FROM alerts
+    """))
+    alerts = cur.fetchone()["total"]
+
+    cur.execute(db_sql("""
+        SELECT COUNT(*) AS total
+        FROM incidents
+    """))
+    incidents = cur.fetchone()["total"]
+
+    conn.close()
+
+    return {
+        "server": "online",
+        "database": "connected",
+        "scans": scans,
+        "alerts": alerts,
+        "incidents": incidents
+    }
+
+active_connections = []
+
+from fastapi.openapi.utils import get_openapi
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title="SOC SIEM API",
+        version="1.0",
+        description="Enterprise SOC System",
+        routes=app.routes,
+    )
+
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT"
+        }
+    }
+
+    for path in openapi_schema["paths"]:
+        for method in openapi_schema["paths"][path]:
+            openapi_schema["paths"][path][method]["security"] = [
+                {"BearerAuth": []}
+            ]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+# =========================
+# GLOBAL STATE
+# =========================
+
+API_KEY = os.getenv("API_KEY")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
+)
+# ðŸ” PHASE 9 AUTH SYSTEM
+INCIDENT_DECLARED = False
+CRISIS_MODE = False
+ACTIVE_SESSIONS = {}
+ALERT_LOG = []
+USER_ROLES = {
+    "admin": ["read", "write", "delete", "analyze"],
+    "analyst": ["read", "analyze"],
+    "viewer": ["read"]
+}
+def hash_password(password: str):
+    return pwd_context.hash(password)
+
+
+def verify_password(
+    plain_password: str,
+    hashed_password: str
+):
+    return pwd_context.verify(
+        plain_password,
+        hashed_password
+    )
+
+# =========================
+# CONNECTION MANAGER
+# =========================
+
+def check_permission(role: str, action: str):
+    return action in USER_ROLES.get(role, [])
+    EXECUTIVE_EVENTS = []
+
+
+def add_executive_event(event_type, message, severity="INFO"):
+    event = {
+        "type": event_type,
+        "message": message,
+        "severity": severity,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+    EXECUTIVE_EVENTS.insert(0, event)
+
+    # keep latest 100 events
+    if len(EXECUTIVE_EVENTS) > 100:
+        EXECUTIVE_EVENTS.pop()
+
+    return event
+
+
+class ConnectionManager:
+
+    def __init__(self):
+        self.active_connections = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        print("?? BROADCAST CALLED")
+        print("?? CONNECTIONS:", len(self.active_connections))
+
+        dead = []
+
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(
+                    jsonable_encoder(message)
+                )
+
+            except Exception as e:
+                print("? SEND FAILED:", e)
+                dead.append(connection)
+
+        for d in dead:
+            self.disconnect(d)
+
+
+manager = ConnectionManager()
+
+# =====================================================
+# Global broadcast wrapper
+# Used by Executive War Room actions
+# =====================================================
+
+async def broadcast(event):
+    await manager.broadcast(event)
+
+ATTACK_CORRELATION = {}
+ATTACK_TIMELINE = {}
+
+ATTACK_GRAPH = {
+    "nodes": {},
+    "edges": [],
+    "clusters": {},
+    "last_node": None
+}
+LAST_ATTACK_NODE = None
+ACTIVE_INCIDENTS = {}
+
+IOC_DATABASE = {
+    "ips": {},
+    "domains": {},
+    "emails": {},
+    "urls": {},
+    "hashes": {}
+}
+THREAT_INTELLIGENCE = {
+    "ioc": {},
+    "campaigns": {},
+    "actors": {},
+    "malware": {}
+}
+# =====================================================
+# Global broadcast wrapper for executive actions
+# =====================================================
+
+async def broadcast(event):
+    await manager.broadcast(event)
+def ensure_timeline(corr_id: str):
+    if corr_id not in ATTACK_TIMELINE:
+        ATTACK_TIMELINE[corr_id] = []
+EVENT_STREAM = {
+    "raw_events": [],
+    "processed_events": [],
+    "alerts": [],
+    "incidents": [],
+    "executive": []
+}
+SOC_MEMORY = {
+    "recent_incidents": [],
+    "threat_patterns": {},
+    "learned_behaviors": {}
+}
+SOC_REASONING_STATE = {
+    "last_decisions": [],
+    "risk_bias": 1.0,
+    "auto_tuning": True
+}
+THREAT_PREDICTION = {
+    "predictions": [],
+    "models": {},
+    "confidence": 0
+}
+
+def update_soc_memory(category: str, score: float, corr_id: str):
+
+    # -------------------------
+    # TRACK INCIDENT PATTERNS
+    # -------------------------
+    if category not in SOC_MEMORY["threat_patterns"]:
+        SOC_MEMORY["threat_patterns"][category] = {
+            "count": 0,
+            "avg_score": 0
+        }
+
+    pattern = SOC_MEMORY["threat_patterns"][category]
+
+    pattern["count"] += 1
+    pattern["avg_score"] = (
+        (pattern["avg_score"] * (pattern["count"] - 1) + score)
+        / pattern["count"]
+    )
+
+    # -------------------------
+    # RECENT INCIDENT BUFFER
+    # -------------------------
+    SOC_MEMORY["recent_incidents"].append({
+        "category": category,
+        "score": score,
+        "corr_id": corr_id,
+        "timestamp": now_ts()
+    })
+
+    # KEEP ONLY LAST 50
+    if len(SOC_MEMORY["recent_incidents"]) > 50:
+        SOC_MEMORY["recent_incidents"] = SOC_MEMORY["recent_incidents"][-50:]
+
+    # -------------------------
+    # LEARNING RULE
+    # -------------------------
+    if pattern["count"] > 5 and pattern["avg_score"] > 75:
+        SOC_MEMORY["learned_behaviors"][category] = {
+            "risk_level": "PERSISTENT_THREAT",
+            "auto_escalate": True
+        }
+
+def build_event(event_type: str, payload: dict):
+    return {
+        "event_type": event_type,
+        "timestamp": datetime.utcnow().isoformat(),
+        "source": "safechat_soc_engine",
+        "version": "4.7.9",
+        "data": payload
+    }
+async def push_event(event_type: str, payload: dict):
+
+    event = build_event(event_type, payload)
+
+    validate_event(event)
+
+    # -------------------------
+    # EVENT ROUTING MAP
+    # -------------------------
+    EVENT_MAP = {
+        "scan_event": "raw_events",
+        "alert_event": "alerts",
+        "incident_event": "incidents",
+        "auto_response_event": "processed_events",
+        "executive_dashboard": "executive"
+    }
+
+    bucket = EVENT_MAP.get(event_type, "raw_events")
+
+    if bucket not in EVENT_STREAM:
+        EVENT_STREAM[bucket] = []
+
+    EVENT_STREAM[bucket].append(event)
+
+    # -------------------------
+    # SPECIAL ALERT HANDLING
+    # -------------------------
+    if event_type == "alert_event":
+        if "alerts" not in EVENT_STREAM:
+            EVENT_STREAM["alerts"] = []
+        EVENT_STREAM["alerts"].append(event)
+
+    # -------------------------
+    # RAW EVENT STORE (SIEM LAYER)
+    # -------------------------
+    if "raw_events" not in EVENT_STREAM:
+        EVENT_STREAM["raw_events"] = []
+
+    EVENT_STREAM["raw_events"].append(event)
+
+    # -------------------------
+    # BROADCAST
+    # -------------------------
+    await manager.broadcast(event)
+
+    # -------------------------
+    # SOC FILTERED ALERTS
+    # -------------------------
+    if event_type in ["incident_event", "auto_response_event"]:
+        print(f"[SOC ALERT] {event_type} triggered")
+def validate_event(payload: dict):
+
+    required_fields = [
+        "event_type",
+        "timestamp",
+        "source",
+        "data"
+    ]
+
+    for field in required_fields:
+        if field not in payload:
+            raise ValueError(
+                f"Missing required field: {field}"
+            )
+
+    if not isinstance(payload["data"], dict):
+        raise ValueError(
+            "Event data must be a dictionary"
+        )
+
+    return True
+def get_user_from_token(token: str):
+
+    return ACTIVE_SESSIONS.get(token)
+# =========================
+# THREAT CLASSIFIER
+# =========================
+
+def classify_threat(text: str):
+    t = text.lower()
+
+    THREAT_SIGNATURES = {
+
+        "Business Email Compromise": {
+            "score": 96,
+            "stage": "Initial Access",
+            "mitre": "T1566.002 - Spearphishing Link",
+            "keywords": [
+                "wire transfer",
+                "invoice fraud",
+                "ceo fraud",
+                "urgent payment",
+                "payment request",
+                "gift cards",
+                "vendor payment",
+                "change bank account",
+                "finance department"
+            ]
+        },
+
+        "Cloud Compromise": {
+            "score": 98,
+            "stage": "Initial Access",
+            "mitre": "T1078 - Valid Accounts",
+            "keywords": [
+                "cloudtrail",
+                "guardduty",
+                "createaccesskey",
+                "iam",
+                "sts",
+                "assumerole",
+                "root account",
+                "access key",
+                "mfa disabled",
+                "aws",
+                "azure",
+                "gcp",
+                "cloud security",
+                "s3 bucket",
+                "public bucket"
+            ]
+        },
+
+        "Identity Attack": {
+            "score": 95,
+            "stage": "Credential Access",
+            "mitre": "T1078 - Valid Accounts",
+            "keywords": [
+                "impossible travel",
+                "conditional access",
+                "azure ad",
+                "entra",
+                "identity",
+                "mfa bypass",
+                "login from",
+                "session remains active",
+                "credential stuffing"
+            ]
+        },
+
+        "Password Spraying": {
+            "score": 95,
+            "stage": "Credential Access",
+            "mitre": "T1110.003 - Password Spraying",
+            "keywords": [
+                "password spraying",
+                "multiple authentication failures",
+                "attempted against",
+                "same password",
+                "user accounts"
+            ]
+        },
+
+        "Brute Force": {
+            "score": 94,
+            "stage": "Credential Access",
+            "mitre": "T1110.001 - Password Guessing",
+            "keywords": [
+                "failed login",
+                "failed logon",
+                "authentication failure",
+                "account locked",
+                "login attempts",
+                "too many login attempts"
+            ]
+        },
+
+        "Container Attack": {
+            "score": 95,
+            "stage": "Privilege Escalation",
+            "mitre": "T1611 - Container Escape",
+            "keywords": [
+                "kubernetes",
+                "cluster-admin",
+                "container escape",
+                "namespace",
+                "pod",
+                "/bin/sh",
+                "docker",
+                "kubectl",
+                "privileged container"
+            ]
+        },
+
+        "Privilege Escalation": {
+            "score": 97,
+            "stage": "Privilege Escalation",
+            "mitre": "T1068 - Exploitation for Privilege Escalation",
+            "keywords": [
+                "system privileges",
+                "administrator account",
+                "local administrator",
+                "privilege escalation",
+                "elevated privileges",
+                "added to administrators",
+                "sudo"
+            ]
+        },
+
+        "Lateral Movement": {
+            "score": 97,
+            "stage": "Lateral Movement",
+            "mitre": "T1021 - Remote Services",
+            "keywords": [
+                "psexec",
+                "remote service",
+                "remote service creation",
+                "smb",
+                "admin shares",
+                "wmic",
+                "remote desktop",
+                "lateral movement"
+            ]
+        },
+
+        "Active Directory Attack": {
+            "score": 99,
+            "stage": "Credential Access",
+            "mitre": "T1558 - Steal or Forge Kerberos Tickets",
+            "keywords": [
+                "golden ticket",
+                "pass-the-ticket",
+                "kerberos",
+                "lsass",
+                "mimikatz",
+                "domain administrator",
+                "dcsync"
+            ]
+        },
+
+        "Command & Control": {
+            "score": 97,
+            "stage": "Command and Control",
+            "mitre": "T1071 - Application Layer Protocol",
+            "keywords": [
+                "c2",
+                "beacon",
+                "beacon interval",
+                "known c2",
+                "reverse shell",
+                "outbound connection",
+                "command and control"
+            ]
+        },
+
+        "DNS Tunneling": {
+            "score": 96,
+            "stage": "Command and Control",
+            "mitre": "T1071.004 - DNS",
+            "keywords": [
+                "dns tunneling",
+                "txt requests",
+                "encoded traffic",
+                "dns exfiltration",
+                "large dns requests"
+            ]
+        },
+
+        "Web Shell": {
+            "score": 97,
+            "stage": "Persistence",
+            "mitre": "T1505.003 - Web Shell",
+            "keywords": [
+                "cmd.aspx",
+                "web shell",
+                "iis",
+                "whoami",
+                "shell uploaded"
+            ]
+        },
+
+        "Malware": {
+            "score": 90,
+            "stage": "Execution",
+            "mitre": "T1204 - User Execution",
+            "keywords": [
+                "powershell",
+                "malware",
+                "trojan",
+                "virus",
+                "loader",
+                "dropper",
+                "payload",
+                "shellcode"
+            ]
+        },
+
+        "Crypto Mining": {
+            "score": 90,
+            "stage": "Execution",
+            "mitre": "T1496 - Resource Hijacking",
+            "keywords": [
+                "xmrig",
+                "mining pool",
+                "cryptocurrency miner",
+                "coinminer",
+                "monero",
+                "cpu utilization"
+            ]
+        },
+
+        "Supply Chain Attack": {
+            "score": 98,
+            "stage": "Initial Access",
+            "mitre": "T1195 - Supply Chain Compromise",
+            "keywords": [
+                "software update",
+                "trusted vendor",
+                "signed package",
+                "supply chain",
+                "malicious update",
+                "compromised vendor"
+            ]
+        },
+
+        "SQL Injection": {
+            "score": 90,
+            "stage": "Initial Access",
+            "mitre": "T1190 - Exploit Public Facing Application",
+            "keywords": [
+                "' or 1=1",
+                "union select",
+                "sql injection",
+                "/login",
+                "database errors"
+            ]
+        },
+
+        "Cross Site Scripting": {
+            "score": 88,
+            "stage": "Initial Access",
+            "mitre": "T1190 - Exploit Public Facing Application",
+            "keywords": [
+                "<script>",
+                "xss",
+                "javascript:",
+                "onerror=",
+                "alert("
+            ]
+        },
+
+        "Phishing": {
+            "score": 85,
+            "stage": "Initial Access",
+            "mitre": "T1566 - Phishing",
+            "keywords": [
+                "password",
+                "verify account",
+                "otp",
+                "login",
+                "bank",
+                "email",
+                "attachment",
+                "click here",
+                "excel"
+            ]
+        },
+
+        "Data Exfiltration": {
+            "score": 97,
+            "stage": "Exfiltration",
+            "mitre": "T1048 - Exfiltration Over Alternative Protocol",
+            "keywords": [
+                "dropbox",
+                "uploaded",
+                "customer records",
+                "onedrive",
+                "google drive",
+                "sensitive data"
+            ]
+        },
+
+        "Data Leak": {
+            "score": 95,
+            "stage": "Exfiltration",
+            "mitre": "T1020 - Automated Exfiltration",
+            "keywords": [
+                "pastebin",
+                "mega.nz",
+                "telegram upload",
+                "discord upload",
+                "github gist",
+                "source code leak",
+                "confidential documents"
+            ]
+        },
+
+        "Insider Threat": {
+            "score": 92,
+            "stage": "Exfiltration",
+            "mitre": "T1020 - Automated Exfiltration",
+            "keywords": [
+                "usb",
+                "employee",
+                "copied files",
+                "after business hours",
+                "endpoint protection"
+            ]
+        },
+
+        "Insider Sabotage": {
+            "score": 97,
+            "stage": "Impact",
+            "mitre": "T1485 - Data Destruction",
+            "keywords": [
+                "deleted database",
+                "deleted backups",
+                "destroyed files",
+                "wiped server",
+                "rm -rf"
+            ]
+        },
+
+        "Ransomware": {
+            "score": 100,
+            "stage": "Impact",
+            "mitre": "T1486 - Data Encrypted for Impact",
+            "keywords": [
+                ".locked",
+                "encrypting files",
+                "vssadmin",
+                "delete shadows",
+                "shadow copies",
+                "ransom note",
+                "ransomware"
+            ]
+        },
+
+        "AI Prompt Injection": {
+            "score": 95,
+            "stage": "Defense Evasion",
+            "mitre": "T1562 - Impair Defenses",
+            "keywords": [
+                "ignore previous instructions",
+                "system prompt",
+                "reveal confidential data",
+                "bypass safety",
+                "execute hidden commands",
+                "prompt injection"
+            ]
+        },
+
+        "Harassment": {
+            "score": 75,
+            "stage": "Impact",
+            "mitre": "T1499 - Endpoint Denial of Service",
+            "keywords": [
+                "kill",
+                "die",
+                "shoot",
+                "bomb",
+                "stab",
+                "murder",
+                "terrorist",
+                "i will kill you",
+                "i'm going to kill you"
+            ]
+        }
+
+    }
+
+    matches = []
+
+    for category, data in THREAT_SIGNATURES.items():
+
+        hits = 0
+
+        for keyword in data["keywords"]:
+            if keyword.lower() in t:
+                hits += 1
+
+        if hits == 0:
+            continue
+
+        score = min(100, data["score"] + hits)
+
+        matches.append({
+            "category": category,
+            "score": score,
+            "stage": data["stage"],
+            "mitre": data["mitre"],
+            "confidence": min(99, score),
+            "hits": hits
+        })
+
+    if matches:
+
+        matches.sort(key=lambda x: (x["score"], x["hits"]), reverse=True)
+
+        primary = matches[0]
+
+        return (
+            primary["category"],
+            primary["score"],
+            primary["stage"],
+            primary["mitre"],
+            primary["confidence"],
+            matches
+        )
+
+    return (
+        "Safe",
+        10,
+        "None",
+        "None",
+        99,
+        []
+    )
+# =========================
+# MITRE ATT&CK MAPPING
+# =========================
+
+MITRE_ATTACK = {
+    "Phishing": {
+        "tactic": "Initial Access",
+        "id": "T1566",
+        "technique": "Phishing",
+        "name": "Phishing"
+    },
+
+    "Malware": {
+        "tactic": "Execution",
+        "id": "T1204",
+        "technique": "User Execution",
+        "name": "User Execution"
+    },
+
+    "Fraud": {
+        "tactic": "Credential Access",
+        "id": "T1110",
+        "technique": "Brute Force",
+        "name": "Brute Force"
+    },
+
+    "Harassment": {
+        "tactic": "Impact",
+        "id": "T1499",
+        "technique": "Endpoint Denial of Service",
+        "name": "Endpoint Denial of Service"
+    },
+
+    "Safe": {
+        "tactic": "None",
+        "id": "-",
+        "technique": "No Mapping",
+        "name": "No Mapping"
+    }
+}
+
+
+def mitre_lookup(category: str):
+    return MITRE_ATTACK.get(
+        category,
+        MITRE_ATTACK["Safe"]
+    )
+import hashlib
+import secrets
+
+def generate_correlation_key(category: str, message: str):
+    base = f"{category}:{message}"
+    return hashlib.md5(base.encode()).hexdigest()[:12]
+
+
+def now_ts():
+    return datetime.utcnow().isoformat()
+
+
+def add_graph_node(node_id, category, score, stage=None, mitre=None):
+    global ATTACK_GRAPH
+
+    if not node_id:
+        return ATTACK_GRAPH
+
+    node_id = str(node_id)
+    score = float(score or 0)
+
+    existing = ATTACK_GRAPH["nodes"].get(node_id)
+
+    if existing:
+        existing["max_score"] = max(
+            existing.get("max_score", 0),
+            score
+        )
+
+        existing["score"] = score
+        existing["count"] = existing.get("count", 1) + 1
+
+        if stage:
+            existing["stage"] = stage
+
+        if mitre:
+            existing["mitre"] = mitre
+
+        if category:
+            existing["category"] = category
+
+    else:
+        ATTACK_GRAPH["nodes"][node_id] = {
+            "id": node_id,
+            "category": category,
+            "max_score": score,
+            "score": score,
+            "stage": stage,
+            "mitre": mitre,
+            "count": 1
+        }
+
+    # Persist node to SQLite
+    save_node(ATTACK_GRAPH["nodes"][node_id])
+
+    ATTACK_GRAPH["last_node"] = node_id
+
+    return ATTACK_GRAPH
+def add_graph_edge(source: str, target: str, category="CORRELATED_ATTACK"):
+
+    global ATTACK_GRAPH
+
+    if not source or not target:
+        return ATTACK_GRAPH
+
+    if source == target:
+        return ATTACK_GRAPH
+
+    source = str(source)
+    target = str(target)
+
+    # Ensure nodes structure
+    if isinstance(ATTACK_GRAPH.get("nodes"), list):
+        ATTACK_GRAPH["nodes"] = {
+            n["id"]: n
+            for n in ATTACK_GRAPH["nodes"]
+        }
+
+    # Create source node if missing
+    if source not in ATTACK_GRAPH["nodes"]:
+        ATTACK_GRAPH["nodes"][source] = {
+            "id": source,
+            "category": source,
+            "max_score": 50,
+            "score": 50,
+            "count": 1
+        }
+
+        save_node(ATTACK_GRAPH["nodes"][source])
+
+    # Create target node if missing
+    if target not in ATTACK_GRAPH["nodes"]:
+        ATTACK_GRAPH["nodes"][target] = {
+            "id": target,
+            "category": target,
+            "max_score": 50,
+            "score": 50,
+            "count": 1
+        }
+
+        save_node(ATTACK_GRAPH["nodes"][target])
+
+    # Check existing edge
+    for edge in ATTACK_GRAPH["edges"]:
+
+        if (
+            edge.get("source") == source
+            and edge.get("target") == target
+        ):
+            edge["weight"] = edge.get("weight", 1) + 1
+            edge["timestamp"] = now_ts()
+            edge["category"] = category
+            edge["relationship"] = "CORRELATED_ATTACK"
+
+            save_edge(edge)
+
+            return ATTACK_GRAPH
+
+    # Create new edge
+    edge = {
+        "source": source,
+        "target": target,
+        "relationship": "CORRELATED_ATTACK",
+        "category": category,
+        "weight": 1,
+        "timestamp": now_ts()
+    }
+
+    ATTACK_GRAPH["edges"].append(edge)
+
+    # Persist edge to SQLite
+    save_edge(edge)
+
+    # Keep memory graph bounded
+    if len(ATTACK_GRAPH["edges"]) > 500:
+        ATTACK_GRAPH["edges"] = ATTACK_GRAPH["edges"][-500:]
+
+    return ATTACK_GRAPH
+def extract_iocs(text):
+
+    ips = re.findall(
+        r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+        text
+    )
+
+    emails = re.findall(
+        r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+        text
+    )
+
+    urls = re.findall(
+        r"https?://[^\s]+",
+        text
+    )
+
+    domains = re.findall(
+        r"\b(?:[a-zA-Z0-9-]+\.)+[A-Za-z]{2,}\b",
+        text
+    )
+
+    hashes = re.findall(
+        r"\b[a-fA-F0-9]{32,64}\b",
+        text
+    )
+
+    return {
+        "ips": ips,
+        "emails": emails,
+        "urls": urls,
+        "domains": domains,
+        "hashes": hashes
+    }
+def update_ioc_database(iocs, tenant_id="demo"):
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    for category in iocs:
+
+        for value in iocs[category]:
+
+            # Update memory
+            if value not in IOC_DATABASE[category]:
+                IOC_DATABASE[category][value] = {"count": 1}
+            else:
+                IOC_DATABASE[category][value]["count"] += 1
+
+            # ---------------------------------
+            # FIND EXISTING IOC
+            # ---------------------------------
+            cursor.execute(
+                db_sql("""
+                    SELECT id, sightings
+                    FROM threat_intelligence
+                    WHERE indicator = ?
+                      AND tenant_id = ?
+                """),
+                (value, tenant_id)
+            )
+
+            row = cursor.fetchone()
+
+            if row:
+
+                # ---------------------------------
+                # UPDATE EXISTING IOC
+                # ---------------------------------
+                cursor.execute(
+                    db_sql("""
+                        UPDATE threat_intelligence
+                        SET sightings = sightings + 1,
+                            last_seen = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """),
+                    (row["id"],)
+                )
+
+                cursor.execute(
+                    db_sql("""
+                        SELECT *
+                        FROM threat_intelligence
+                        WHERE id = ?
+                    """),
+                    (row["id"],)
+                )
+
+                result = cursor.fetchone()
+                data = dict(result) if result else {}
+
+            else:
+
+                # ---------------------------------
+                # INSERT NEW IOC
+                # ---------------------------------
+                cursor.execute(
+                    db_sql("""
+                        INSERT INTO threat_intelligence
+                        (
+                            tenant_id,
+                            indicator,
+                            category,
+                            score,
+                            confidence,
+                            sightings,
+                            campaign,
+                            first_seen,
+                            last_seen
+                        )
+                        VALUES
+                        (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """),
+                    (
+                        tenant_id,
+                        value,
+                        category.title(),
+                        85,
+                        90,
+                        1,
+                        "Unknown"
+                    )
+                )
+
+                conn.commit()
+
+                # ---------------------------------
+                # GET INSERTED IOC
+                # ---------------------------------
+                if DATABASE_URL:
+                    cursor.execute(
+                        db_sql("""
+                            SELECT *
+                            FROM threat_intelligence
+                            WHERE indicator = ?
+                              AND tenant_id = ?
+                            ORDER BY id DESC
+                            LIMIT 1
+                        """),
+                        (value, tenant_id)
+                    )
+                else:
+                    cursor.execute(
+                        db_sql("""
+                            SELECT *
+                            FROM threat_intelligence
+                            WHERE id = last_insert_rowid()
+                        """)
+                    )
+
+                result = cursor.fetchone()
+                data = dict(result) if result else {}
+
+            # ---------------------------------
+            # BROADCAST LIVE IOC
+            # ---------------------------------
+            import asyncio
+
+            asyncio.create_task(
+                manager.broadcast({
+                    "type": "ioc_update",
+                    "data": data
+                })
+            )
+
+    conn.commit()
+    conn.close()
+def update_threat_intelligence(category, text, score):
+
+    global THREAT_INTELLIGENCE
+
+    indicator = category.lower()
+
+    if indicator not in THREAT_INTELLIGENCE["ioc"]:
+
+        THREAT_INTELLIGENCE["ioc"][indicator] = {
+            "count": 0,
+            "highest_score": score,
+            "last_seen": datetime.utcnow().isoformat()
+        }
+
+    intel = THREAT_INTELLIGENCE["ioc"][indicator]
+
+    intel["count"] += 1
+    intel["highest_score"] = max(
+        intel["highest_score"],
+        score
+    )
+    intel["last_seen"] = datetime.utcnow().isoformat()
+
+    return intel
+def calculate_status(score: float):
+    if score >= 80:
+        return "High Risk"
+    elif score >= 50:
+        return "Suspicious"
+    return "Low Risk"
+
+        
+# =========================
+# CORE SOC ENGINE (SINGLE SOURCE OF TRUTH)
+# =========================
+def predict_breach_risk():
+
+    data = soc_metrics()
+
+    # -------------------------
+    # FEATURE EXTRACTION
+    # -------------------------
+    risk = data["avg_risk"]
+    incidents = data["open_incidents"]
+    alerts = data["total_alerts"]
+    critical = data["critical_threats"]
+
+    # -------------------------
+    # SIMPLE FORECAST MODEL (HEURISTIC PREDICTOR)
+    # -------------------------
+    risk_trend = (risk * 0.5) + (incidents * 2) + (alerts * 0.2) + (critical * 3)
+
+    # normalize to 0â€“100 scale
+    forecast_score = min(100, risk_trend)
+
+    # -------------------------
+    # BREACH PROBABILITY
+    # -------------------------
+    if forecast_score >= 75:
+        probability = "HIGH"
+        window = "0â€“24 HOURS"
+    elif forecast_score >= 50:
+        probability = "MEDIUM"
+        window = "1â€“3 DAYS"
+    elif forecast_score >= 25:
+        probability = "LOW"
+        window = "3â€“7 DAYS"
+    else:
+        probability = "MINIMAL"
+        window = "STABLE"
+
+    # -------------------------
+    # TREND DIRECTION (SIMPLE MODEL)
+    # -------------------------
+    if risk > 70 and incidents > 5:
+        trend = "ESCALATING"
+    elif risk < 30:
+        trend = "DECREASING"
+    else:
+        trend = "STABLE"
+
+    return {
+        "forecast_score": round(forecast_score, 2),
+        "breach_probability": probability,
+        "time_window": window,
+        "trend": trend
+    }
+def soc_decision_engine(category: str, score: float, corr_id: str):
+
+    decision = {
+        "level": "NONE",
+        "actions": [],
+        "escalation": False
+    }
+
+    # ðŸ”´ CRITICAL THREAT
+    if score >= 90:
+        decision["level"] = "CRITICAL"
+        decision["actions"] = [
+            "IMMEDIATE CONTAINMENT",
+            "ISOLATE SESSION",
+            "TRIGGER INCIDENT RESPONSE TEAM"
+        ]
+        decision["escalation"] = True
+
+    # ðŸŸ  HIGH THREAT
+    elif score >= 80:
+        decision["level"] = "HIGH"
+        decision["actions"] = [
+            "AUTO CREATE INCIDENT",
+            "ENHANCED MONITORING",
+            "LIMIT ACCESS"
+        ]
+        decision["escalation"] = True
+
+    # ðŸŸ¡ MEDIUM
+    elif score >= 50:
+        decision["level"] = "MEDIUM"
+        decision["actions"] = [
+            "LOG INCIDENT",
+            "MONITOR BEHAVIOR"
+        ]
+
+    # ðŸŸ¢ LOW
+    else:
+        decision["level"] = "LOW"
+        decision["actions"] = ["LOG ONLY"]
+
+    ATTACK_TIMELINE[corr_id].append({
+        "type": "ai_decision",
+        "timestamp": now_ts(),
+        "decision": decision
+    })
+
+    return decision
+def auto_response_engine(category: str, score: float, corr_id: str):
+
+    actions = []
+
+    # ---------------- HIGH RISK AUTO RESPONSE ----------------
+    if score >= 80:
+        actions.append("BLOCK SOURCE IMMEDIATELY")
+        actions.append("ESCALATE TO SOC LEVEL 2")
+        actions.append("ISOLATE SESSION")
+
+        ensure_timeline(corr_id)
+        ATTACK_TIMELINE[corr_id].append({
+            "type": "auto_response",
+            "action": "BLOCK + ISOLATE",
+            "severity": "CRITICAL",
+            "timestamp": now_ts()
+        })
+
+    # ---------------- MEDIUM RISK ----------------
+    elif score >= 50:
+        actions.append("INCREASE MONITORING")
+        actions.append("FLAG FOR ANALYST REVIEW")
+
+        ensure_timeline(corr_id)
+        ATTACK_TIMELINE[corr_id].append({
+            "type": "auto_response",
+            "action": "MONITORING MODE",
+            "severity": "MEDIUM",
+            "timestamp": now_ts()
+        })
+
+    # ---------------- LOW RISK ----------------
+    else:
+        actions.append("LOG ONLY")
+
+    return {
+        "category": category,
+        "score": score,
+        "actions": actions
+    }
+
+
+def soc_metrics():
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    # -------------------------
+    # CORE COUNTS
+    # -------------------------
+    cur.execute("SELECT COUNT(*) AS total FROM scans")
+    scans = cur.fetchone()["total"] or 0
+
+    cur.execute("SELECT COUNT(*) AS total FROM alerts")
+    alerts = cur.fetchone()["total"] or 0
+
+    cur.execute("SELECT COUNT(*) AS total FROM incidents")
+    incidents = cur.fetchone()["total"] or 0
+
+    cur.execute("""
+        SELECT COUNT(*) AS total
+        FROM incidents
+        WHERE status = 'OPEN'
+    """)
+    open_incidents = cur.fetchone()["total"] or 0
+
+    # -------------------------
+    # RISK ENGINE
+    # -------------------------
+    cur.execute("SELECT AVG(risk_score) AS average FROM scans")
+    avg_risk = cur.fetchone()["average"]
+
+    try:
+        avg_risk = float(avg_risk or 0)
+    except:
+        avg_risk = 0
+
+    avg_risk = round(avg_risk, 2)
+
+    # -------------------------
+    # CRITICAL THREATS
+    # -------------------------
+    cur.execute("""
+        SELECT COUNT(*) AS total
+        FROM scans
+        WHERE risk_score >= 80
+    """)
+    critical_threats = cur.fetchone()["total"] or 0
+
+    conn.close()
+
+    # -------------------------
+    # NORMALIZATION LAYER
+    # -------------------------
+    norm_risk = min(avg_risk, 100)
+    norm_alerts = min(alerts, 200)
+    norm_incidents = min(open_incidents, 50)
+    norm_critical = min(critical_threats, 100)
+
+    # -------------------------
+    # SOC HEALTH ENGINE
+    # -------------------------
+    risk_penalty = norm_risk * 0.4
+    incident_penalty = norm_incidents * 2.0
+    alert_penalty = norm_alerts * 0.3
+    critical_penalty = norm_critical * 2.5
+
+    soc_health = 100 - (
+        risk_penalty +
+        incident_penalty +
+        alert_penalty +
+        critical_penalty
+    )
+
+    soc_health = max(5, min(100, soc_health))
+
+    # -------------------------
+    # STATUS CLASSIFICATION
+    # -------------------------
+    if soc_health >= 75:
+        status = "HEALTHY"
+    elif soc_health >= 50:
+        status = "STABLE"
+    elif soc_health >= 25:
+        status = "DEGRADED"
+    else:
+        status = "CRITICAL"
+
+    return {
+    "total_scans": scans,
+    "total_alerts": alerts,
+    "total_incidents": incidents,
+    "open_incidents": open_incidents,
+    "avg_risk": avg_risk,
+    "critical_threats": critical_threats,
+
+    # Frontend expects this
+    "security_score": round(soc_health, 2),
+
+    # Keep this too
+    "soc_health": round(soc_health, 2),
+
+    "status": status
+}
+def train_threat_model():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT risk_score FROM scans")
+    rows = cur.fetchall()
+
+    conn.close()
+
+    if len(rows) < 10:
+        return None
+
+    data = [[r["risk_score"]] for r in rows]
+
+    MODEL.fit(data)
+
+    return MODEL
+def predict_threat_anomaly(score: float):
+
+    try:
+        result = MODEL.predict([[score]])
+
+        if result[0] == -1:
+            return "ANOMALY DETECTED"
+        return "NORMAL"
+
+    except:
+        return "MODEL NOT TRAINED"
+def compute_soc_health(
+    risk_score,
+    open_incidents,
+    critical_alerts
+):
+    health = 100
+
+    health -= risk_score * 0.5
+    health -= open_incidents * 2
+    health -= critical_alerts * 3
+
+    return max(0, min(100, health))
+def executive_ai_layer():
+    data = soc_metrics()
+
+    tpi = (
+        data["critical_threats"] * 4 +
+        data["open_incidents"] * 3 +
+        data["total_alerts"] * 0.2
+    )
+
+    instability = min(100, tpi / 2)
+
+    if instability > 70:
+        decision = "LOCKDOWN MODE"
+    elif instability > 40:
+        decision = "HEIGHTENED MONITORING"
+    else:
+        decision = "NORMAL OPERATIONS"
+
+    return {
+        "threat_pressure_index": round(tpi, 2),
+        "instability_score": round(instability, 2),
+        "executive_decision": decision
+    }
+def soc_ai_analyst(query: str):
+
+    query = query.lower()
+
+    metrics = soc_metrics()
+
+    insights = []
+
+    # -----------------------------
+    # Executive Summary
+    # -----------------------------
+    insights.append(
+        f"{metrics['open_incidents']} open incidents currently require attention."
+    )
+
+    insights.append(
+        f"Average platform risk score is {metrics['avg_risk']}."
+    )
+
+    insights.append(
+        f"{metrics['critical_threats']} critical threats have been detected."
+    )
+
+    # -----------------------------
+    # Threat Pattern Analysis
+    # -----------------------------
+    if SOC_MEMORY["threat_patterns"]:
+
+        top = max(
+            SOC_MEMORY["threat_patterns"].items(),
+            key=lambda x: x[1]["count"]
+        )
+
+        insights.append(
+            f"Most frequent attack category: {top[0]} ({top[1]['count']} detections)."
+        )
+
+    # -----------------------------
+    # Trend
+    # -----------------------------
+    if metrics["open_incidents"] > 20:
+        insights.append(
+            "Incident volume is increasing rapidly."
+        )
+    else:
+        insights.append(
+            "Incident volume remains stable."
+        )
+
+    # -----------------------------
+    # Recommendations
+    # -----------------------------
+    recommendations = []
+
+    if metrics["critical_threats"] > 0:
+        recommendations.append(
+            "Investigate all critical incidents immediately."
+        )
+
+    if metrics["avg_risk"] > 70:
+        recommendations.append(
+            "Enable enhanced monitoring across the platform."
+        )
+
+    if metrics["open_incidents"] > 10:
+        recommendations.append(
+            "Assign additional analysts to reduce backlog."
+        )
+
+    if not recommendations:
+        recommendations.append(
+            "Continue normal SOC monitoring."
+        )
+
+    return {
+        "query": query,
+        "insights": insights,
+        "recommendations": recommendations,
+        "risk_level": metrics["status"],
+        "timestamp": datetime.utcnow().isoformat()
+    }
+def build_threat_matrix():
+    return {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "matrix": []
+    }
+
+def build_digital_twin():
+    return {
+        "nodes": list(ATTACK_GRAPH["nodes"].values()),
+        "links": ATTACK_GRAPH["edges"]
+    }
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    token = credentials.credentials
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=["HS256"]
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired authentication token."
+        )
+
+    username = payload.get("sub")
+
+    if not username:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication token."
+        )
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                SELECT *
+                FROM users
+                WHERE username = ?
+            """),
+            (username,)
+        )
+
+        user = cursor.fetchone()
+
+        if not user:
+            raise HTTPException(
+                status_code=401,
+                detail="User account not found."
+            )
+
+        user = dict(user)
+
+        if not user.get("is_active", 1):
+            raise HTTPException(
+                status_code=403,
+                detail="User account is inactive."
+            )
+
+        return user
+
+    finally:
+        conn.close()
+
+def require_admin(user=Depends(get_current_user)):
+    """
+    Require an authenticated administrator for admin-only endpoints.
+    Uses the existing get_current_user authentication dependency.
+    """
+    role = None
+
+    if isinstance(user, dict):
+        role = user.get("role")
+    else:
+        role = getattr(user, "role", None)
+
+    if str(role or "").strip().lower() != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Administrator privileges required."
+        )
+
+    return user
+
+
+def build_executive_payload():
+    data = soc_metrics()
+    ai = executive_ai_layer()
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    # Active threats
+    cursor.execute("""
+        SELECT
+            id,
+            username,
+            full_name,
+            email,
+            role,
+            tenant_id,
+            created_at,
+            status,
+            is_active,
+            password_reset_required,
+            suspended_at,
+            blocked_at,
+            mfa_enabled
+        FROM users
+        ORDER BY created_at DESC
+    """)
+
+    users = []
+
+    for row in cursor.fetchall():
+
+        user = dict(row)
+
+        username = user.get("username")
+        tenant_id = user.get("tenant_id")
+
+        # ---------------------------------
+        # SESSION / ACTIVE STATUS
+        # ---------------------------------
+        user["active"] = any(
+            session_user
+            and session_user.get("username") == username
+            for session_user in ACTIVE_SESSIONS.values()
+        )
+
+        # ---------------------------------
+        # TOTAL SCANS
+        # ---------------------------------
+        cursor.execute(db_sql("""
+            SELECT COUNT(*) AS total
+            FROM scans
+            WHERE tenant_id = ?
+        """), (tenant_id,))
+
+        user["total_scans"] = cursor.fetchone()["total"] or 0
+
+        # ---------------------------------
+        # TOTAL ALERTS
+        # ---------------------------------
+        cursor.execute(db_sql("""
+            SELECT COUNT(*) AS total
+            FROM alerts
+            WHERE tenant_id = ?
+        """), (tenant_id,))
+
+        user["total_alerts"] = cursor.fetchone()["total"] or 0
+
+        # ---------------------------------
+        # TOTAL INCIDENTS
+        # ---------------------------------
+        cursor.execute(db_sql("""
+            SELECT COUNT(*) AS total
+            FROM incidents
+            WHERE tenant_id = ?
+        """), (tenant_id,))
+
+        user["total_incidents"] = cursor.fetchone()["total"] or 0
+
+        # ---------------------------------
+        # OPEN INCIDENTS
+        # ---------------------------------
+        cursor.execute(db_sql("""
+            SELECT COUNT(*) AS total
+            FROM incidents
+            WHERE tenant_id = ?
+              AND status = 'OPEN'
+        """), (tenant_id,))
+
+        user["open_incidents"] = cursor.fetchone()["total"] or 0
+
+        # ---------------------------------
+        # HIGH-RISK INCIDENTS
+        # ---------------------------------
+        cursor.execute(db_sql("""
+            SELECT COUNT(*) AS total
+            FROM incidents
+            WHERE tenant_id = ?
+              AND risk_score >= 80
+        """), (tenant_id,))
+
+        user["high_risk_incidents"] = cursor.fetchone()["total"] or 0
+
+        # ---------------------------------
+        # AVERAGE RISK
+        # ---------------------------------
+        cursor.execute(db_sql("""
+            SELECT AVG(risk_score) AS avg_risk
+            FROM scans
+            WHERE tenant_id = ?
+        """), (tenant_id,))
+
+        avg_risk = cursor.fetchone()["avg_risk"] or 0
+
+        user["average_risk"] = round(avg_risk, 2)
+
+        # ---------------------------------
+        # LAST SCAN
+        # ---------------------------------
+        cursor.execute(db_sql("""
+            SELECT MAX(created_at) AS last_scan
+            FROM scans
+            WHERE tenant_id = ?
+        """), (tenant_id,))
+
+        user["last_scan"] = cursor.fetchone()["last_scan"]
+
+        # ---------------------------------
+        # LAST INCIDENT
+        # ---------------------------------
+        cursor.execute(db_sql("""
+            SELECT MAX(created_at) AS last_incident
+            FROM incidents
+            WHERE tenant_id = ?
+        """), (tenant_id,))
+
+        user["last_incident"] = cursor.fetchone()["last_incident"]
+        # ---------------------------------
+        # SECURITY STATUS
+        # ---------------------------------
+        if user["high_risk_incidents"] > 0:
+            user["security_status"] = "HIGH RISK"
+
+        elif user["open_incidents"] > 0:
+            user["security_status"] = "ATTENTION"
+
+        elif user["total_scans"] > 0 and user["average_risk"] >= 50:
+            user["security_status"] = "ELEVATED"
+
+        else:
+            user["security_status"] = "NORMAL"
+
+        # ---------------------------------
+        # NEVER EXPOSE AUTH SECRETS
+        # ---------------------------------
+        user.pop("password_hash", None)
+
+        users.append(user)
+
+    conn.close()
+
+    return {
+        "total_users": len(users),
+        "users": users
+    }
+
+
+@app.get("/executive/users")
+def executive_users():
+    return {
+        "users": build_executive_payload().get("users", [])
+    }
+
+
+# ============================================================
+# ADMIN USER MANAGEMENT API
+# ============================================================
+
+@app.get("/admin/users")
+def admin_users(user=Depends(require_admin)):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(db_sql("""
+            SELECT
+                id,
+                username,
+                full_name,
+                email,
+                role,
+                tenant_id,
+                status,
+                is_active,
+                suspended_at,
+                blocked_at,
+                session_version,
+                password_reset_required,
+                mfa_enabled,
+                created_at
+            FROM users
+            ORDER BY id DESC
+        """))
+
+        users = [dict(row) for row in cursor.fetchall()]
+
+        return {
+            "success": True,
+            "total_users": len(users),
+            "users": users
+        }
+
+    finally:
+        conn.close()
+
+
+@app.get("/admin/users/{user_id}")
+def admin_user_details(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(db_sql("""
+            SELECT
+                id,
+                username,
+                full_name,
+                email,
+                role,
+                tenant_id,
+                status,
+                is_active,
+                suspended_at,
+                blocked_at,
+                session_version,
+                password_reset_required,
+                mfa_enabled,
+                created_at
+            FROM users
+            WHERE id = ?
+        """), (user_id,))
+
+        target = cursor.fetchone()
+
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        return {
+            "success": True,
+            "user": dict(target)
+        }
+
+    finally:
+        conn.close()
+
+
+@app.patch("/admin/users/{user_id}/status")
+def admin_change_user_status(
+    user_id: int,
+    status: str,
+    user=Depends(require_admin)
+):
+    status = status.strip().lower()
+
+    allowed = {
+        "active",
+        "suspended",
+        "blocked"
+    }
+
+    if status not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Status must be active, suspended, or blocked."
+        )
+
+    if user.get("id") == user_id and status != "active":
+        raise HTTPException(
+            status_code=400,
+            detail="An administrator cannot suspend or block their own account."
+        )
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                SELECT id, username
+                FROM users
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        target = cursor.fetchone()
+
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        now = datetime.utcnow().isoformat()
+
+        if status == "active":
+            cursor.execute(
+                db_sql("""
+                    UPDATE users
+                    SET status = 'active',
+                        is_active = 1,
+                        suspended_at = NULL,
+                        blocked_at = NULL,
+                        session_version = COALESCE(session_version, 0) + 1
+                    WHERE id = ?
+                """),
+                (user_id,)
+            )
+
+        elif status == "suspended":
+            cursor.execute(
+                db_sql("""
+                    UPDATE users
+                    SET status = 'suspended',
+                        is_active = 0,
+                        suspended_at = ?,
+                        session_version = COALESCE(session_version, 0) + 1
+                    WHERE id = ?
+                """),
+                (now, user_id)
+            )
+
+        else:
+            cursor.execute(
+                db_sql("""
+                    UPDATE users
+                    SET status = 'blocked',
+                        is_active = 0,
+                        blocked_at = ?,
+                        session_version = COALESCE(session_version, 0) + 1
+                    WHERE id = ?
+                """),
+                (now, user_id)
+            )
+
+        conn.commit()
+
+        try:
+            create_audit_log(
+                action=f"USER_STATUS_CHANGE:{status}",
+                user=user.get("username"),
+                message=f"Admin changed user {target['username']} to {status}"
+            )
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "status": status
+        }
+
+    finally:
+        conn.close()
+
+
+@app.post("/admin/users/{user_id}/force-logout")
+def admin_force_logout(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                SELECT username
+                FROM users
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        target = cursor.fetchone()
+
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        conn.commit()
+
+        try:
+            create_audit_log(
+                action="FORCE_LOGOUT",
+                user=user.get("username"),
+                message=f"Admin revoked all sessions for {target['username']}"
+            )
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "message": "All user sessions have been revoked."
+        }
+
+    finally:
+        conn.close()
+
+
+@app.patch("/admin/users/{user_id}/role")
+def admin_change_user_role(
+    user_id: int,
+    role: str,
+    user=Depends(require_admin)
+):
+    role = role.strip().lower()
+
+    allowed = {
+        "admin",
+        "analyst",
+        "viewer",
+        "customer",
+        "executive"
+    }
+
+    if role not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid role."
+        )
+
+    if user.get("id") == user_id and role != "admin":
+        raise HTTPException(
+            status_code=400,
+            detail="An administrator cannot remove their own administrator role."
+        )
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET role = ?,
+                    session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (role, user_id)
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "role": role
+        }
+
+    finally:
+        conn.close()
+
+
+@app.patch("/admin/users/{user_id}/tenant")
+def admin_change_user_tenant(
+    user_id: int,
+    tenant_id: str,
+    user=Depends(require_admin)
+):
+    tenant_id = tenant_id.strip()
+
+    if not tenant_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Tenant ID is required."
+        )
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET tenant_id = ?,
+                    session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (tenant_id, user_id)
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "tenant_id": tenant_id
+        }
+
+    finally:
+        conn.close()
+
+
+@app.post("/admin/users/{user_id}/password-reset")
+def admin_password_reset(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                SELECT id, username, email
+                FROM users
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        target = cursor.fetchone()
+
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        reset_token = secrets.token_urlsafe(48)
+        expires_at = datetime.utcnow() + timedelta(minutes=30)
+
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET reset_token = ?,
+                    reset_token_expires = ?,
+                    password_reset_required = 1
+                WHERE id = ?
+            """),
+            (
+                reset_token,
+                expires_at.isoformat(),
+                user_id
+            )
+        )
+
+        conn.commit()
+
+        try:
+            create_audit_log(
+                action="ADMIN_PASSWORD_RESET",
+                user=user.get("username"),
+                message=f"Password reset initiated for {target['username']}"
+            )
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "message": "Password reset token generated.",
+            "username": target["username"],
+            "expires_at": expires_at.isoformat(),
+            "reset_token": reset_token
+        }
+
+    finally:
+        conn.close()
+
+
+@app.post("/admin/users/{user_id}/suspend")
+def admin_suspend_user(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET status = 'suspended',
+                    is_active = 0,
+                    suspended_at = CURRENT_TIMESTAMP,
+                    session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "message": "User suspended successfully.",
+            "user_id": user_id,
+            "status": "suspended"
+        }
+
+    finally:
+        conn.close()
+
+
+@app.post("/admin/users/{user_id}/lock")
+def admin_lock_user(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET status = 'locked',
+                    is_active = 0,
+                    blocked_at = CURRENT_TIMESTAMP,
+                    session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "message": "User locked successfully.",
+            "user_id": user_id,
+            "status": "locked"
+        }
+
+    finally:
+        conn.close()
+
+
+@app.post("/admin/users/{user_id}/unlock")
+def admin_unlock_user(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET status = 'active',
+                    is_active = 1,
+                    blocked_at = NULL,
+                    suspended_at = NULL,
+                    session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "message": "User unlocked successfully.",
+            "user_id": user_id,
+            "status": "active"
+        }
+
+    finally:
+        conn.close()
+
+
+@app.post("/admin/users/{user_id}/activate")
+def admin_activate_user(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET status = 'active',
+                    is_active = 1,
+                    blocked_at = NULL,
+                    suspended_at = NULL,
+                    password_reset_required = 0,
+                    session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "message": "User activated successfully.",
+            "user_id": user_id,
+            "status": "active"
+        }
+
+    finally:
+        conn.close()
+
+@app.post("/admin/users/{user_id}/mfa-reset")
+def admin_mfa_reset(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET mfa_enabled = 0,
+                    session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "message": "MFA has been reset and existing sessions revoked."
+        }
+
+    finally:
+        conn.close()
+
+
+@app.delete("/admin/users/{user_id}")
+def admin_delete_user(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    if user.get("id") == user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="An administrator cannot delete their own account."
+        )
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                SELECT username
+                FROM users
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        target = cursor.fetchone()
+
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        cursor.execute(
+            db_sql("""
+                DELETE FROM users
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        conn.commit()
+
+        try:
+            create_audit_log(
+                action="USER_DELETED",
+                user=user.get("username"),
+                message=f"Admin deleted user {target['username']}"
+            )
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "message": "User account deleted."
+        }
+
+    finally:
+        conn.close()
+
+
+@app.get("/executive-ai")
+def executive_ai():
+
+    summary = executive_summary()
+
+    graph = {
+        "nodes": list(ATTACK_GRAPH["nodes"].values()),
+        "edges": ATTACK_GRAPH["edges"]
+    }
+
+    nodes = graph.get("nodes", [])
+
+
+    # fallback to incidents when attack graph is empty
+    if len(nodes) == 0:
+
+        incidents = get_incidents()
+
+        nodes = []
+
+        for i in incidents:
+
+            category = i.get("category", "Unknown")
+
+            if category == "Safe":
+                continue
+
+            nodes.append({
+                "id": i.get("id"),
+                "category": category,
+                "max_score": (
+                    i.get("risk_score")
+                    or i.get("score")
+                    or 0
+                )
+            })
+
+        graph["nodes"] = nodes
+
+
+    scores = []
+
+    for n in nodes:
+
+        score = (
+            n.get("max_score")
+            or n.get("score")
+            or n.get("risk_score")
+            or 0
+        )
+
+        try:
+            score = int(score)
+        except:
+            score = 0
+
+        scores.append(score)
+
+
+    critical = summary.get(
+    "critical_threats",
+    0
+)
+
+    high = summary.get(
+    "open_incidents",
+    0
+)
+
+
+    probability = min(
+    100,
+    (critical * 20) + (min(high, 20) * 2)
+)
+
+
+    security_score = summary.get(
+    "security_score",
+    0
+)
+
+
+    if critical > 0:
+
+        severity = "Critical"
+
+        recommendation = (
+            "Immediate executive response required. "
+            "Contain affected systems and activate incident response."
+        )
+
+
+    elif high > 0:
+
+        severity = "High"
+
+        recommendation = (
+            "High-risk threats detected. "
+            "SOC investigation required."
+        )
+    else:
+
+        severity = "Low"
+
+        recommendation = "Environment is stable."
+
+    ai = executive_reasoning(
+    summary,
+    {
+        "nodes": nodes,
+        "edges": graph["edges"]
+    }
+)
+    return {
+        "severity": severity,
+        "probability": probability,
+        "critical_nodes": critical,
+        "high_nodes": high,
+        "security_score": security_score,
+        "recommendation": recommendation,
+        "summary": summary,
+
+        "executive_summary": ai.get("summary", ""),
+        "top_threats": ai.get("top_threats", []),
+        "confidence": ai.get("confidence", 0)
+    }
+@app.get("/executive/incident-commander")
+def executive_incident_commander():
+    return {
+        "total_active": len(ACTIVE_INCIDENTS),
+        "incidents": list(ACTIVE_INCIDENTS.values())
+    }
+@app.post("/executive/close-incident/{incident_id}")
+def executive_close_incident(incident_id: int):
+
+    return close_incident(incident_id)
+@app.get("/executive/active-count")
+def active_count():
+
+    return {
+        "active": len(ACTIVE_INCIDENTS)
+    }
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "service": "SafeChat AI SOC",
+        "environment": os.getenv("ENVIRONMENT", "production"),
+        "database": "connected",
+        "api": "running"
+    }
+@app.get("/executive-ai-brief")
+def executive_ai_brief():
+
+    return {
+        "overall_risk": "HIGH",
+        "executive_summary":
+            "Critical phishing activity increased across the enterprise. AI predicts elevated credential theft risk within the next 24 hours.",
+
+        "top_business_risks": [
+            "Credential compromise",
+            "Financial fraud",
+            "Business email compromise",
+            "Data exfiltration"
+        ],
+
+        "recommended_actions": [
+            "Enable MFA enforcement",
+            "Block malicious IP addresses",
+            "Reset compromised credentials",
+            "Patch exposed systems"
+        ],
+
+        "predictions": {
+            "next_24h": "High",
+            "next_7d": "Elevated",
+            "confidence": 96
+        }
+    }
+@app.get("/attack-path-analysis")
+def attack_path_analysis():
+
+    return {
+        "paths": [
+            {
+                "id": 1,
+                "probability": 92,
+                "risk": "Critical",
+                "business_impact": "High",
+                "steps": [
+                    "Internet",
+                    "Email Gateway",
+                    "Employee Laptop",
+                    "Domain Controller",
+                    "Finance Database"
+                ]
+            },
+            {
+                "id": 2,
+                "probability": 71,
+                "risk": "High",
+                "business_impact": "Medium",
+                "steps": [
+                    "VPN",
+                    "Application Server",
+                    "SQL Server"
+                ]
+            }
+        ]
+    }
+
+@app.get("/executive/recommendations")
+def executive_recommendations():
+
+    recommendations = [
+        {
+            "priority": "Critical",
+            "title": "Strengthen Identity Protection",
+            "action": "Enable MFA for all privileged accounts."
+        },
+        {
+            "priority": "High",
+            "title": "Reduce Attack Surface",
+            "action": "Patch internet-facing systems with critical vulnerabilities."
+        },
+        {
+            "priority": "Medium",
+            "title": "Improve Threat Detection",
+            "action": "Tune SIEM correlation rules and review alert thresholds."
+        }
+    ]
+
+    return {
+        "generated": datetime.utcnow().isoformat(),
+        "recommendations": recommendations
+    }
+def build_mitre_matrix():
+    data = soc_metrics()
+
+    total = max(data["total_scans"], 1)
+    critical = data["critical_threats"]
+
+    return {
+        "Initial Access": min(100, round(total * 0.18)),
+        "Execution": min(100, round(total * 0.22)),
+        "Persistence": min(100, round(total * 0.15)),
+        "Privilege Escalation": min(100, round(critical * 0.35)),
+        "Defense Evasion": min(100, round(total * 0.17)),
+        "Credential Access": min(100, round(critical * 0.45)),
+        "Discovery": min(100, round(total * 0.25)),
+        "Lateral Movement": min(100, round(critical * 0.30)),
+        "Collection": min(100, round(total * 0.14)),
+        "Exfiltration": min(100, round(critical * 0.20))
+    }
+def build_enterprise_digital_twin():
+
+    return {
+        "Internet": 28,
+        "Firewall": 12,
+        "Email Gateway": 33,
+        "Identity": 24,
+        "Enterprise Servers": 41,
+        "Databases": 18,
+        "Finance": 9,
+        "attack_paths": len(ATTACK_GRAPH["edges"]),
+        "protected_assets": build_security_posture()["protected_assets"]
+    }
+
+# ==============================
+# EXECUTIVE WAR ROOM ACTIONS
+# ==============================
+
+CRISIS_MODE = False
+EXECUTIVE_STATUS = {
+    "posture": "NORMAL",
+    "risk_level": "LOW",
+    "reason": "No active incidents",
+    "updated": datetime.utcnow().isoformat()
+}
+
+
+def update_executive_posture(
+    posture,
+    risk_level,
+    reason
+):
+
+    EXECUTIVE_STATUS.update({
+
+        "posture": posture,
+        "risk_level": risk_level,
+        "reason": reason,
+        "updated": datetime.utcnow().isoformat()
+
+    })
+
+
+    return EXECUTIVE_STATUS
+
+EXECUTIVE_EVENTS = []
+
+
+def add_executive_event(event_type, message, severity="INFO"):
+
+    event = {
+        "type": event_type,
+        "message": message,
+        "severity": severity,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+    EXECUTIVE_EVENTS.insert(0, event)
+
+    if len(EXECUTIVE_EVENTS) > 100:
+        EXECUTIVE_EVENTS.pop()
+
+    return event
+
+@app.post("/executive/declare-incident")
+async def declare_incident():
+
+    update_executive_posture(
+        "INCIDENT RESPONSE",
+        "CRITICAL",
+        "Executive incident declared"
+    )
+
+
+    event = add_executive_event(
+        "INCIDENT",
+        "ðŸš¨ Incident declared by Executive Commander",
+        "CRITICAL"
+    )
+
+
+    await manager.broadcast(event)
+
+
+    return {
+        "status":"success",
+        "message":"Incident declared",
+        "posture": EXECUTIVE_STATUS
+    }
+
+@app.post("/executive/crisis-mode")
+async def crisis_mode():
+
+    global CRISIS_MODE
+
+    CRISIS_MODE = True
+
+
+    update_executive_posture(
+        "CRISIS",
+        "CRITICAL",
+        "Enterprise crisis mode activated"
+    )
+
+
+    event = add_executive_event(
+        "CRISIS",
+        "âš  Enterprise crisis mode activated",
+        "CRITICAL"
+    )
+
+
+    await manager.broadcast(event)
+
+
+    return {
+        "success":True,
+        "message":"âš  Executive Crisis Mode Activated",
+        "posture": EXECUTIVE_STATUS
+    }
+
+@app.post("/executive/notify-board")
+async def notify_board():
+
+    event = add_executive_event(
+        "BOARD",
+        "ðŸ“¢ Board members notified",
+        "HIGH"
+    )
+
+    await manager.broadcast(event)
+
+
+    return {
+        "success": True,
+        "message": "ðŸ“¢ Board Members Notified",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@app.post("/executive/generate-report")
+async def generate_report():
+
+    summary = executive_summary()
+    decision = executive_ai_decision()
+
+
+    report = {
+    "generated": datetime.utcnow().isoformat(),
+
+    "security_score":
+        decision.get("security_score", 0),
+
+    "critical_threats":
+        decision.get("critical_threats", 0),
+
+    "enterprise_risk":
+        decision.get(
+            "enterprise_risk",
+            get_executive_kpis().get("enterprise_risk", 0)
+        ),
+
+    "recommendation":
+        decision.get(
+            "recommendation",
+            executive_recommendations().get("recommendations", [])
+        )
+}
+
+
+    event = add_executive_event(
+        "REPORT",
+        "ðŸ“„ Executive security report generated",
+        "INFO"
+    )
+
+    await manager.broadcast(event)
+
+
+    return {
+        "success": True,
+        "message": "ðŸ“„ Executive Report Generated",
+        "report": report
+    }
+
+@app.get("/executive/live-events")
+async def executive_live_events():
+
+    return {
+        "events": EXECUTIVE_EVENTS
+    }
+@app.get("/executive/posture")
+async def executive_posture():
+
+    return EXECUTIVE_STATUS
+@app.get("/attack-replay")
+def attack_replay(correlation_id: str | None = None):
+
+    if correlation_id:
+        return build_replay(correlation_id)
+
+    events = get_replay()
+
+    return {
+        "correlation_id": None,
+        "count": len(events),
+        "events": events
+    }
+@app.get("/compliance-summary")
+def get_compliance_summary():
+    return compliance_summary()
+@app.get("/executive/audit-log")
+def executive_audit_log():
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            SELECT
+                timestamp,
+                category,
+                status,
+                severity
+            FROM incidents
+            ORDER BY id DESC
+            LIMIT 20
+        """)
+
+        rows = cur.fetchall()
+
+        logs = []
+
+        for r in rows:
+            logs.append({
+                "time": r["timestamp"],
+                "user": "SOC AI",
+                "action": f'{r["category"]} ({r["severity"]})',
+                "status": r["status"]
+            })
+
+        return logs
+
+    finally:
+        conn.close()
+@app.get("/executive/report")
+def executive_report():
+
+    return {
+        "title": "Executive Security Report",
+        "generated": datetime.utcnow().isoformat(),
+        "risk_score": executive_risk_trend(),
+        "compliance": {
+            "score": 87,
+            "status": "Compliant",
+            "frameworks": [
+                "ISO 27001",
+                "NIST CSF",
+                "SOC 2",
+                "PCI DSS"
+            ],
+            "controls": {
+                "implemented": 87,
+                "pending": 13
+            }
+        },
+        "summary": executive_summary(),
+        "recommendations": executive_recommendations()
+    }
+@app.get("/")
+def root():
+    return {
+        "service": "SafeChatAI SOC",
+        "status": "online",
+        "version": "production"
+    }
+@app.get("/digital-twin")
+def digital_twin(
+    user=Depends(get_current_user)
+):
+    try:
+        tenant_id = getattr(user, "tenant_id", None)
+
+        summary = get_digital_twin_summary(tenant_id)
+
+        graph = get_asset_graph(tenant_id)
+
+        risk_summary = get_asset_risk_summary(tenant_id)
+
+        high_risk_assets = get_high_risk_assets(tenant_id)
+
+        return {
+            "success": True,
+
+            "digital_twin": {
+                "summary": summary,
+
+                "risk": risk_summary,
+
+                "assets": graph["assets"],
+
+                "relationships": graph["relationships"],
+
+                "high_risk_assets": high_risk_assets
+            }
+        }
+
+    except Exception as e:
+
+        print(
+            "DIGITAL TWIN API ERROR =",
+            str(e)
+        )
+
+        return {
+            "success": False,
+            "error": "DIGITAL_TWIN_ERROR",
+            "details": str(e)
+        }
+@app.get("/digital-twin/asset/{asset_id:path}")
+def digital_twin_asset(
+    asset_id: str,
+    user=Depends(get_current_user)
+):
+    try:
+        tenant_id = getattr(user, "tenant_id", None)
+
+        asset = get_asset(asset_id)
+
+        if not asset:
+            return {
+                "success": False,
+                "error": "ASSET_NOT_FOUND",
+                "asset_id": asset_id
+            }
+
+        if tenant_id is not None:
+            asset_tenant = asset.get("tenant_id")
+
+            if asset_tenant is not None and str(asset_tenant) != str(tenant_id):
+                return {
+                    "success": False,
+                    "error": "ASSET_NOT_FOUND",
+                    "asset_id": asset_id
+                }
+
+        try:
+            risk = calculate_asset_risk(asset_id)
+        except Exception as risk_error:
+            print("DIGITAL TWIN ASSET RISK ERROR =", str(risk_error))
+            risk = None
+
+        return {
+            "success": True,
+            "asset": asset,
+            "risk": risk
+        }
+
+    except Exception as e:
+        print("DIGITAL TWIN ASSET ERROR =", str(e))
+
+        return {
+            "success": False,
+            "error": "DIGITAL_TWIN_ASSET_ERROR",
+            "details": str(e)
+        }
+@app.get("/digital-twin/risk")
+def digital_twin_risk(
+    user=Depends(get_current_user)
+):
+    try:
+
+        tenant_id = getattr(user, "tenant_id", None)
+
+        results = recalculate_all_asset_risks(
+            tenant_id
+        )
+
+        summary = get_asset_risk_summary(
+            tenant_id
+        )
+
+        high_risk = get_high_risk_assets(
+            tenant_id
+        )
+
+        return {
+            "success": True,
+            "risk": {
+                "summary": summary,
+                "assets": results,
+                "high_risk_assets": high_risk
+            }
+        }
+
+    except Exception as e:
+
+        print(
+            "DIGITAL TWIN RISK ERROR =",
+            str(e)
+        )
+
+        return {
+            "success": False,
+            "error": "DIGITAL_TWIN_RISK_ERROR",
+            "details": str(e)
+        }
+@app.post("/security-events")
+def ingest_security_event(payload: dict):
+    event = persist_security_event(payload)
+    correlation = correlate_event(event)
+
+    return {
+    "success": True,
+    "event": event,
+    "correlation": correlation,
+}
+
+
+@app.get("/security-events")
+def security_events(limit: int = 100, tenant_id: str | None = None):
+    return {
+        "events": get_security_events(
+            limit=limit,
+            tenant_id=tenant_id,
+        )
+    }
+
+
+@app.get("/security-events/event/{event_id}")
+def security_event(event_id: str):
+    event = get_security_event(event_id)
+
+    if not event:
+        return {
+            "success": False,
+            "error": "SECURITY_EVENT_NOT_FOUND",
+            "event_id": event_id,
+        }
+
+    return {
+        "success": True,
+        "event": event,
+    }
+
+
+@app.get("/security-events/{event_id}/correlations")
+def security_event_correlations(event_id: str):
+    return {
+        "event_id": event_id,
+        "correlations": get_event_correlations(event_id),
+    }
+
+
+@app.get("/correlation-clusters")
+def correlation_clusters(
+    limit: int = 50,
+    tenant_id: str | None = None,
+):
+    return {
+        "clusters": get_correlation_clusters(
+            tenant_id=tenant_id,
+            limit=limit,
+        )
+    }
+
+
+@app.get("/correlation-clusters/{cluster_id}")
+def correlation_cluster(cluster_id: str):
+    cluster = get_correlation_cluster(cluster_id)
+
+    if not cluster:
+        return {
+            "success": False,
+            "error": "CLUSTER_NOT_FOUND",
+            "cluster_id": cluster_id,
+        }
+
+    return {
+        "success": True,
+        "cluster": cluster,
+    }
+
+
+@app.get("/attack-campaigns")
+def attack_campaigns(
+    limit: int = 50,
+    tenant_id: str | None = None,
+):
+    return {
+        "campaigns": get_attack_campaigns(
+            tenant_id=tenant_id,
+            limit=limit,
+        )
+    }
+
+
+@app.get("/attack-campaigns/{campaign_id}")
+def attack_campaign(campaign_id: str):
+    campaign = get_attack_campaign(campaign_id)
+
+    if not campaign:
+        return {
+            "success": False,
+            "error": "CAMPAIGN_NOT_FOUND",
+            "campaign_id": campaign_id,
+        }
+
+    return {
+        "success": True,
+        "campaign": campaign,
+    }
+
+
+@app.get("/attack-campaigns/{campaign_id}/investigation")
+def attack_campaign_investigation(campaign_id: str):
+    campaign = get_attack_campaign(campaign_id)
+
+    if not campaign:
+        return {
+            "success": False,
+            "error": "CAMPAIGN_NOT_FOUND",
+            "campaign_id": campaign_id,
+        }
+
+    cluster_id = campaign.get("cluster_id")
+    cluster = (
+        get_correlation_cluster(cluster_id)
+        if cluster_id
+        else None
+    )
+
+    # ============================================================
+    # PHASE 42.22 - CAMPAIGN RESPONSE HISTORY
+    # Match response events by campaign_id OR by the authoritative
+    # Fabric correlation IDs belonging to this campaign's members.
+    # ============================================================
+    response_events = []
+
+    try:
+        correlation_ids = set()
+
+        for member in (cluster or {}).get("members", []):
+            event_id = member.get("event_id")
+
+            if not event_id:
+                continue
+
+            source_event = get_security_event(event_id)
+
+            if source_event:
+                correlation_id = source_event.get(
+                    "correlation_id"
+                )
+
+                if correlation_id:
+                    correlation_ids.add(
+                        correlation_id
+                    )
+
+        fabric_events = get_security_events(
+            limit=500,
+            tenant_id=campaign.get("tenant_id")
+        )
+
+        for fabric_event in fabric_events:
+
+            if fabric_event.get("event_type") != (
+                "auto_response_event"
+            ):
+                continue
+
+            same_campaign = (
+                fabric_event.get("campaign_id")
+                == campaign_id
+            )
+
+            same_correlation = (
+                fabric_event.get("correlation_id")
+                in correlation_ids
+            )
+
+            if same_campaign or same_correlation:
+                response_events.append(
+                    fabric_event
+                )
+
+    except Exception as response_error:
+        print(
+            "[42.22] Campaign response lookup failed:",
+            response_error,
+        )
+
+    response_status = (
+        "EXECUTED"
+        if any(
+            e.get("status") == "EXECUTED"
+            for e in response_events
+        )
+        else (
+            "BACKFILLED"
+            if response_events
+            else "NO_RESPONSE_RECORDED"
+        )
+    )
+
+    investigation = {
+        "campaign": campaign,
+        "cluster": cluster,
+        "timeline": get_campaign_timeline(campaign_id),
+
+        "response": {
+            "status": response_status,
+            "event_count": len(response_events),
+            "events": response_events,
+        },
+
+        "threat_dna": None,
+        "attack_graph": None,
+        "digital_twin": None,
+        "replay": None,
+        "links": {
+            "campaign_id": campaign_id,
+            "cluster_id": cluster_id,
+        },
+    }
+
+    # ---------------------------------------------------------
+    # Threat DNA
+    # ---------------------------------------------------------
+    try:
+        from threat_dna import get_threat_dna
+
+        getter = get_threat_dna
+
+        try:
+            investigation["threat_dna"] = getter(
+                campaign.get("primary_category")
+            )
+        except TypeError:
+            investigation["threat_dna"] = getter()
+
+    except Exception as e:
+        print("[42.18] Threat DNA unavailable:", e)
+
+    # ---------------------------------------------------------
+    # Attack Graph
+    # ---------------------------------------------------------
+    try:
+        from attack_graph import get_graph
+
+        investigation["attack_graph"] = get_graph()
+
+    except Exception as e:
+        print("[42.18] Attack Graph unavailable:", e)
+
+    # ---------------------------------------------------------
+    # Digital Twin
+    # ---------------------------------------------------------
+    try:
+        from digital_twin import get_digital_twin_summary
+
+        investigation["digital_twin"] = get_digital_twin_summary()
+
+    except Exception as e:
+        print("[42.18] Digital Twin unavailable:", e)
+
+    # ---------------------------------------------------------
+    # Threat Replay
+    # ---------------------------------------------------------
+    try:
+        from replay_engine import build_replay, get_replay
+
+        members = (
+            (cluster or {}).get("members")
+            or []
+        )
+
+        correlation_id = None
+
+        for member in members:
+            event_id = member.get("event_id")
+
+            if event_id:
+                correlation_id = event_id
+                break
+
+        if correlation_id:
+            try:
+                investigation["replay"] = get_replay(
+                    correlation_id
+                )
+            except Exception:
+                try:
+                    investigation["replay"] = build_replay(
+                        correlation_id
+                    )
+                except Exception as replay_error:
+                    print(
+                        "[42.18] Replay unavailable:",
+                        replay_error
+                    )
+
+    except Exception as e:
+        print("[42.18] Replay module unavailable:", e)
+
+    return {
+        "success": True,
+        "investigation": investigation,
+    }
+
+
+
+# ============================================================
+# SOC AI STREAM - CUSTOMER THREAT ANALYSIS
+# ============================================================
+
+@app.post("/soc-ai-stream")
+async def soc_ai_stream(payload: dict, user=Depends(get_current_user)):
+
+    text_value = str(payload.get("text") or "").strip()
+
+    if not text_value:
+        return {
+            "success": False,
+            "error": "Text is required."
+        }
+
+    username = payload.get("username") or "unknown"
+    hostname = payload.get("hostname") or "unknown"
+    source_ip = payload.get("source_ip") or "unknown"
+
+    try:
+        # ----------------------------------------------------
+        # Existing SafeChat AI threat classifier
+        # ----------------------------------------------------
+        classification = classify_threat(text_value)
+
+        if isinstance(classification, dict):
+            category = (
+                classification.get("category")
+                or classification.get("threat")
+                or classification.get("type")
+                or "Unknown"
+            )
+
+            score = float(
+                classification.get("score")
+                or classification.get("risk_score")
+                or 0
+            )
+
+            stage = classification.get("stage") or "Unknown"
+            mitre = classification.get("mitre") or ""
+
+        elif isinstance(classification, (tuple, list)):
+            category = str(classification[0]) if len(classification) > 0 else "Unknown"
+            score = float(classification[1]) if len(classification) > 1 else 0
+            stage = str(classification[2]) if len(classification) > 2 else "Unknown"
+            mitre = str(classification[3]) if len(classification) > 3 else ""
+
+        else:
+            category = str(classification or "Unknown")
+            score = 0
+            stage = "Unknown"
+            mitre = ""
+
+        # ----------------------------------------------------
+        # IOC extraction
+        # ----------------------------------------------------
+        try:
+            iocs = extract_iocs(text_value)
+        except Exception as e:
+            print("SOC AI IOC ERROR:", e)
+            iocs = {}
+
+        # ----------------------------------------------------
+        # Persist/update IOC intelligence
+        # ----------------------------------------------------
+        try:
+            if iocs:
+                update_ioc_database(iocs)
+        except Exception as e:
+            print("SOC AI IOC DATABASE ERROR:", e)
+
+        # ----------------------------------------------------
+        # Correlation / Attack Graph
+        # ----------------------------------------------------
+        correlation_id = generate_correlation_key(
+            category,
+            text_value
+        )
+
+        node_id = f"{category}:{correlation_id}"
+
+        # Capture the previous node BEFORE adding the new node.
+        previous_node = ATTACK_GRAPH.get("last_node")
+
+        graph = add_graph_node(
+            node_id=node_id,
+            category=category,
+            score=score,
+            stage=stage,
+            mitre=mitre
+        )
+
+        # Connect this attack to the previous live attack.
+        if previous_node and previous_node != node_id:
+            add_graph_edge(
+                previous_node,
+                node_id,
+                category="CORRELATED_ATTACK"
+            )
+
+        # Re-read graph after possible edge creation.
+        graph = ATTACK_GRAPH
+
+        # ----------------------------------------------------
+        # Risk level
+        # ----------------------------------------------------
+        if score >= 90:
+            risk_level = "Critical"
+        elif score >= 75:
+            risk_level = "High"
+        elif score >= 50:
+            risk_level = "Medium"
+        else:
+            risk_level = "Low"
+
+        # ----------------------------------------------------
+        # Live Attack Graph event
+        # ----------------------------------------------------
+        live_node = {
+            "id": node_id,
+            "category": category,
+            "score": score,
+            "max_score": score,
+            "stage": stage,
+            "mitre": mitre,
+            "count": graph["nodes"].get(
+                node_id,
+                {}
+            ).get("count", 1),
+            "correlation_id": correlation_id,
+            "source_ip": source_ip,
+            "hostname": hostname,
+            "username": username
+        }
+
+        event = {
+            "type": "attack_graph_live",
+            "timestamp": now_ts(),
+            "correlation_id": correlation_id,
+            "node": live_node,
+            "links": graph.get("edges", [])
+        }
+
+        await manager.broadcast(event)
+
+        # ----------------------------------------------------
+        # Dashboard update
+        # ----------------------------------------------------
+        await manager.broadcast({
+            "type": "dashboard_update",
+            "timestamp": now_ts(),
+            "data": {
+                "category": category,
+                "score": score,
+                "risk_level": risk_level
+            }
+        })
+
+        # ----------------------------------------------------
+        # Customer-facing AI response
+        # ----------------------------------------------------
+        summary = (
+            f"{category} detected with a {risk_level} risk level "
+            f"(score {score:.0f}/100)."
+        )
+
+        recommendations = [
+            "Review the detected activity and associated indicators.",
+            "Investigate the affected account, host, and source IP.",
+            "Correlate related events in the Attack Graph."
+        ]
+
+        if risk_level in ("Critical", "High"):
+            recommendations.insert(
+                0,
+                "Escalate this event for immediate SOC investigation."
+            )
+
+        return {
+            "success": True,
+            "reply": summary,
+            "data": {
+                "summary": summary,
+                "analysis": summary,
+                "category": category,
+                "score": score,
+                "risk_level": risk_level,
+                "level": risk_level,
+                "stage": stage,
+                "mitre": mitre,
+                "iocs": iocs,
+                "correlation_id": correlation_id,
+                "username": username,
+                "hostname": hostname,
+                "source_ip": source_ip,
+                "actions": recommendations,
+                "recommendations": recommendations,
+                "node": live_node
+            }
+        }
+
+    except Exception as e:
+        print("SOC AI STREAM ERROR:", repr(e))
+
+        return {
+            "success": False,
+            "error": "SOC AI analysis failed.",
+            "detail": str(e)
+        }
+
+
+
+# ============================================================
+
+# ============================================================
+# ATTACK GRAPH COMPATIBILITY ROUTE
+# ============================================================
+
+@app.get("/attack-graph")
+def attack_graph():
+    """
+    Return the current live SafeChat AI Attack Graph.
+
+    Uses the existing in-memory ATTACK_GRAPH populated by
+    /soc-ai-stream and the existing graph helper functions.
+    """
+    try:
+        graph = ATTACK_GRAPH
+
+        nodes = graph.get("nodes", {})
+        edges = graph.get("edges", [])
+
+        if isinstance(nodes, dict):
+            nodes = list(nodes.values())
+
+        if not isinstance(nodes, list):
+            nodes = []
+
+        if not isinstance(edges, list):
+            edges = []
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "links": edges,
+            "last_node": graph.get("last_node")
+        }
+
+    except Exception as e:
+        print("ATTACK GRAPH ERROR:", repr(e))
+        return {
+            "nodes": [],
+            "edges": [],
+            "links": [],
+            "last_node": None
+        }
+
+
+# CUSTOMER DASHBOARD MISSING COMPATIBILITY ROUTES
+# ============================================================
+
+@app.get("/incidents")
+def customer_incidents():
+    """
+    Customer dashboard incident feed.
+    Uses the existing database incident query.
+    """
+    try:
+        data = get_incidents()
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        print("INCIDENTS ERROR:", e)
+        return []
+
+
+@app.get("/customer/attack-trend")
+def customer_attack_trend():
+    """
+    Customer dashboard attack trend.
+    Returns a stable array for the Recharts trend component.
+    """
+    try:
+        incidents = get_incidents()
+
+        if not isinstance(incidents, list):
+            incidents = []
+
+        trend = {}
+
+        for incident in incidents:
+            timestamp = (
+                incident.get("created_at")
+                or incident.get("timestamp")
+                or incident.get("detected_at")
+            )
+
+            if not timestamp:
+                continue
+
+            day = str(timestamp)[:10]
+            trend[day] = trend.get(day, 0) + 1
+
+        return [
+            {
+                "date": day,
+                "attacks": count
+            }
+            for day, count in sorted(trend.items())
+        ]
+
+    except Exception as e:
+        print("ATTACK TREND ERROR:", e)
+        return []
+
+
+@app.websocket("/ws/soc")
+async def websocket_soc(websocket: WebSocket):
+    """
+    Customer SOC live event stream.
+    """
+    await manager.connect(websocket)
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception:
+        manager.disconnect(websocket)
+
+
+# ============================================================
+# CUSTOMER IOC ARRAY COMPATIBILITY
+# ============================================================
+
+def _customer_ioc_array():
+    result = []
+
+    try:
+        for category, values in IOC_DATABASE.items():
+
+            if not isinstance(values, dict):
+                continue
+
+            for value, metadata in values.items():
+
+                item = {
+                    "ioc": value,
+                    "value": value,
+                    "type": category,
+                }
+
+                if isinstance(metadata, dict):
+                    item.update(metadata)
+
+                result.append(item)
+
+    except Exception as e:
+        print("IOC ARRAY ERROR:", e)
+
+    return result
+
+
+# ============================================================
+# CUSTOMER DASHBOARD COMPATIBILITY ROUTES
+# ============================================================
+
+@app.get("/soc-summary")
+def soc_summary():
+    return {
+        "total_scans": get_total_scans(),
+        "total_alerts": get_total_alerts(),
+        "total_incidents": get_total_incidents(),
+        "open_incidents": get_open_incident_count(),
+        "status": "operational"
+    }
+
+
+@app.get("/customer/dashboard")
+def customer_dashboard(user=Depends(get_current_user)):
+    return {
+        "total_scans": get_total_scans(),
+        "total_alerts": get_total_alerts(),
+        "total_incidents": get_total_incidents(),
+        "open_incidents": get_open_incident_count(),
+        "status": "operational"
+    }
+
+
+@app.get("/customer/iocs")
+def customer_iocs(user=Depends(get_current_user)):
+    return _customer_ioc_array()
+
+
+@app.get("/threat-dna")
+def threat_dna():
+    try:
+        dna = get_all_threat_dna()
+
+        if isinstance(dna, list):
+            return {
+                "fingerprints": dna
+            }
+
+        return {
+            "fingerprints": []
+        }
+
+    except Exception as e:
+        print("THREAT DNA ERROR:", e)
+        return {
+            "fingerprints": []
+        }
+
+
+

@@ -1,0 +1,166 @@
+﻿import App from "./App";
+import AdminUserMetrics from "./AdminUserMetrics";
+import AdminUserDirectory from "./AdminUserDirectory";
+import "./AdminSOC.css";
+
+export default function AdminSOC() {
+  return (
+    <div className="admin-soc-page">
+
+      {/* HERO */}
+      <section className="admin-soc-hero">
+        <div className="admin-soc-glow admin-soc-glow-one" />
+        <div className="admin-soc-glow admin-soc-glow-two" />
+
+        <div className="admin-soc-hero-content">
+
+          <div className="admin-soc-title-block">
+
+            <div className="admin-soc-eyebrow">
+              <span className="admin-soc-live-dot" />
+              ADMIN SECURITY OPERATIONS
+            </div>
+
+            <h1 className="admin-soc-title">
+              <span className="admin-soc-shield">🛡️</span>
+              SafeChat AI
+              <span className="admin-soc-title-muted">
+                {" "}SOC Command Center
+              </span>
+            </h1>
+
+            <p className="admin-soc-subtitle">
+              Enterprise identity, access, tenant governance and security
+              operations in one intelligent control surface.
+            </p>
+
+          </div>
+
+          <div className="admin-soc-status">
+
+            <div className="admin-soc-status-icon">
+              ⚡
+            </div>
+
+            <div>
+              <div className="admin-soc-status-label">
+                Control Status
+              </div>
+
+              <div className="admin-soc-status-value">
+                <span className="admin-soc-status-dot" />
+                OPERATIONAL
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div className="admin-soc-hero-meta">
+
+          <div className="admin-soc-meta-item">
+            <span className="admin-soc-meta-label">
+              Security Layer
+            </span>
+            <strong>
+              ACTIVE
+            </strong>
+          </div>
+
+          <div className="admin-soc-meta-divider" />
+
+          <div className="admin-soc-meta-item">
+            <span className="admin-soc-meta-label">
+              Access Control
+            </span>
+            <strong>
+              ENFORCED
+            </strong>
+          </div>
+
+          <div className="admin-soc-meta-divider" />
+
+          <div className="admin-soc-meta-item">
+            <span className="admin-soc-meta-label">
+              SOC Platform
+            </span>
+            <strong>
+              ONLINE
+            </strong>
+          </div>
+
+        </div>
+      </section>
+
+      {/* CORE ADMIN SOC */}
+      <section className="admin-soc-core">
+
+        <div className="admin-soc-section-heading">
+          <div>
+            <div className="admin-soc-section-kicker">
+              CONTROL PLANE
+            </div>
+
+            <h2>
+              Security Administration
+            </h2>
+          </div>
+
+          <div className="admin-soc-section-indicator">
+            <span />
+            LIVE
+          </div>
+        </div>
+
+        <div className="admin-soc-app">
+          <App />
+        </div>
+
+      </section>
+
+      {/* USER SECURITY METRICS */}
+      <section className="admin-soc-module">
+
+        <div className="admin-soc-module-heading">
+          <div>
+            <span className="admin-soc-module-kicker">
+              IDENTITY INTELLIGENCE
+            </span>
+
+            <h2>
+              User Security Metrics
+            </h2>
+          </div>
+        </div>
+
+        <div className="admin-soc-module-card">
+          <AdminUserMetrics />
+        </div>
+
+      </section>
+
+      {/* USER DIRECTORY */}
+      <section className="admin-soc-module admin-soc-module-last">
+
+        <div className="admin-soc-module-heading">
+          <div>
+            <span className="admin-soc-module-kicker">
+              IDENTITY GOVERNANCE
+            </span>
+
+            <h2>
+              User Directory
+            </h2>
+          </div>
+        </div>
+
+        <div className="admin-soc-module-card">
+          <AdminUserDirectory />
+        </div>
+
+      </section>
+
+    </div>
+  );
+}

@@ -1,10 +1,42 @@
-from fastapi import (
+﻿from fastapi import (
     FastAPI,
     Header,
     Request,
     WebSocket,
     WebSocketDisconnect,
     Depends
+)
+from event_correlation import (
+    init_event_correlation,
+    correlate_event,
+    get_event_correlations,
+    get_correlation_cluster,
+    get_correlation_clusters,
+    get_attack_campaign,
+    get_attack_campaigns,
+    get_campaign_timeline,
+)
+from security_fabric import (
+    init_security_fabric,
+    persist_security_event,
+    get_security_events,
+    get_security_event,
+)
+from event_correlation import (
+    init_event_correlation,
+    correlate_event,
+    get_event_correlations,
+    get_correlation_cluster,
+    get_correlation_clusters,
+    get_attack_campaign,
+    get_attack_campaigns,
+    get_campaign_timeline,
+)
+from security_fabric import (
+    init_security_fabric,
+    persist_security_event,
+    get_security_events,
+    get_security_event,
 )
 from replay_engine import add_replay_event, get_replay
 from attack_graph import add_event, get_graph
@@ -93,6 +125,7 @@ from db import create_scan
 
 from db import (
     init_db,
+    db_sql,
     get_conn,
     create_incident,
     update_incident_status,
@@ -1811,9 +1844,73 @@ def get_current_user(
                 detail="Invalid token"
             )
 
+        conn = get_conn()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                db_sql("""
+                    SELECT
+                        id,
+                        username,
+                        role,
+                        tenant_id,
+                        status,
+                        is_active,
+                        session_version
+                    FROM users
+                    WHERE username = ?
+                    LIMIT 1
+                """),
+                (username,)
+            )
+
+            db_user = cursor.fetchone()
+
+        finally:
+            conn.close()
+
+        if db_user:
+            db_user = dict(db_user)
+
+            status = str(
+                db_user.get("status") or "active"
+            ).lower()
+
+            if status in ("blocked", "suspended") or not db_user.get("is_active", 1):
+                raise HTTPException(
+                    status_code=403,
+                    detail="User account is suspended or blocked."
+                )
+
+            token_version = int(
+                payload.get("session_version", 0)
+            )
+
+            db_version = int(
+                db_user.get("session_version") or 0
+            )
+
+            if token_version != db_version:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Session has been revoked. Please sign in again."
+                )
+
+            role = db_user.get("role") or role
+
+            return {
+                "id": db_user.get("id"),
+                "username": db_user.get("username"),
+                "role": role,
+                "tenant_id": db_user.get("tenant_id")
+            }
+
         return {
+            "id": payload.get("user_id"),
             "username": username,
-            "role": role
+            "role": role,
+            "tenant_id": payload.get("tenant_id", "demo")
         }
 
     except JWTError:
@@ -1821,6 +1918,8 @@ def get_current_user(
             status_code=401,
             detail="Invalid or expired token"
         )
+
+
 def verify_token(token: str):
 
     if not token:
@@ -3793,7 +3892,7 @@ async def soc_ai_stream(payload: dict):
     if ai["category"] == "Safe":
 
         reply = f"""
-✅ Threat Assessment Complete
+Threat Assessment Complete
 
 I analyzed your message and found no indicators of phishing, malware, credential theft, fraud, or social engineering.
 
@@ -3807,10 +3906,10 @@ Risk Level:
 {risk}
 
 Reasoning:
-• No suspicious keywords detected.
-• No malicious IOC indicators were extracted.
-• No known attack patterns matched.
-• No MITRE ATT&CK technique was triggered.
+- No suspicious keywords detected.
+- No malicious IOC indicators were extracted.
+- No known attack patterns matched.
+- No MITRE ATT&CK technique was triggered.
 
 Recommended Action:
 Continue normal operations.
@@ -3822,7 +3921,7 @@ Confidence:
     else:
 
         reply = f"""
-🚨 Threat Assessment Complete
+Threat Assessment Complete
 
 This communication appears malicious.
 
@@ -3836,9 +3935,9 @@ Risk Level:
 {risk}
 
 Why I believe this is malicious:
-• Threat classification engine matched known attack patterns.
-• Risk score exceeded the detection threshold.
-• SOC Brain classified the event as {risk}.
+- Threat classification engine matched known attack patterns.
+- Risk score exceeded the detection threshold.
+- SOC Brain classified the event as {risk}.
 """
 
         if ai["mitre"]:
@@ -3876,10 +3975,10 @@ Suspicious IPs:
         reply += """
 
 Recommended Actions:
-• Isolate the affected endpoint.
-• Block identified indicators.
-• Review authentication logs.
-• Notify the SOC team.
+- Isolate the affected endpoint.
+- Block identified indicators.
+- Review authentication logs.
+- Notify the SOC team.
 
 Confidence:
 96%
@@ -4281,6 +4380,166 @@ async def soc_stream(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         print("DISCONNECTED")
+
+
+@app.get("/security-events")
+def security_events(limit: int = 100, tenant_id: str | None = None):
+    return {
+        "events": get_security_events(
+            limit=limit,
+            tenant_id=tenant_id,
+        )
+    }
+
+
+@app.get("/security-events/event/{event_id}")
+def security_event(event_id: str):
+    event = get_security_event(event_id)
+
+    if not event:
+        return {
+            "success": False,
+            "error": "SECURITY_EVENT_NOT_FOUND",
+            "event_id": event_id,
+        }
+
+    return {
+        "success": True,
+        "event": event,
+    }
+
+@app.get("/attack-campaigns")
+def attack_campaigns(
+    limit: int = 50,
+    tenant_id: str | None = None,
+):
+    return {
+        "campaigns": get_attack_campaigns(
+            tenant_id=tenant_id,
+            limit=limit,
+        )
+    }
+
+
+@app.get("/attack-campaigns/{campaign_id}")
+def attack_campaign(campaign_id: str):
+    campaign = get_attack_campaign(campaign_id)
+
+    if not campaign:
+        return {
+            "success": False,
+            "error": "CAMPAIGN_NOT_FOUND",
+            "campaign_id": campaign_id,
+        }
+
+    return {
+        "success": True,
+        "campaign": campaign,
+    }
+
+
+@app.get("/attack-campaigns/{campaign_id}/investigation")
+def attack_campaign_investigation(campaign_id: str):
+    campaign = get_attack_campaign(campaign_id)
+
+    if not campaign:
+        return {
+            "success": False,
+            "error": "CAMPAIGN_NOT_FOUND",
+            "campaign_id": campaign_id,
+        }
+
+    cluster_id = campaign.get("cluster_id")
+    cluster = (
+        get_correlation_cluster(cluster_id)
+        if cluster_id
+        else None
+    )
+
+    response_events = []
+
+    try:
+        correlation_ids = set()
+
+        for member in (cluster or {}).get("members", []):
+            event_id = member.get("event_id")
+
+            if not event_id:
+                continue
+
+            source_event = get_security_event(event_id)
+
+            if source_event:
+                correlation_id = source_event.get("correlation_id")
+
+                if correlation_id:
+                    correlation_ids.add(correlation_id)
+
+        fabric_events = get_security_events(
+            limit=500,
+            tenant_id=campaign.get("tenant_id"),
+        )
+
+        for fabric_event in fabric_events:
+            if fabric_event.get("event_type") != "auto_response_event":
+                continue
+
+            same_campaign = (
+                fabric_event.get("campaign_id") == campaign_id
+            )
+
+            same_correlation = (
+                fabric_event.get("correlation_id")
+                in correlation_ids
+            )
+
+            if same_campaign or same_correlation:
+                response_events.append(fabric_event)
+
+    except Exception as response_error:
+        print(
+            "[42.22] Campaign response lookup failed:",
+            response_error,
+        )
+
+    response_status = (
+        "EXECUTED"
+        if any(
+            event.get("status") == "EXECUTED"
+            for event in response_events
+        )
+        else (
+            "BACKFILLED"
+            if response_events
+            else "NO_RESPONSE_RECORDED"
+        )
+    )
+
+    investigation = {
+        "campaign": campaign,
+        "cluster": cluster,
+        "timeline": get_campaign_timeline(campaign_id),
+        "response": {
+            "status": response_status,
+            "event_count": len(response_events),
+            "events": response_events,
+        },
+        "threat_dna": None,
+        "attack_graph": None,
+        "digital_twin": None,
+        "replay": None,
+        "links": {
+            "campaign_id": campaign_id,
+            "cluster_id": cluster_id,
+        },
+    }
+
+    return {
+        "success": True,
+        "investigation": investigation,
+    }
+
+
 @app.get("/campaigns")
 def campaigns():
 
@@ -5798,7 +6057,7 @@ def executive_pdf_report():
         story.append(
 
             Paragraph(
-                "• " + item,
+                "- " + item,
                 styles["BodyText"]
             )
 
@@ -6291,6 +6550,578 @@ def incident_intel(incident_id:int):
         "incident_id":incident_id,
         "intel":json.loads(row["threat_intel"] or "[]")
     }
+@app.get("/executive/users")
+def executive_users():
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            id,
+            username,
+            full_name,
+            email,
+            role,
+            tenant_id,
+            created_at
+        FROM users
+        ORDER BY created_at DESC
+    """)
+
+    users = []
+
+    for row in cursor.fetchall():
+        user = dict(row)
+
+        # Do not expose passwords or authentication tokens
+        user["active"] = any(
+            session_user
+            and session_user.get("username") == user["username"]
+            for session_user in ACTIVE_SESSIONS.values()
+        )
+
+        users.append(user)
+
+    conn.close()
+
+    return {
+        "total_users": len(users),
+        "users": users
+    }
+
+
+
+# ============================================================
+# ADMIN USER MANAGEMENT API
+# ============================================================
+
+def require_admin(user=Depends(get_current_user)):
+    if str(user.get("role", "")).lower() != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Administrator access required."
+        )
+    return user
+
+@app.get("/admin/users")
+def admin_users(user=Depends(require_admin)):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(db_sql("""
+            SELECT
+                id,
+                username,
+                full_name,
+                email,
+                role,
+                tenant_id,
+                status,
+                is_active,
+                suspended_at,
+                blocked_at,
+                session_version,
+                password_reset_required,
+                mfa_enabled,
+                created_at
+            FROM users
+            ORDER BY id DESC
+        """))
+
+        users = [dict(row) for row in cursor.fetchall()]
+
+        return {
+            "success": True,
+            "total_users": len(users),
+            "users": users
+        }
+
+    finally:
+        conn.close()
+
+
+@app.get("/admin/users/{user_id}")
+def admin_user_details(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(db_sql("""
+            SELECT
+                id,
+                username,
+                full_name,
+                email,
+                role,
+                tenant_id,
+                status,
+                is_active,
+                suspended_at,
+                blocked_at,
+                session_version,
+                password_reset_required,
+                mfa_enabled,
+                created_at
+            FROM users
+            WHERE id = ?
+        """), (user_id,))
+
+        target = cursor.fetchone()
+
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        return {
+            "success": True,
+            "user": dict(target)
+        }
+
+    finally:
+        conn.close()
+
+
+@app.patch("/admin/users/{user_id}/status")
+def admin_change_user_status(
+    user_id: int,
+    status: str,
+    user=Depends(require_admin)
+):
+    status = status.strip().lower()
+
+    allowed = {
+        "active",
+        "suspended",
+        "blocked"
+    }
+
+    if status not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Status must be active, suspended, or blocked."
+        )
+
+    if user.get("id") == user_id and status != "active":
+        raise HTTPException(
+            status_code=400,
+            detail="An administrator cannot suspend or block their own account."
+        )
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                SELECT id, username
+                FROM users
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        target = cursor.fetchone()
+
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        now = datetime.utcnow().isoformat()
+
+        if status == "active":
+            cursor.execute(
+                db_sql("""
+                    UPDATE users
+                    SET status = 'active',
+                        is_active = 1,
+                        suspended_at = NULL,
+                        blocked_at = NULL,
+                        session_version = COALESCE(session_version, 0) + 1
+                    WHERE id = ?
+                """),
+                (user_id,)
+            )
+
+        elif status == "suspended":
+            cursor.execute(
+                db_sql("""
+                    UPDATE users
+                    SET status = 'suspended',
+                        is_active = 0,
+                        suspended_at = ?,
+                        session_version = COALESCE(session_version, 0) + 1
+                    WHERE id = ?
+                """),
+                (now, user_id)
+            )
+
+        else:
+            cursor.execute(
+                db_sql("""
+                    UPDATE users
+                    SET status = 'blocked',
+                        is_active = 0,
+                        blocked_at = ?,
+                        session_version = COALESCE(session_version, 0) + 1
+                    WHERE id = ?
+                """),
+                (now, user_id)
+            )
+
+        conn.commit()
+
+        try:
+            create_audit_log(
+                action=f"USER_STATUS_CHANGE:{status}",
+                user=user.get("username"),
+                message=f"Admin changed user {target['username']} to {status}"
+            )
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "status": status
+        }
+
+    finally:
+        conn.close()
+
+
+@app.post("/admin/users/{user_id}/force-logout")
+def admin_force_logout(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                SELECT username
+                FROM users
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        target = cursor.fetchone()
+
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        conn.commit()
+
+        try:
+            create_audit_log(
+                action="FORCE_LOGOUT",
+                user=user.get("username"),
+                message=f"Admin revoked all sessions for {target['username']}"
+            )
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "message": "All user sessions have been revoked."
+        }
+
+    finally:
+        conn.close()
+
+
+@app.patch("/admin/users/{user_id}/role")
+def admin_change_user_role(
+    user_id: int,
+    role: str,
+    user=Depends(require_admin)
+):
+    role = role.strip().lower()
+
+    allowed = {
+        "admin",
+        "analyst",
+        "viewer",
+        "customer",
+        "executive"
+    }
+
+    if role not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid role."
+        )
+
+    if user.get("id") == user_id and role != "admin":
+        raise HTTPException(
+            status_code=400,
+            detail="An administrator cannot remove their own administrator role."
+        )
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET role = ?,
+                    session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (role, user_id)
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "role": role
+        }
+
+    finally:
+        conn.close()
+
+
+@app.patch("/admin/users/{user_id}/tenant")
+def admin_change_user_tenant(
+    user_id: int,
+    tenant_id: str,
+    user=Depends(require_admin)
+):
+    tenant_id = tenant_id.strip()
+
+    if not tenant_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Tenant ID is required."
+        )
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET tenant_id = ?,
+                    session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (tenant_id, user_id)
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "user_id": user_id,
+            "tenant_id": tenant_id
+        }
+
+    finally:
+        conn.close()
+
+
+@app.post("/admin/users/{user_id}/password-reset")
+def admin_password_reset(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                SELECT id, username, email
+                FROM users
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        target = cursor.fetchone()
+
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        reset_token = secrets.token_urlsafe(48)
+        expires_at = datetime.utcnow() + timedelta(minutes=30)
+
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET reset_token = ?,
+                    reset_token_expires = ?,
+                    password_reset_required = 1
+                WHERE id = ?
+            """),
+            (
+                reset_token,
+                expires_at.isoformat(),
+                user_id
+            )
+        )
+
+        conn.commit()
+
+        try:
+            create_audit_log(
+                action="ADMIN_PASSWORD_RESET",
+                user=user.get("username"),
+                message=f"Password reset initiated for {target['username']}"
+            )
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "message": "Password reset token generated.",
+            "username": target["username"],
+            "expires_at": expires_at.isoformat(),
+            "reset_token": reset_token
+        }
+
+    finally:
+        conn.close()
+
+
+@app.post("/admin/users/{user_id}/mfa-reset")
+def admin_mfa_reset(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                UPDATE users
+                SET mfa_enabled = 0,
+                    session_version = COALESCE(session_version, 0) + 1
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "message": "MFA has been reset and existing sessions revoked."
+        }
+
+    finally:
+        conn.close()
+
+
+@app.delete("/admin/users/{user_id}")
+def admin_delete_user(
+    user_id: int,
+    user=Depends(require_admin)
+):
+    if user.get("id") == user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="An administrator cannot delete their own account."
+        )
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            db_sql("""
+                SELECT username
+                FROM users
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        target = cursor.fetchone()
+
+        if not target:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+
+        cursor.execute(
+            db_sql("""
+                DELETE FROM users
+                WHERE id = ?
+            """),
+            (user_id,)
+        )
+
+        conn.commit()
+
+        try:
+            create_audit_log(
+                action="USER_DELETED",
+                user=user.get("username"),
+                message=f"Admin deleted user {target['username']}"
+            )
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "message": "User account deleted."
+        }
+
+    finally:
+        conn.close()
+
+
 @app.get("/executive-ai")
 def executive_ai():
 
@@ -6740,3 +7571,10 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
+
+
+
+
+
+
+

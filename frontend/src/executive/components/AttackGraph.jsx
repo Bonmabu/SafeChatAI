@@ -1,4 +1,4 @@
-import ForceGraph2D from "react-force-graph-2d";
+﻿import ForceGraph2D from "react-force-graph-2d";
 
 export default function AttackGraph({
   graphRef,
@@ -12,16 +12,81 @@ export default function AttackGraph({
   setHighlightLinks,
   updateKillChain
 }) {
-  // Always provide arrays to ForceGraph2D
-  const safeNodes = Array.isArray(attackGraph?.nodes)
+    // Normalize and validate graph data before ForceGraph2D.
+  const rawNodes = Array.isArray(attackGraph?.nodes)
     ? attackGraph.nodes
     : Object.values(attackGraph?.nodes || {});
 
-  const safeLinks = Array.isArray(attackGraph?.links)
+  const rawLinks = Array.isArray(attackGraph?.links)
     ? attackGraph.links
     : Array.isArray(attackGraph?.edges)
       ? attackGraph.edges
       : [];
+
+  const safeNodes = rawNodes.filter((node) => {
+    if (!node || node.id === undefined || node.id === null) {
+      return false;
+    }
+
+    const id = String(node.id).trim();
+
+    return (
+      id !== "" &&
+      id.toLowerCase() !== "none" &&
+      id.toLowerCase() !== "null" &&
+      id.toLowerCase() !== "undefined"
+    );
+  });
+
+  const nodeIds = new Set(
+    safeNodes.map((node) => String(node.id).trim())
+  );
+
+  const safeLinks = rawLinks.filter((link) => {
+    if (!link) {
+      return false;
+    }
+
+    const source =
+      typeof link.source === "object"
+        ? link.source?.id
+        : link.source;
+
+    const target =
+      typeof link.target === "object"
+        ? link.target?.id
+        : link.target;
+
+    if (
+      source === undefined ||
+      source === null ||
+      target === undefined ||
+      target === null
+    ) {
+      return false;
+    }
+
+    const sourceId = String(source).trim();
+    const targetId = String(target).trim();
+
+    if (
+      !sourceId ||
+      !targetId ||
+      sourceId.toLowerCase() === "none" ||
+      targetId.toLowerCase() === "none" ||
+      sourceId.toLowerCase() === "null" ||
+      targetId.toLowerCase() === "null" ||
+      sourceId.toLowerCase() === "undefined" ||
+      targetId.toLowerCase() === "undefined"
+    ) {
+      return false;
+    }
+
+    return (
+      nodeIds.has(sourceId) &&
+      nodeIds.has(targetId)
+    );
+  });
 
   return (
     <>

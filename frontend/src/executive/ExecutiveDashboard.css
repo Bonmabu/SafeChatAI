@@ -1,74 +1,54 @@
-.executive-dashboard {
-    width: 100%;
-    min-height: 100vh;
-    background: #020617;
-    padding: 20px;
-    overflow-x: hidden;
-    box-sizing: border-box;
+﻿/* =========================================================
+   SAFECHAT AI SOC — FULL WIDTH / FIT TO SCREEN
+   ========================================================= */
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
 }
 
-.executive-section {
-    background: #111827;
-    border: 1px solid #334155;
-    border-radius: 18px;
-    padding: 20px;
-    margin-bottom: 25px;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-.executive-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 20px;
+.executive-dashboard,
+.executive-dashboard-page,
+.executive-dashboard-container {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
-@media(max-width:768px){
-
-.executive-dashboard {
-    padding:10px;
+.executive-dashboard > * {
+  max-width: none !important;
 }
 
-.executive-grid {
-    grid-template-columns:1fr;
+.dashboard-container,
+.dashboard-content,
+.dashboard-main,
+.dashboard-wrapper {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
-}
-.executive-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 20px;
-    margin-top: 20px;
-}
-
-.executive-grid-wide {
-    grid-column: 1 / -1;
-}
-
-.executive-grid > div,
-.executive-grid > section {
-    min-height: 340px;
-}
-
-@media (max-width: 1200px) {
-    .executive-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .executive-grid-wide {
-        grid-column: auto;
-    }
-}
-.posture-card {
-  background: #111827;
-  border: 1px solid #ef4444;
-  padding: 20px;
-  margin-bottom: 20px;
-  border-radius: 12px;
-}
-
-.posture-card h2 {
-  color: #f87171;
-}
-
-.posture-card h3 {
-  color: #facc15;
+@media (max-width: 768px) {
+  .executive-dashboard,
+  .executive-dashboard-page,
+  .executive-dashboard-container {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
 }

@@ -1,4 +1,4 @@
-import sqlite3
+﻿import sqlite3
 
 import os
 from dotenv import load_dotenv
@@ -7,10 +7,18 @@ load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 DATABASE_PATH = os.getenv(
     "DATABASE_PATH",
     os.path.join(BASE_DIR, "SafeChatAI.db")
 )
+
+def db_sql(sql):
+    """Use SQLite ? placeholders locally and PostgreSQL %s placeholders when DATABASE_URL is set."""
+    if DATABASE_URL:
+        return sql.replace("?", "%s")
+    return sql
 
 def get_conn():
     conn = sqlite3.connect(DATABASE_PATH)
@@ -1219,9 +1227,9 @@ def add_threat_intel_column():
         ALTER TABLE incidents 
         ADD COLUMN threat_intel TEXT
         """)
-        print("✅ threat_intel column added")
+        print("âœ… threat_intel column added")
     except Exception as e:
-        print("ℹ️ threat_intel column already exists:", e)
+        print("â„¹ï¸ threat_intel column already exists:", e)
 
     conn.commit()
     conn.close()
@@ -1334,3 +1342,4 @@ def get_executive_risk_forecast():
             "risk": 43
         }
     ]
+

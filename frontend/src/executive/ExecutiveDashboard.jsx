@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import ForceGraph2D from "react-force-graph-2d";
 import CountUp from "react-countup";
@@ -19,47 +19,130 @@ import EnterpriseDigitalTwin from "./components/EnterpriseDigitalTwin";
 import CommandCenter from "./components/CommandCenter";
 import AttackSurfaceMap from "./components/AttackSurfaceMap";
 import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-  RadialBarChart,
-  RadialBar
+ ResponsiveContainer,
+ LineChart,
+ Line,
+ XAxis,
+ YAxis,
+ Tooltip,
+ PieChart,
+ Pie,
+ Cell,
+ Legend,
+ RadialBarChart,
+ RadialBar
 } from "recharts";
 
 const API = import.meta.env.VITE_API_BASE;
 
 const COLORS = [
-  "#ef4444",
-  "#f97316",
-  "#facc15",
-  "#22c55e",
-  "#3b82f6",
-  "#a855f7"
+ "#ef4444",
+ "#f97316",
+ "#facc15",
+ "#22c55e",
+ "#3b82f6",
+ "#a855f7"
 ];
 
+const normalizeGraphData = (graph) => {
+  const rawNodes = Array.isArray(graph?.nodes)
+    ? graph.nodes
+    : Object.values(graph?.nodes || {});
+
+  const rawLinks = Array.isArray(graph?.links)
+    ? graph.links
+    : Array.isArray(graph?.edges)
+      ? graph.edges
+      : [];
+
+  const validNodes = rawNodes.filter((node) => {
+    if (!node || node.id === undefined || node.id === null) {
+      return false;
+    }
+
+    const id = String(node.id).trim();
+
+    return (
+      id !== "" &&
+      id.toLowerCase() !== "none" &&
+      id.toLowerCase() !== "null" &&
+      id.toLowerCase() !== "undefined"
+    );
+  });
+
+  const nodeIds = new Set(
+    validNodes.map((node) => String(node.id).trim())
+  );
+
+  const validLinks = rawLinks.filter((link) => {
+    if (!link) {
+      return false;
+    }
+
+    const source =
+      typeof link.source === "object"
+        ? link.source?.id
+        : link.source;
+
+    const target =
+      typeof link.target === "object"
+        ? link.target?.id
+        : link.target;
+
+    if (
+      source === undefined ||
+      source === null ||
+      target === undefined ||
+      target === null
+    ) {
+      return false;
+    }
+
+    const sourceId = String(source).trim();
+    const targetId = String(target).trim();
+
+    if (
+      !sourceId ||
+      !targetId ||
+      sourceId.toLowerCase() === "none" ||
+      targetId.toLowerCase() === "none" ||
+      sourceId.toLowerCase() === "null" ||
+      targetId.toLowerCase() === "null" ||
+      sourceId.toLowerCase() === "undefined" ||
+      targetId.toLowerCase() === "undefined"
+    ) {
+      return false;
+    }
+
+    return (
+      nodeIds.has(sourceId) &&
+      nodeIds.has(targetId)
+    );
+  });
+
+  return {
+    nodes: validNodes,
+    links: validLinks
+  };
+};
+
 export default function ExecutiveDashboard() {
+
 const [attackGraph, setAttackGraph] = useState({
-  nodes: [],
-  links: []
+ nodes: [],
+ links: []
 });
 const [securityPosture, setSecurityPosture] = useState({
-  score: 0,
-  threat_level: "Normal",
-  active_incidents: 0,
-  assets: 0,
-  prediction: "Low"
+ score: 0,
+ threat_level: "Normal",
+ active_incidents: 0,
+ assets: 0,
+ prediction: "Low"
 });
 const [threatMatrix, setThreatMatrix] = useState({
-  threats: [],
-  categories: [],
-  matrix: []
+ threats: [],
+ categories: [],
+ matrix: []
 });
 const [attackPaths, setAttackPaths] = useState([]);
 const [digitalTwin, setDigitalTwin] = useState({});
@@ -71,37 +154,37 @@ const [activeAttackPath, setActiveAttackPath] = useState([]);
 const [forecast, setForecast] = useState([]);
 const [kpiHistory, setKpiHistory] = useState([]);
 const [socMetrics, setSocMetrics] = useState({
-  active_threats: 0,
-  critical_alerts: 0,
-  blocked_attacks: 0,
-  ai_decisions: 0
+ active_threats: 0,
+ critical_alerts: 0,
+ blocked_attacks: 0,
+ ai_decisions: 0
 });
 
 const [commandCenter, setCommandCenter] = useState({
-  status: "Healthy",
-  attackRate: 0,
-  mttd: 0,
-  mttr: 0,
-  aiConfidence: 98,
-  threatTemperature: 0
+ status: "Healthy",
+ attackRate: 0,
+ mttd: 0,
+ mttr: 0,
+ aiConfidence: 98,
+ threatTemperature: 0
 });
 const [attackStats, setAttackStats] = useState({
-  totalNodes: 0,
-  totalLinks: 0,
-  criticalNodes: 0,
-  activeChains: 0
+ totalNodes: 0,
+ totalLinks: 0,
+ criticalNodes: 0,
+ activeChains: 0
 });
 const [riskForecast, setRiskForecast] = useState({
-  probability: 0,
-  expectedThreats: 0,
-  predictedSeverity: "Low",
-  recommendation: "Monitoring..."
+ probability: 0,
+ expectedThreats: 0,
+ predictedSeverity: "Low",
+ recommendation: "Monitoring..."
 });
 const [warRoom, setWarRoom] = useState({
-  attacks: 0,
-  critical: 0,
-  active: 0,
-  risk: "LOW"
+ attacks: 0,
+ critical: 0,
+ active: 0,
+ risk: "LOW"
 });
 const [mitreMatrix, setMitreMatrix] = useState({});
 const [recommendations, setRecommendations] = useState([]);
@@ -116,17 +199,17 @@ const [loading, setLoading] = useState(true);
 const [attackIncrease, setAttackIncrease] = useState(20);
 const [attackReplay, setAttackReplay] = useState([]);
 const [replayGraph, setReplayGraph] = useState({
-  nodes: [],
-  links: []
+ nodes: [],
+ links: []
 });
 const [killChain, setKillChain] = useState([
-  { stage: "Initial Access", active: false },
-  { stage: "Execution", active: false },
-  { stage: "Persistence", active: false },
-  { stage: "Privilege Escalation", active: false },
-  { stage: "Credential Access", active: false },
-  { stage: "Lateral Movement", active: false },
-  { stage: "Exfiltration", active: false }
+ { stage: "Initial Access", active: false },
+ { stage: "Execution", active: false },
+ { stage: "Persistence", active: false },
+ { stage: "Privilege Escalation", active: false },
+ { stage: "Credential Access", active: false },
+ { stage: "Lateral Movement", active: false },
+ { stage: "Exfiltration", active: false }
 ]);
 const [executivePosture, setExecutivePosture] = useState(null);
 const [executiveBrief, setExecutiveBrief] = useState(null);
@@ -136,15 +219,15 @@ const [currentReplayLink, setCurrentReplayLink] = useState(null);
 const [replayRunning, setReplayRunning] = useState(false);
 const [replayPaused, setReplayPaused] = useState(false);
 const [replaySpeed, setReplaySpeed] = useState(1000);
-  const [kpis, setKpis] = useState(null);
-  const [briefing, setBriefing] = useState(null);
-  const [riskTrend, setRiskTrend] = useState([]);
-  const [threatDistribution, setThreatDistribution] = useState([]);
-  const [incidents, setIncidents] = useState([]);
-  const [question, setQuestion] = useState("");
-  const [copilot, setCopilot] = useState("");
-  const [copilotLoading, setCopilotLoading] = useState(false);
-  const [liveFeed, setLiveFeed] = useState([]);
+ const [kpis, setKpis] = useState(null);
+ const [briefing, setBriefing] = useState(null);
+ const [riskTrend, setRiskTrend] = useState([]);
+ const [threatDistribution, setThreatDistribution] = useState([]);
+ const [incidents, setIncidents] = useState([]);
+ const [question, setQuestion] = useState("");
+ const [copilot, setCopilot] = useState("");
+ const [copilotLoading, setCopilotLoading] = useState(false);
+ const [liveFeed, setLiveFeed] = useState([]);
 const [lastUpdated, setLastUpdated] = useState("");
 const [decision, setDecision] = useState(null);
 const [priorityQueue, setPriorityQueue] = useState([]);
@@ -167,657 +250,657 @@ const [threatIntelligence, setThreatIntelligence] = useState(null);
 
 const [attackBurst, setAttackBurst] = useState(null);
 const [attackMap, setAttackMap] = useState({
-  nodes: [],
-  links: []
+ nodes: [],
+ links: []
 });
 const [strategy, setStrategy] = useState(null);
 
-  useEffect(() => {
+ useEffect(() => {
 
-  loadData();
+ loadData();
 
-  const interval = setInterval(() => {
-  loadData();
+ const interval = setInterval(() => {
+ loadData();
 }, 60000);
 
-  const ws = new WebSocket(
-    `${import.meta.env.VITE_WS_BASE}/ws/soc`
-);
+ const wsBase = import.meta.env.VITE_WS_URL || import.meta.env.VITE_WS_BASE || "ws://127.0.0.1:8000/ws/soc";
 
-  ws.onopen = () => {
-    console.log("Executive Dashboard WebSocket Connected");
-  };
+ const ws = new WebSocket(wsBase);
 
-  ws.onmessage = (event) => {
+ ws.onopen = () => {
+  console.log("Executive Dashboard WebSocket Connected");
+ };
 
-    const data = JSON.parse(event.data);
+ ws.onmessage = (event) => {
+
+  const data = JSON.parse(event.data);
 
 console.log(
-  "EXECUTIVE WS:",
-  JSON.stringify(data, null, 2)
+ "EXECUTIVE WS:",
+ JSON.stringify(data, null, 2)
 );
 
 /* Live executive dashboard update */
 if (data.type === "executive_dashboard") {
 if (data.executive_briefing) {
-    setExecutiveAI(data.executive_briefing);
-}
-
-  if (data.kpis) {
-    setKpis(data.kpis);
-  }
-
-  if (data.soc) {
-    setSocMetrics(data.soc);
-  }
-
-  if (data.risk) {
-    setRiskForecast(data.risk);
-  }
-
-  if (data.attack_graph) {
-    setAttackGraph(data.attack_graph);
-  }
-
-  if (data.threat_matrix) {
-    setThreatMatrix(data.threat_matrix);
-  }
-
-  if (data.mitre_matrix) {
-    setMitreMatrix(data.mitre_matrix);
-  }
-
-  if (data.digital_twin) {
-    setDigitalTwin(data.digital_twin);
-  }
-
-  if (data.security_posture) {
-    setSecurityPosture(data.security_posture);
-  }
-if (data.executive_briefing) {
   setExecutiveAI(data.executive_briefing);
 }
 
+ if (data.kpis) {
+  setKpis(data.kpis);
+ }
+
+ if (data.soc) {
+  setSocMetrics(data.soc);
+ }
+
+ if (data.risk) {
+  setRiskForecast(data.risk);
+ }
+
+ if (data.attack_graph) {
+  setAttackGraph(data.attack_graph);
+ }
+
+ if (data.threat_matrix) {
+  setThreatMatrix(data.threat_matrix);
+ }
+
+ if (data.mitre_matrix) {
+  setMitreMatrix(data.mitre_matrix);
+ }
+
+ if (data.digital_twin) {
+  setDigitalTwin(data.digital_twin);
+ }
+
+ if (data.security_posture) {
+  setSecurityPosture(data.security_posture);
+ }
+if (data.executive_briefing) {
+ setExecutiveAI(data.executive_briefing);
+}
+
 if (data.intelligence) {
-  setThreatIntelligence(data.intelligence);
+ setThreatIntelligence(data.intelligence);
 }
 
 if (data.attack_burst) {
-  setAttackBurst(data.attack_burst);
+ setAttackBurst(data.attack_burst);
 }
-  return;
+ return;
 }
 
 /* Threat intelligence stream */
 if (data.event_type === "threat_intelligence") {
 
-  setLiveExecutiveAlerts(prev => [
+ setLiveExecutiveAlerts(prev => [
 
-    {
-      type: data.event_type,
-      timestamp: data.timestamp,
-      risk: data.data?.soc_core?.avg_risk,
-      status: data.data?.soc_core?.status,
-      critical: data.data?.soc_core?.critical_threats,
-      velocity: data.data?.velocity?.status,
-      anomaly: data.data?.anomaly?.anomaly_level
-    },
+  {
+   type: data.event_type,
+   timestamp: data.timestamp,
+   risk: data.data?.soc_core?.avg_risk,
+   status: data.data?.soc_core?.status,
+   critical: data.data?.soc_core?.critical_threats,
+   velocity: data.data?.velocity?.status,
+   anomaly: data.data?.anomaly?.anomaly_level
+  },
 
-    ...prev.slice(0,9)
+  ...prev.slice(0,9)
 
-  ]);
+ ]);
 
-  return;
+ return;
 }
 
 /* Live graph updates */
 if (data.type === "attack_graph_live") {
 
-  if (!data.node) {
-    console.warn("Missing node:", data);
-    return;
-  }
-
-  setAttackGraph(prev => {
-
-    const safeNodes = (prev?.nodes || []).filter(
-      n => n && n.id
-    );
-
-    const exists = safeNodes.some(
-      n => n.id === data.node.id
-    );
-
-    return {
-      nodes: exists
-        ? safeNodes
-        : [...safeNodes, data.node],
-      links: Array.isArray(data.links)
-        ? data.links
-        : (prev?.links || [])
-    };
-
-  });
-
+ if (!data.node) {
+  console.warn("Missing node:", data);
   return;
+ }
+
+ setAttackGraph(prev => {
+
+  const safeNodes = (prev?.nodes || []).filter(
+   n => n && n.id
+  );
+
+  const exists = safeNodes.some(
+   n => n.id === data.node.id
+  );
+
+  return {
+   nodes: exists
+    ? safeNodes
+    : [...safeNodes, data.node],
+   links: Array.isArray(data.links)
+    ? data.links
+    : (prev?.links || [])
+  };
+
+ });
+
+ return;
 }
 
 /* New incident */
 if (data.type === "new_threat") {
 
-  setSocMetrics(prev => ({
-    ...prev,
-    active_threats: prev.active_threats + 1
-  }));
+ setSocMetrics(prev => ({
+  ...prev,
+  active_threats: prev.active_threats + 1
+ }));
 
-  loadData();
+ loadData();
 }
 };
 
-  ws.onerror = (err) => {
-    console.error(
-      "Executive WS Error",
-      err
-    );
-  };
+ ws.onerror = (err) => {
+  console.error(
+   "Executive WS Error",
+   err
+  );
+ };
 
-  ws.onclose = () => {
-    console.log("Executive Dashboard WebSocket Closed");
-  };
+ ws.onclose = () => {
+  console.log("Executive Dashboard WebSocket Closed");
+ };
 
-  return () => {
-    clearInterval(interval);
-    ws.close();
-  };
+ return () => {
+  clearInterval(interval);
+  ws.close();
+ };
 
 }, []);
 const loadExecutivePosture = async () => {
-    try {
-        const posture = await axios.get(
-            `${API_BASE}/executive/posture`
-        );
+  try {
+    const posture = await axios.get(
+      `${API}/executive/posture`
+    );
 
-        setExecutivePosture(posture.data);
+    setExecutivePosture(posture.data);
 
-    } catch (error) {
-        console.error(
-            "Executive posture error:",
-            error
-        );
-    }
+  } catch (error) {
+    console.error(
+      "Executive posture error:",
+      error
+    );
+  }
 };
 useEffect(() => {
-  loadExecutivePosture();
+ loadExecutivePosture();
 }, []);
 useEffect(() => {
-  if (!graphRef.current) return;
+ if (!graphRef.current) return;
 
-  graphRef.current.d3Force("charge").strength(-80);
-  graphRef.current.d3Force("link").distance(80);
+ graphRef.current.d3Force("charge").strength(-80);
+ graphRef.current.d3Force("link").distance(80);
 }, [attackGraph]);
 useEffect(() => {
 
-  if (!replayRunning || replayPaused || attackReplay.length === 0) return;
+ if (!replayRunning || replayPaused || attackReplay.length === 0) return;
 
-  let index = 0;
+ let index = 0;
 
-  setReplayGraph({
-    nodes: [],
-    links: []
-  });
+ setReplayGraph({
+  nodes: [],
+  links: []
+ });
 
-  const timer = setInterval(() => {
+ const timer = setInterval(() => {
 
-    if (index >= attackReplay.length) {
-      clearInterval(timer);
-      setReplayRunning(false);
-      return;
-    }
+  if (index >= attackReplay.length) {
+   clearInterval(timer);
+   setReplayRunning(false);
+   return;
+  }
 
-    const node = attackReplay[index];
+  const node = attackReplay[index];
 setCurrentReplayNode(node.id);
 setSelectedNode(node);
 if(index % 5 === 0){
-  graphRef.current?.zoomToFit(300,50);
+ graphRef.current?.zoomToFit(300,50);
 }
 
-    setReplayGraph(prev => ({
+  setReplayGraph(prev => ({
 
-      nodes: [...prev.nodes, node],
+   nodes: [...prev.nodes, node],
 
-      links:
-        index === 0
-          ? []
-          : [
-              ...prev.links,
-              {
-                source: attackReplay[index - 1].id,
-                target: node.id
-              }
-            ]
+   links:
+    index === 0
+     ? []
+     : [
+       ...prev.links,
+       {
+        source: attackReplay[index - 1].id,
+        target: node.id
+       }
+      ]
 
-    }));
+  }));
 
-    index++;
+  index++;
 if (index > 0) {
-  setCurrentReplayLink({
-    source: attackReplay[index - 1].id,
-    target: node.id
-  });
+ setCurrentReplayLink({
+  source: attackReplay[index - 1].id,
+  target: node.id
+ });
 }
 
-    setReplayIndex(index);
+  setReplayIndex(index);
 
-  }, replaySpeed);
+ }, replaySpeed);
 
-  return () => clearInterval(timer);
+ return () => clearInterval(timer);
 
 }, [replayRunning, replayPaused, attackReplay, replaySpeed]);
 if (loading) {
-  return (
-    <div
-      style={{
-        color: "#00ffc8",
-        textAlign: "center",
-        padding: 60,
-        fontSize: 22
-      }}
-    >
-      Loading Executive Dashboard...
-    </div>
-  );
+ return (
+  <div
+   style={{
+    color: "#00ffc8",
+    textAlign: "center",
+    padding: 60,
+    fontSize: 22
+   }}
+  >
+   Loading Executive Dashboard...
+  </div>
+ );
 }
 async function declareIncident() {
-  setWarRoomLoading(true);
+ setWarRoomLoading(true);
 
-  try {
-    const res = await axios.post(`${API}/executive/declare-incident`);
+ try {
+  const res = await axios.post(`${API}/executive/declare-incident`);
 
-    setWarRoomMessage(res.data.message);
-    loadData();
+  setWarRoomMessage(res.data.message);
+  loadData();
 
-  } catch {
+ } catch {
 
-    setWarRoomMessage("Unable to declare incident.");
+  setWarRoomMessage("Unable to declare incident.");
 
-  }
+ }
 
-  setWarRoomLoading(false);
+ setWarRoomLoading(false);
 }
 
 async function activateCrisisMode() {
-  setWarRoomLoading(true);
+ setWarRoomLoading(true);
 
-  try {
-    const res = await axios.post(`${API}/executive/crisis-mode`);
+ try {
+  const res = await axios.post(`${API}/executive/crisis-mode`);
 
-    setWarRoomMessage(res.data.message);
+  setWarRoomMessage(res.data.message);
 
-  } catch {
+ } catch {
 
-    setWarRoomMessage("Unable to activate crisis mode.");
+  setWarRoomMessage("Unable to activate crisis mode.");
 
-  }
+ }
 
-  setWarRoomLoading(false);
+ setWarRoomLoading(false);
 }
 
 async function notifyBoard() {
-  setWarRoomLoading(true);
+ setWarRoomLoading(true);
 
-  try {
-    const res = await axios.post(`${API}/executive/notify-board`);
+ try {
+  const res = await axios.post(`${API}/executive/notify-board`);
 
-    setWarRoomMessage(res.data.message);
+  setWarRoomMessage(res.data.message);
 
-  } catch {
+ } catch {
 
-    setWarRoomMessage("Unable to notify board.");
+  setWarRoomMessage("Unable to notify board.");
 
-  }
+ }
 
-  setWarRoomLoading(false);
+ setWarRoomLoading(false);
 }
 
 async function generateExecutiveReport() {
-  setWarRoomLoading(true);
+ setWarRoomLoading(true);
 
-  try {
-    const res = await axios.post(`${API}/executive/generate-report`);
+ try {
+  const res = await axios.post(`${API}/executive/generate-report`);
 
-    setWarRoomMessage(res.data.message);
+  setWarRoomMessage(res.data.message);
 
-  } catch {
+ } catch {
 
-    setWarRoomMessage("Unable to generate report.");
+  setWarRoomMessage("Unable to generate report.");
 
-  }
+ }
 
-  setWarRoomLoading(false);
+ setWarRoomLoading(false);
 }
 
-  async function loadData() {
-  try {
-    const kpi = await axios.get(`${API}/executive/dashboard`);
-    setKpis(kpi.data);
+ async function loadData() {
+ try {
+  const kpi = await axios.get(`${API}/executive/dashboard`);
+  setKpis(kpi.data);
 
-    const mapRes = await axios.get(`${API}/executive/threat-map`);
-    setThreatMap(mapRes.data);
+  const mapRes = await axios.get(`${API}/executive/threat-map`);
+  setThreatMap(mapRes.data);
 
-    const forecastRes = await axios.get(`${API}/executive/risk-forecast`);
-    setForecast(forecastRes.data);
+  const forecastRes = await axios.get(`${API}/executive/risk-forecast`);
+  setForecast(forecastRes.data);
 const historyRes = await axios.get(
-  `${API}/executive/kpi-history`
+ `${API}/executive/kpi-history`
 );
 
 setKpiHistory(historyRes.data);
 const metricsRes = await axios.get(
-  `${API}/executive/live-metrics`);
+ `${API}/executive/live-metrics`);
 const attackPathRes = await axios.get(
-    `${API}/attack-path-analysis`
+  `${API}/attack-path-analysis`
 );
 
 setAttackPaths(
-    attackPathRes.data.paths || []
+  attackPathRes.data.paths || []
 );
 
 setSocMetrics(metricsRes.data);
 setCommandCenter({
-  status:
-    metricsRes.data.critical_alerts >= 10
-      ? "Critical"
-      : metricsRes.data.critical_alerts >= 5
-      ? "Warning"
-      : "Healthy",
+ status:
+  metricsRes.data.critical_alerts >= 10
+   ? "Critical"
+   : metricsRes.data.critical_alerts >= 5
+   ? "Warning"
+   : "Healthy",
 
-  attackRate: metricsRes.data.active_threats,
+ attackRate: metricsRes.data.active_threats,
 
-  mttd: Math.max(
-    1,
-    Math.round(metricsRes.data.active_threats / 2)
-  ),
+ mttd: Math.max(
+  1,
+  Math.round(metricsRes.data.active_threats / 2)
+ ),
 
-  mttr: Math.max(
-    2,
-    Math.round(metricsRes.data.blocked_attacks / 3)
-  ),
+ mttr: Math.max(
+  2,
+  Math.round(metricsRes.data.blocked_attacks / 3)
+ ),
 
-  aiConfidence: 98,
+ aiConfidence: 98,
 
-  threatTemperature: Math.min(
-    100,
-    metricsRes.data.critical_alerts * 10
-  )
+ threatTemperature: Math.min(
+  100,
+  metricsRes.data.critical_alerts * 10
+ )
 });
 const aiRes = await axios.get(`${API}/executive-ai`);
 
 setRiskForecast({
-  probability: aiRes.data.probability,
-  expectedThreats:
-    aiRes.data.critical_nodes +
-    aiRes.data.high_nodes,
-  predictedSeverity: aiRes.data.severity,
-  recommendation: aiRes.data.recommendation
+ probability: aiRes.data.probability,
+ expectedThreats:
+  aiRes.data.critical_nodes +
+  aiRes.data.high_nodes,
+ predictedSeverity: aiRes.data.severity,
+ recommendation: aiRes.data.recommendation
 });
 
-    const ai = await axios.get(`${API}/executive/ai-decision`);
-    setAiDecision(ai.data);
+  const ai = await axios.get(`${API}/executive/ai-decision`);
+  setAiDecision(ai.data);
 
-    const brief = await axios.get(`${API}/executive/briefing`);
+  const brief = await axios.get(`${API}/executive/briefing`);
 
-    setExecutiveBrief(brief.data);
-    setBriefing(brief.data);
+  setExecutiveBrief(brief.data);
+  setBriefing(brief.data);
 
-    const trend = await axios.get(`${API}/executive/risk-trend`);
-    setRiskTrend(trend.data);
+  const trend = await axios.get(`${API}/executive/risk-trend`);
+  setRiskTrend(trend.data);
 
-    const distribution = await axios.get(
-      `${API}/executive/threat-distribution`
-    );
-    setThreatDistribution(distribution.data);
+  const distribution = await axios.get(
+   `${API}/executive/threat-distribution`
+  );
+  setThreatDistribution(distribution.data);
 
-    const incidentRes = await axios.get(
-      `${API}/executive/incidents`
-    );
-    setIncidents(incidentRes.data);
+  const incidentRes = await axios.get(
+   `${API}/executive/incidents`
+  );
+  setIncidents(incidentRes.data);
 
-    const feed = await axios.get(
-      `${API}/executive/live-feed`
-    );
-    setLiveFeed(feed.data);
+  const feed = await axios.get(
+   `${API}/executive/live-feed`
+  );
+  setLiveFeed(feed.data);
 
-    const decisionRes = await axios.get(
-      `${API}/executive/decision`
-    );
-    setDecision(decisionRes.data);
+  const decisionRes = await axios.get(
+   `${API}/executive/decision`
+  );
+  setDecision(decisionRes.data);
 
-    setLastUpdated(new Date().toLocaleTimeString());
+  setLastUpdated(new Date().toLocaleTimeString());
 
-    const escalationRes = await axios.get(
-      `${API}/executive/escalation-matrix`
-    );
-    setEscalation(escalationRes.data);
+  const escalationRes = await axios.get(
+   `${API}/executive/escalation-matrix`
+  );
+  setEscalation(escalationRes.data);
 
-    const priority = await axios.get(
-      `${API}/executive/priority-queue`
-    );
-    setPriorityQueue(priority.data);
+  const priority = await axios.get(
+   `${API}/executive/priority-queue`
+  );
+  setPriorityQueue(priority.data);
 
-    const actions = await axios.get(
-      `${API}/executive/actions`
-    );
-    setExecutiveActions(actions.data);
+  const actions = await axios.get(
+   `${API}/executive/actions`
+  );
+  setExecutiveActions(actions.data);
 
-    const remediationRes = await axios.get(
-      `${API}/executive/remediation`
-    );
-    setRemediation(remediationRes.data);
+  const remediationRes = await axios.get(
+   `${API}/executive/remediation`
+  );
+  setRemediation(remediationRes.data);
 
-    const complianceRes = await axios.get(
-      `${API}/executive/compliance`
-    );
-    setCompliance(complianceRes.data);
+  const complianceRes = await axios.get(
+   `${API}/executive/compliance`
+  );
+  setCompliance(complianceRes.data);
 
-    const scoreRes = await axios.get(
-      `${API}/executive/scorecard`
-    );
-    setScorecard(scoreRes.data);
+  const scoreRes = await axios.get(
+   `${API}/executive/scorecard`
+  );
+  setScorecard(scoreRes.data);
 
-    const graphRes = await axios.get(
-  `${API}/attack-graph`
+  const graphRes = await axios.get(
+ `${API}/attack-graph`
 );
 const recommendationRes = await axios.get(
-    `${API}/executive/recommendations`
+  `${API}/executive/recommendations`
 );
 
 setRecommendations(
-    recommendationRes.data.recommendations || []
+  recommendationRes.data.recommendations || []
 );
 
 const graph = {
-  nodes: graphRes.data.nodes || [],
-  links: graphRes.data.links || []
+ nodes: graphRes.data.nodes || [],
+ links: graphRes.data.links || []
 };
 
 setAttackGraph(graph);
 
 setAttackStats({
-  totalNodes: graph.nodes.length,
-  totalLinks: graph.links.length,
-  criticalNodes: graph.nodes.filter(
-    n => (n.max_score ?? n.score ?? 0) >= 90
-  ).length,
-  activeChains: graph.links.length
+ totalNodes: graph.nodes.length,
+ totalLinks: graph.links.length,
+ criticalNodes: graph.nodes.filter(
+  n => (n.max_score ?? n.score ?? 0) >= 90
+ ).length,
+ activeChains: graph.links.length
 });
 calculateRiskForecast(graph);
 const critical = graph.nodes.filter(
-  n => (n.max_score ?? n.score ?? 0) >= 90
+ n => (n.max_score ?? n.score ?? 0) >= 90
 ).length;
 
 const high = graph.nodes.filter(n => {
-  const risk = n.max_score ?? n.score ?? 0;
-  return risk >= 70 && risk < 90;
+ const risk = n.max_score ?? n.score ?? 0;
+ return risk >= 70 && risk < 90;
 }).length;
 
 const medium = graph.nodes.filter(n => {
-  const risk = n.max_score ?? n.score ?? 0;
-  return risk >= 40 && risk < 70;
+ const risk = n.max_score ?? n.score ?? 0;
+ return risk >= 40 && risk < 70;
 }).length;
 
 const low = graph.nodes.filter(
-  n => (n.max_score ?? n.score ?? 0) < 40
+ n => (n.max_score ?? n.score ?? 0) < 40
 ).length;
 
 setThreatMatrix({
-  critical,
-  high,
-  medium,
-  low
+ critical,
+ high,
+ medium,
+ low
 });
 
 const highestLinks =
-    (graphRes.data.links || [])
-        .filter(l => (l.weight || 0) >= 5)
-        .map(l => `${l.source}-${l.target}`);
+  (graphRes.data.links || [])
+    .filter(l => (l.weight || 0) >= 5)
+    .map(l => `${l.source}-${l.target}`);
 
 setActiveAttackPath(highestLinks);
 const replayRes = await axios.get(
-  `${API}/executive/attack-replay`
+ `${API}/executive/attack-replay`
 );
 
 setAttackReplay(replayRes.data);
 
-    const reportRes = await axios.get(
-      `${API}/executive/board-report`
-    );
-    setBoardReport(reportRes.data);
+  const reportRes = await axios.get(
+   `${API}/executive/board-report`
+  );
+  setBoardReport(reportRes.data);
 
-    const strategyRes = await axios.get(
-      `${API}/executive/strategy`
-    );
-    setStrategy(strategyRes.data);
+  const strategyRes = await axios.get(
+   `${API}/executive/strategy`
+  );
+  setStrategy(strategyRes.data);
 
-    const intel = await axios.get(
-      `${API}/executive/threat-intelligence`
-    );
-    setThreatIntel(intel.data);
+  const intel = await axios.get(
+   `${API}/executive/threat-intelligence`
+  );
+  setThreatIntel(intel.data);
 
-    const predictionRes = await axios.get(
-      `${API}/executive/prediction`
-    );
-    setPrediction(predictionRes.data);
+  const predictionRes = await axios.get(
+   `${API}/executive/prediction`
+  );
+  setPrediction(predictionRes.data);
 
-    const summaryRes = await axios.get(
-      `${API}/executive/summary`
-    );
-    setSummary(summaryRes.data);
+  const summaryRes = await axios.get(
+   `${API}/executive/summary`
+  );
+  setSummary(summaryRes.data);
 const commander = await axios.get(
-  `${API}/executive/incident-commander`
+ `${API}/executive/incident-commander`
 );
 
 setIncidentCommander(commander.data.incidents);
 
 const count = await axios.get(
-  `${API}/executive/active-count`
+ `${API}/executive/active-count`
 );
 
 setActiveIncidents(count.data.active);
 
 setWarRoom({
-  attacks: graph.nodes.length,
-  critical: commander.data.incidents.filter(
-    i => i.score >= 90
-  ).length,
-  active: count.data.active,
-  risk:
-    commander.data.incidents.some(
-      i => i.score >= 90
+ attacks: graph.nodes.length,
+ critical: commander.data.incidents.filter(
+  i => i.score >= 90
+ ).length,
+ active: count.data.active,
+ risk:
+  commander.data.incidents.some(
+   i => i.score >= 90
+  )
+   ? "CRITICAL"
+   : commander.data.incidents.some(
+     i => i.score >= 70
     )
-      ? "CRITICAL"
-      : commander.data.incidents.some(
-          i => i.score >= 70
-        )
-      ? "HIGH"
-      : "NORMAL"
+   ? "HIGH"
+   : "NORMAL"
 });
 
 
-  } catch (err) {
-    console.error("Executive Dashboard Error:", err);
-  } finally {
-    setLoading(false);
-  }
+ } catch (err) {
+  console.error("Executive Dashboard Error:", err);
+ } finally {
+  setLoading(false);
+ }
 }
 async function askCopilot() {
 
-  if (!question.trim()) return;
+ if (!question.trim()) return;
 
-  setCopilot("");
-  setCopilotLoading(true);
+ setCopilot("");
+ setCopilotLoading(true);
 
-  try {
+ try {
 
-    const res = await axios.post(
-      `${API}/executive/copilot`,
-      { question }
-    );
+  const res = await axios.post(
+   `${API}/executive/copilot`,
+   { question }
+  );
 
-    console.log("COPILOT:", res.data);
+  console.log("COPILOT:", res.data);
 
-    setCopilot(res.data.answer);
+  setCopilot(res.data.answer);
 
-  } catch (err) {
+ } catch (err) {
 
-    console.error(err);
+  console.error(err);
 
-    if (err.response) {
-      setCopilot(JSON.stringify(err.response.data, null, 2));
-    } else {
-      setCopilot(err.message);
-    }
-
-  } finally {
-
-    console.log("Finished");
-
-    setCopilotLoading(false);
-
+  if (err.response) {
+   setCopilot(JSON.stringify(err.response.data, null, 2));
+  } else {
+   setCopilot(err.message);
   }
+
+ } finally {
+
+  console.log("Finished");
+
+  setCopilotLoading(false);
+
+ }
 
 }
 async function runSimulation() {
 
-  try {
+ try {
 
-    const res = await axios.post(
-      `${API}/executive/simulate`,
-      {
-        attack: "Phishing",
-        increase: attackIncrease
-      }
-    );
+  const res = await axios.post(
+   `${API}/executive/simulate`,
+   {
+    attack: "Phishing",
+    increase: attackIncrease
+   }
+  );
 
-    setSimulation(res.data);
+  setSimulation(res.data);
 
-  } catch (err) {
+ } catch (err) {
 
-    console.error(err);
+  console.error(err);
 
-  }
+ }
 
 }
 function downloadExecutivePDF() {
 
-  window.open(
-    `${API}/executive/report/pdf`,
-    "_blank"
-  );
+ window.open(
+  `${API}/executive/report/pdf`,
+  "_blank"
+ );
 
 }
 
-  if (!kpis) {
-    return (
-      <div
+ if (!kpis) {
+  return (
+   <div
 style={{
 background:"#0f172a",
 color:"white",
@@ -826,374 +909,363 @@ overflowX:"hidden",
 position:"relative"
 }}
 >
-        Loading Executive Dashboard...
-      </div>
-    );
-  }
+    Loading Executive Dashboard...
+   </div>
+  );
+ }
 function updateKillChain(node) {
 
-  const stages = [
-    "Initial Access",
-    "Execution",
-    "Persistence",
-    "Privilege Escalation",
-    "Credential Access",
-    "Lateral Movement",
-    "Exfiltration"
-  ];
+ const stages = [
+  "Initial Access",
+  "Execution",
+  "Persistence",
+  "Privilege Escalation",
+  "Credential Access",
+  "Lateral Movement",
+  "Exfiltration"
+ ];
 
-  const currentStage = node?.stage || "Initial Access";
+ const currentStage = node?.stage || "Initial Access";
 
-  const currentIndex = stages.indexOf(currentStage);
+ const currentIndex = stages.indexOf(currentStage);
 
-  setKillChain(
-    stages.map((stage, index) => ({
-      stage,
-      active: index <= currentIndex
-    }))
-  );
+ setKillChain(
+  stages.map((stage, index) => ({
+   stage,
+   active: index <= currentIndex
+  }))
+ );
 }
 async function openIncident(id) {
 
-  try {
+ try {
 
-    const res = await axios.get(
-      `${API}/executive/incident/${id}`
-    );
+  const res = await axios.get(
+   `${API}/executive/incident/${id}`
+  );
 
-    setSelectedIncident(res.data);
+  setSelectedIncident(res.data);
 
-  } catch (err) {
+ } catch (err) {
 
-    console.error(err);
+  console.error(err);
 
-  }
+ }
 
 }
 function calculateRiskForecast(graph) {
-  const nodes = graph.nodes || [];
+ const nodes = graph.nodes || [];
 
-  const critical = nodes.filter(
-    n => (n.max_score ?? n.score ?? 0) >= 90
-  ).length;
+ const critical = nodes.filter(
+  n => (n.max_score ?? n.score ?? 0) >= 90
+ ).length;
 
-  const high = nodes.filter(n => {
-    const risk = n.max_score ?? n.score ?? 0;
-    return risk >= 70 && risk < 90;
-  }).length;
+ const high = nodes.filter(n => {
+  const risk = n.max_score ?? n.score ?? 0;
+  return risk >= 70 && risk < 90;
+ }).length;
 
-  const probability = Math.min(
-    100,
-    critical * 15 + high * 8
-  );
+ const probability = Math.min(
+  100,
+  critical * 15 + high * 8
+ );
 
-  let severity = "Low";
+ let severity = "Low";
 
-  if (probability >= 80)
-    severity = "Critical";
-  else if (probability >= 60)
-    severity = "High";
-  else if (probability >= 30)
-    severity = "Medium";
+ if (probability >= 80)
+  severity = "Critical";
+ else if (probability >= 60)
+  severity = "High";
+ else if (probability >= 30)
+  severity = "Medium";
 
-  setRiskForecast({
-    probability,
-    expectedThreats: critical + high,
-    predictedSeverity: severity,
-    recommendation:
-      probability >= 80
-        ? "Immediate containment recommended."
-        : probability >= 60
-        ? "Increase monitoring and isolate high-risk assets."
-        : "Continue monitoring."
-  });
+ setRiskForecast({
+  probability,
+  expectedThreats: critical + high,
+  predictedSeverity: severity,
+  recommendation:
+   probability >= 80
+    ? "Immediate containment recommended."
+    : probability >= 60
+    ? "Increase monitoring and isolate high-risk assets."
+    : "Continue monitoring."
+ });
 }
 
-  return (
-  <div className="executive-dashboard">
-return (
-  <div className="executive-dashboard">
+ return (
+ <div className="executive-dashboard">
 
-    
 
-    {/* existing dashboard */}
+  {/* existing dashboard */}
 
-    
 
-  
-      <h2
-  style={{
-    color: "#00ffc8",
-    fontSize: 24,
-    fontWeight: 700,
-    marginBottom: 18
-  }}
+
+
+   <h2
+ style={{
+  color: "#00ffc8",
+  fontSize: 24,
+  fontWeight: 700,
+  marginBottom: 18
+ }}
 >
-  🛡 Executive War Room
+  Executive War Room
 </h2>
 
-      <div
+   <div
 style={{
-  margin: "5px auto",
-  width: "100%",
-  maxWidth: "1600px",
-  background: "#111827",
-  borderRadius: 12,
-  padding: 10,
+ margin: 0,
+ width: "100%",
+ maxWidth: "none",
+ background: "#111827",
+ borderRadius: 12,
+ padding: 10,
 }}
 >
 
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-      gap: 16
-    }}
-  >
-
-    <Card title="Attack Graph" value={warRoom.attacks} />
-    <Card title="Critical" value={warRoom.critical} />
-    <Card title="Active Incidents" value={warRoom.active} />
-    <Card title="Enterprise Risk" value={warRoom.risk} />
-
-  </div>
-
-</div>
-      <div
+ <div
   style={{
-    marginTop: 25,
-    background: "#111827",
-    border: "1px solid #334155",
-    borderRadius: 18,
-    padding: 20,
-    overflow: "hidden",
-    width: "100%",
-    boxSizing: "border-box"
+   display: "grid",
+   gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+   gap: 16
   }}
+ >
+
+  <Card title="Attack Graph" value={warRoom.attacks} />
+  <Card title="Critical" value={warRoom.critical} />
+  <Card title="Active Incidents" value={warRoom.active} />
+  <Card title="Enterprise Risk" value={warRoom.risk} />
+
+ </div>
+
+</div>
+   <div
+ style={{
+  marginTop: 25,
+  background: "#111827",
+  border: "1px solid #334155",
+  borderRadius: 18,
+  padding: 20,
+  overflow: "hidden",
+  width: "100%",
+  boxSizing: "border-box"
+ }}
 >
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 15
-    }}
-  >
-    <div>
-      <h2
-        style={{
-          margin: 0,
-          color: "#00ffc8",
-          fontSize: 24
-        }}
-      >
-        🌐 Live Attack Network
-      </h2>
-
-      <p
-        style={{
-          marginTop: 6,
-          color: "#94a3b8",
-          fontSize: 14
-        }}
-      >
-        Real-time visualization of correlated enterprise attacks
-      </p>
-    </div>
-
-    <div
-      style={{
-        background: "#0f172a",
-        padding: "8px 14px",
-        borderRadius: 20,
-        color: "#22c55e",
-        fontWeight: "bold",
-        border: "1px solid #334155"
-      }}
-    >
-      ● LIVE
-    </div>
-  </div>
-
-  <div
-    style={{
-      width: "100%",
-      height: 500,
-      overflow: "hidden",
-      borderRadius: 12
-    }}
-  >
-    <ForceGraph2D
-  graphData={{
-    nodes: Array.isArray(attackGraph?.nodes)
-      ? attackGraph.nodes
-      : Object.values(attackGraph?.nodes || {}),
-
-    links: Array.isArray(attackGraph?.links)
-      ? attackGraph.links
-      : (attackGraph?.edges || [])
+ <div
+  style={{
+   display: "flex",
+   justifyContent: "space-between",
+   alignItems: "center",
+   marginBottom: 15
   }}
-  width={window.innerWidth * 0.85}
-  height={500}
-  nodeAutoColorBy="category"
-  nodeRelSize={8}
-  linkDirectionalParticles={3}
-  linkDirectionalParticleSpeed={0.005}
-  cooldownTicks={80}
-  backgroundColor="#111827"
-/>
+ >
+  <div>
+   <h2
+    style={{
+     margin: 0,
+     color: "#00ffc8",
+     fontSize: 24
+    }}
+   >
+     Live Attack Network
+   </h2>
+
+   <p
+    style={{
+     marginTop: 6,
+     color: "#94a3b8",
+     fontSize: 14
+    }}
+   >
+    Real-time visualization of correlated enterprise attacks
+   </p>
   </div>
+
+  <div
+   style={{
+    background: "#0f172a",
+    padding: "8px 14px",
+    borderRadius: 20,
+    color: "#22c55e",
+    fontWeight: "bold",
+    border: "1px solid #334155"
+   }}
+  >
+   ● LIVE
+  </div>
+ </div>
+
+ <div
+  style={{
+   width: "100%",
+   height: 500,
+   overflow: "hidden",
+   borderRadius: 12
+  }}
+ >
+  <ForceGraph2D
+ graphData={normalizeGraphData(attackGraph)}
+ width={window.innerWidth * 0.85}
+ height={500}
+ nodeAutoColorBy="category"
+ nodeRelSize={8}
+ linkDirectionalParticles={3}
+ linkDirectionalParticleSpeed={0.005}
+ cooldownTicks={80}
+ backgroundColor="#111827"
+/>
+ </div>
 </div>
 
- 
+
 
 <p
-  style={{
-    color: "#94a3b8",
-    marginTop: 5,
-    marginBottom: 20
-  }}
+ style={{
+  color: "#94a3b8",
+  marginTop: 5,
+  marginBottom: 20
+ }}
 >
 Last Updated: {lastUpdated}
 </p>
 
 <button
-  onClick={downloadExecutivePDF}
-  style={{
-    padding: "12px 20px",
-    background: "#ef4444",
-    color: "white",
-    border: "none",
-    borderRadius: 10,
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: 15
-  }}
+ onClick={downloadExecutivePDF}
+ style={{
+  padding: "12px 20px",
+  background: "#ef4444",
+  color: "white",
+  border: "none",
+  borderRadius: 10,
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: 15
+ }}
 >
-📄 Download Executive PDF
+ Download Executive PDF
 </button>
 
 
 <div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-    gap: 20,
-    marginBottom: 30
-  }}
+ style={{
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+  gap: 20,
+  marginBottom: 30
+ }}
 >
-  <Card
-  title="🔥 Active Threats"
-  value={kpis?.active_threats ?? 0}
+ <Card
+ title=" Active Threats"
+ value={kpis?.active_threats ?? 0}
 />
 
 <Card
-  title="🚨 Critical Alerts"
-  value={kpis?.critical_alerts ?? 0}
+ title=" Critical Alerts"
+ value={kpis?.critical_alerts ?? 0}
 />
 
 <Card
-  title="🛡 Blocked Attacks"
-  value={kpis?.blocked_attacks ?? 0}
+ title=" Blocked Attacks"
+ value={kpis?.blocked_attacks ?? 0}
 />
 
 <Card
-  title="🤖 AI Decisions"
-  value={kpis?.ai_decisions ?? "N/A"}
+ title=" AI Decisions"
+ value={kpis?.ai_decisions ?? "N/A"}
 />
 </div>
 <div
-  style={{
-    marginTop: 30,
-    background: "#111827",
-    border: "1px solid #334155",
-    borderRadius: 16,
-    padding: 24
-  }}
+ style={{
+  marginTop: 30,
+  background: "#111827",
+  border: "1px solid #334155",
+  borderRadius: 16,
+  padding: 24
+ }}
 >
-  <h2 style={{ color: "#00ffc8", marginBottom: 20 }}>
-  🧠 Executive AI Briefing
+ <h2 style={{ color: "#00ffc8", marginBottom: 20 }}>
+ Executive AI Briefing
 </h2>
 
 {executiveAI ? (
-  <>
-    <h3 style={{ color: "#ffffff" }}>
-      {executiveAI.title}
-    </h3>
+ <>
+  <h3 style={{ color: "#ffffff" }}>
+   {executiveAI.title}
+  </h3>
 
-    <p
-      style={{
-        color: "#cbd5e1",
-        lineHeight: 1.8,
-        marginTop: 15
-      }}
-    >
-      {executiveAI.summary}
-    </p>
+  <p
+   style={{
+    color: "#cbd5e1",
+    lineHeight: 1.8,
+    marginTop: 15
+   }}
+  >
+   {executiveAI.summary}
+  </p>
 
-    <div
-      style={{
-        display: "inline-block",
-        marginTop: 15,
-        padding: "6px 14px",
-        borderRadius: 20,
-        background:
-          executiveAI.priority === "HIGH"
-            ? "#7f1d1d"
-            : "#064e3b",
-        color: "#fff",
-        fontWeight: "bold"
-      }}
-    >
-      Priority: {executiveAI.priority}
-    </div>
-
-    <h3
-      style={{
-        color: "#22c55e",
-        marginTop: 25
-      }}
-    >
-      Recommended Actions
-    </h3>
-
-    <ul style={{ color: "#e2e8f0", lineHeight: 2 }}>
-      {executiveAI.recommendations?.map((item, i) => (
-        <li key={i}>{item}</li>
-      ))}
-    </ul>
-  </>
-) : (
-  <div style={{ color: "#94a3b8" }}>
-    Generating executive assessment...
+  <div
+   style={{
+    display: "inline-block",
+    marginTop: 15,
+    padding: "6px 14px",
+    borderRadius: 20,
+    background:
+     executiveAI.priority === "HIGH"
+      ? "#7f1d1d"
+      : "#064e3b",
+    color: "#fff",
+    fontWeight: "bold"
+   }}
+  >
+   Priority: {executiveAI.priority}
   </div>
+
+  <h3
+   style={{
+    color: "#22c55e",
+    marginTop: 25
+   }}
+  >
+   Recommended Actions
+  </h3>
+
+  <ul style={{ color: "#e2e8f0", lineHeight: 2 }}>
+   {executiveAI.recommendations?.map((item, i) => (
+    <li key={i}>{item}</li>
+   ))}
+  </ul>
+ </>
+) : (
+ <div style={{ color: "#94a3b8" }}>
+  Generating executive assessment...
+ </div>
 )}
 </div>
 <button
 onClick={() => {
 
-    const data = JSON.stringify(
-        boardReport,
-        null,
-        2
-    );
+  const data = JSON.stringify(
+    boardReport,
+    null,
+    2
+  );
 
-    const blob = new Blob(
-        [data],
-        {
-            type: "application/json"
-        }
-    );
+  const blob = new Blob(
+    [data],
+    {
+      type: "application/json"
+    }
+  );
 
-    const url = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
 
-    const a = document.createElement("a");
+  const a = document.createElement("a");
 
-    a.href = url;
+  a.href = url;
 
-    a.download = "Executive_Board_Report.json";
+  a.download = "Executive_Board_Report.json";
 
-    a.click();
+  a.click();
 
 }}
 style={{
@@ -1206,7 +1278,7 @@ fontWeight:"bold",
 cursor:"pointer"
 }}
 >
-📄 Download Executive Board Report
+ Download Executive Board Report
 </button>
 {strategy && (
 
@@ -1221,7 +1293,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-🧭 AI Strategic Security Advisor
+ AI Strategic Security Advisor
 </h2>
 
 
@@ -1308,190 +1380,190 @@ borderRadius:8
 
 )}
 <div
-  style={{
-    marginTop: 30,
-    background: "linear-gradient(180deg,#111827,#0f172a)",
-    borderRadius: 20,
-    border: "1px solid #334155",
-    overflow: "hidden",
-    boxShadow: "0 10px 35px rgba(0,0,0,.35)"
-  }}
+ style={{
+  marginTop: 30,
+  background: "linear-gradient(180deg,#111827,#0f172a)",
+  borderRadius: 20,
+  border: "1px solid #334155",
+  overflow: "hidden",
+  boxShadow: "0 10px 35px rgba(0,0,0,.35)"
+ }}
 >
 {executivePosture && (
-      <div className="posture-card">
+   <div className="posture-card">
 
-        <h2>🛡 Executive Security Posture</h2>
+    <h2> Executive Security Posture</h2>
 
-        <h3>
-          {executivePosture.posture}
-        </h3>
+    <h3>
+     {executivePosture.posture}
+    </h3>
 
-        <p>
-          Risk Level:
-          <strong>
-            {" "}{executivePosture.risk_level}
-          </strong>
-        </p>
+    <p>
+     Risk Level:
+     <strong>
+      {" "}{executivePosture.risk_level}
+     </strong>
+    </p>
 
-        <p>
-          {executivePosture.reason}
-        </p>
+    <p>
+     {executivePosture.reason}
+    </p>
 
-        <small>
-          Updated: {executivePosture.updated}
-        </small>
+    <small>
+     Updated: {executivePosture.updated}
+    </small>
 
-      </div>
-    )}
-  
+   </div>
+  )}
+
 <div className="executive-grid">
 
-  <div className="executive-grid-wide">
-    <CommandCenter
-      attackGraph={attackGraph}
-      incidents={incidents}
-      alerts={liveExecutiveAlerts}
-      securityPosture={securityPosture}
-      riskForecast={riskForecast}
-    />
-  </div>
-
-  <SecurityPosturePanel
-    posture={securityPosture}
+ <div className="executive-grid-wide">
+  <CommandCenter
+   attackGraph={attackGraph}
+   incidents={incidents}
+   alerts={liveExecutiveAlerts}
+   securityPosture={securityPosture}
+   riskForecast={riskForecast}
   />
+ </div>
 
-  <ExecutiveRiskRadar
-  securityPosture={securityPosture}
-  threatIntelligence={threatIntelligence}
-  executiveAI={executiveAI}
+ <SecurityPosturePanel
+  posture={securityPosture}
+ />
+
+ <ExecutiveRiskRadar
+ securityPosture={securityPosture}
+ threatIntelligence={threatIntelligence}
+ executiveAI={executiveAI}
 />
 
 <ExecutiveSummary
-  securityPosture={securityPosture}
-  executiveAI={executiveAI}
-  socMetrics={socMetrics}
-  threatIntelligence={threatIntelligence}
-  riskForecast={riskForecast}
-  attackGraph={attackGraph}
+ securityPosture={securityPosture}
+ executiveAI={executiveAI}
+ socMetrics={socMetrics}
+ threatIntelligence={threatIntelligence}
+ riskForecast={riskForecast}
+ attackGraph={attackGraph}
 />
 
 <ThreatHeatMap
-  threatMatrix={threatMatrix}
+ threatMatrix={threatMatrix}
 />
-  <MitreAttackMatrix
-    matrix={mitreMatrix}
-/>
-
-  <EnterpriseDigitalTwin
-
-  attackGraph={attackGraph}
-
-  securityPosture={securityPosture}
-
+ <MitreAttackMatrix
+  matrix={mitreMatrix}
 />
 
-  <div className="executive-grid-wide">
-    <AttackSurfaceMap
-      attackGraph={attackGraph}
-      threatMatrix={threatMatrix}
-      riskForecast={riskForecast}
-    />
-  </div>
+ <EnterpriseDigitalTwin
+
+ attackGraph={attackGraph}
+
+ securityPosture={securityPosture}
+
+/>
+
+ <div className="executive-grid-wide">
+  <AttackSurfaceMap
+   attackGraph={attackGraph}
+   threatMatrix={threatMatrix}
+   riskForecast={riskForecast}
+  />
+ </div>
 <div className="executive-grid-wide">
-    <AttackPathAnalysis
-        paths={attackPaths}
-    />
+  <AttackPathAnalysis
+    paths={attackPaths}
+  />
 </div>
 
-  <div className="executive-grid-wide">
-    <ExecutiveThreatTimeline
-      incidents={incidents}
-    />
+ <div className="executive-grid-wide">
+  <ExecutiveThreatTimeline
+   incidents={incidents}
+  />
 <AIRecommendations
-    recommendations={recommendations}
+  recommendations={recommendations}
 />
 <ExecutivePosture
-   posture={executivePosture}
+  posture={executivePosture}
 />
 
-  </div>
+ </div>
 
 </div>
-    </div>
+  </div>
 <div
-  style={{
-    height: replayGraph.nodes?.length ? 600 : 0,
-    overflow: "hidden",
-    margin: 0,
-    padding: 0
-  }}
+ style={{
+  height: replayGraph.nodes?.length ? 600 : 0,
+  overflow: "hidden",
+  margin: 0,
+  padding: 0
+ }}
 >
 
-    <ForceGraph2D
+  <ForceGraph2D
 
-      ref={graphRef}
+   ref={graphRef}
 
-      graphData={replayGraph}
+   graphData={replayGraph}
 
-      width={1150}
+   width={1150}
 
-      height={replayGraph.nodes?.length ? 600 : 0}
+   height={replayGraph.nodes?.length ? 600 : 0}
 
-      backgroundColor="#111827"
+   backgroundColor="#111827"
 
-      nodeRelSize={10}
+   nodeRelSize={10}
 
-      linkWidth={2}
+   linkWidth={2}
 
-      linkDirectionalArrowLength={10}
+   linkDirectionalArrowLength={10}
 
-      linkDirectionalArrowRelPos={1}
+   linkDirectionalArrowRelPos={1}
 
-      linkDirectionalParticles={6}
+   linkDirectionalParticles={6}
 
-      linkDirectionalParticleSpeed={0.008}
+   linkDirectionalParticleSpeed={0.008}
 
-      cooldownTicks={80}
+   cooldownTicks={80}
 
-      d3VelocityDecay={0.28}
+   d3VelocityDecay={0.28}
 
-      dagMode="td"
+   dagMode="td"
 
-      dagLevelDistance={130}
+   dagLevelDistance={130}
 
-      nodeAutoColorBy="category"
+   nodeAutoColorBy="category"
 
-      linkColor={() => "#475569"}
+   linkColor={() => "#475569"}
 
-      nodeCanvasObject={(node, ctx) => {
+   nodeCanvasObject={(node, ctx) => {
 
-        const active = node.id === currentReplayNode;
+    const active = node.id === currentReplayNode;
 
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, active ? 16 : 10, 0, Math.PI * 2);
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, active ? 16 : 10, 0, Math.PI * 2);
 
-        ctx.fillStyle =
-          active
-            ? "#ef4444"
-            : "#00ffc8";
+    ctx.fillStyle =
+     active
+      ? "#ef4444"
+      : "#00ffc8";
 
-        ctx.fill();
+    ctx.fill();
 
-        if (active) {
+    if (active) {
 
-          ctx.strokeStyle = "#ffffff";
+     ctx.strokeStyle = "#ffffff";
 
-          ctx.lineWidth = 3;
+     ctx.lineWidth = 3;
 
-          ctx.stroke();
+     ctx.stroke();
 
-        }
+    }
 
-      }}
+   }}
 
-    />
+  />
 
-  </div>
+ </div>
 
 {scorecard && (
 <div
@@ -1505,7 +1577,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-🏆 Security Maturity Scorecard
+Security Maturity Scorecard
 </h2>
 <div
 style={{
@@ -1556,7 +1628,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-📋 Compliance & Governance Center
+Compliance & Governance Center
 </h2>
 
 <div
@@ -1630,7 +1702,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-🔍 AI Investigation
+AI Investigation
 </h2>
 
 
@@ -1692,95 +1764,74 @@ Close
 
 )}
 <div
-  style={{
-    marginTop: 25,
-    background: "#111827",
-    borderRadius: 16,
-    padding: 20,
-    border: "1px solid #334155"
-  }}
+ style={{
+  marginTop: 25,
+  background: "#111827",
+  borderRadius: 16,
+  padding: 20,
+  border: "1px solid #334155"
+ }}
 >
 
 <h2 style={{ color: "#00ffc8" }}>
-🛡️ AI Remediation Center
+  Executive Threat Matrix
 </h2>
 
-{remediation.map((item, index) => (
+<div style={{
+  display: "grid",
+  gridTemplateColumns: "repeat(4, 1fr)",
+  gap: 20,
+  marginTop: 20
+}}>
+  <div style={{
+    padding: 20,
+    background: "#7f1d1d",
+    borderRadius: 12,
+    textAlign: "center"
+  }}>
+    <h3>Critical Threats</h3>
+    <div style={{ fontSize: 28, fontWeight: 700 }}>
+      {socMetrics?.critical_threats ?? 0}
+    </div>
+  </div>
 
-<div
-  key={`${item.id}-${index}`}
-  style={{
-    marginTop:15,
-    padding:15,
-    background:"#0f172a",
-    borderRadius:10,
-    borderLeft:
-      item.priority === "CRITICAL"
-        ? "4px solid #ef4444"
-        : item.priority === "HIGH"
-        ? "4px solid #f97316"
-        : "4px solid #22c55e"
-  }}
->
+  <div style={{
+    padding: 20,
+    background: "#78350f",
+    borderRadius: 12,
+    textAlign: "center"
+  }}>
+    <h3>High Risk</h3>
+    <div style={{ fontSize: 28, fontWeight: 700 }}>
+      {socMetrics?.high_risk ?? 0}
+    </div>
+  </div>
 
-<h3>
-#{item.id} - {item.category}
-</h3>
+  <div style={{
+    padding: 20,
+    background: "#164e63",
+    borderRadius: 12,
+    textAlign: "center"
+  }}>
+    <h3>Suspicious</h3>
+    <div style={{ fontSize: 28, fontWeight: 700 }}>
+      {socMetrics?.suspicious ?? 0}
+    </div>
+  </div>
 
-
-<p>
-Risk Score: {item.risk_score}
-</p>
-
-
-<p>
-Priority: {item.priority}
-</p>
-
-
-<p>
-AI Action:
-<br/>
-{item.recommended_action}
-</p>
-
-
-<button
-onClick={async () => {
-
-  try {
-
-    const res = await axios.post(
-  `${API}/executive/approve-action/${item.id}`
-);
-
-alert(res.data.message);
-
-loadData();
-
-  } catch (err) {
-
-    console.error(err);
-
-  }
-
-}}
-style={{
-padding:"10px 16px",
-background:"#00ffc8",
-border:"none",
-borderRadius:8,
-fontWeight:"bold",
-cursor:"pointer"
-}}
->
-Approve Action
-</button>
-
-
+  <div style={{
+    padding: 20,
+    background: "#14532d",
+    borderRadius: 12,
+    textAlign: "center"
+  }}>
+    <h3>Monitored</h3>
+    <div style={{ fontSize: 28, fontWeight: 700 }}>
+      {socMetrics?.total_threats ?? 0}
+    </div>
+  </div>
 </div>
 
-))}
 
 
 </div>
@@ -1795,7 +1846,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-📡 Live Executive SOC Stream
+ Live Executive SOC Stream
 </h2>
 
 
@@ -1808,45 +1859,45 @@ Waiting for live security events...
 
 {liveExecutiveAlerts.map((alert, index) => {
 
-  const risk =
-    alert.data?.soc_core?.avg_risk ??
-    alert.node?.max_score ??
-    alert.node?.score ??
-    0;
+ const risk =
+  alert.data?.soc_core?.avg_risk ??
+  alert.node?.max_score ??
+  alert.node?.score ??
+  0;
 
-  const eventType =
-    alert.node?.category ??
-    alert.event_type ??
-    alert.type ??
-    "Security Event";
+ const eventType =
+  alert.node?.category ??
+  alert.event_type ??
+  alert.type ??
+  "Security Event";
 
-  return (
+ return (
 
-    <div
-      key={index}
-      style={{
-        marginTop: 15,
-        padding: 15,
-        background: "#0f172a",
-        borderRadius: 10,
-        borderLeft:
-          risk >= 90
-            ? "5px solid #ef4444"
-            : risk >= 70
-            ? "5px solid #f97316"
-            : "5px solid #22c55e"
-      }}
-    >
+  <div
+   key={index}
+   style={{
+    marginTop: 15,
+    padding: 15,
+    background: "#0f172a",
+    borderRadius: 10,
+    borderLeft:
+     risk >= 90
+      ? "5px solid #ef4444"
+      : risk >= 70
+      ? "5px solid #f97316"
+      : "5px solid #22c55e"
+   }}
+  >
 
-      <h3>{eventType}</h3>
+   <h3>{eventType}</h3>
 
-      <p>
-        <b>Risk Score:</b> {risk.toFixed(1)}
-      </p>
+   <p>
+    <b>Risk Score:</b> {risk.toFixed(1)}
+   </p>
 
-    </div>
+  </div>
 
-  );
+ );
 
 })}
 
@@ -1864,7 +1915,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-🔮 AI Attack Forecast
+AI Attack Forecast
 </h2>
 
 
@@ -1925,7 +1976,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-🧠 Threat Intelligence Center
+Threat Intelligence Center
 </h2>
 
 <div
@@ -2035,7 +2086,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-⚡ Attack Burst Detection
+Attack Burst Detection
 </h2>
 
 <h1
@@ -2075,7 +2126,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-📊 Executive Security Summary
+Executive Security Summary
 </h2>
 
 
@@ -2109,27 +2160,27 @@ value={summary.critical_threats}
 
 </div>
 <div
-  style={{
-    marginTop: 30,
-    background: "#111827",
-    borderRadius: 16,
-    padding: 20,
-    border: "1px solid #334155"
-  }}
+ style={{
+  marginTop: 30,
+  background: "#111827",
+  borderRadius: 16,
+  padding: 20,
+  border: "1px solid #334155"
+ }}
 >
 
 <h2 style={{ color:"#00ffc8" }}>
-🎖 Incident Commander
+Incident Commander
 </h2>
 
 <div
-  style={{
-    marginTop:15,
-    marginBottom:20,
-    fontSize:22,
-    fontWeight:"bold",
-    color:"#22c55e"
-  }}
+ style={{
+  marginTop:15,
+  marginBottom:20,
+  fontSize:22,
+  fontWeight:"bold",
+  color:"#22c55e"
+ }}
 >
 Active Incidents: {activeIncidents}
 </div>
@@ -2246,7 +2297,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-🧠 Executive Risk Decision Engine
+Executive Risk Decision Engine
 </h2>
 
 <div
@@ -2308,7 +2359,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#ef4444"}}>
-🚨 Threat Escalation Matrix
+ Threat Escalation Matrix
 </h2>
 
 <div
@@ -2368,7 +2419,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-⚡ Automated Executive Actions
+Automated Executive Actions
 </h2>
 
 {executiveActions.map((item,index)=>(
@@ -2430,7 +2481,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#ef4444"}}>
-🚨 AI Priority Queue
+ AI Priority Queue
 </h2>
 
 <table
@@ -2492,17 +2543,17 @@ item.risk_score >=70
 </div>
 {decision && (
 <div
-  style={{
-    marginTop:25,
-    background:"#111827",
-    borderRadius:16,
-    padding:20,
-    border:"1px solid #334155"
-  }}
+ style={{
+  marginTop:25,
+  background:"#111827",
+  borderRadius:16,
+  padding:20,
+  border:"1px solid #334155"
+ }}
 >
 
 <h2 style={{color:"#00ffc8"}}>
-🤖 Autonomous Executive AI
+ Autonomous Executive AI
 </h2>
 
 <h3>
@@ -2541,176 +2592,176 @@ Recommended Actions
 )}
 
 
-      {briefing && (
-        <div
-          style={{
-            marginTop: 25,
-            marginBottom: 30,
-            background: "#111827",
-            borderRadius: 16,
-            padding: 20,
-            border: "1px solid #334155"
-          }}
-        >
-          <h2 style={{ color: "#00ffc8" }}>
-            🧠 Executive AI Briefing
-          </h2>
+   {briefing && (
+    <div
+     style={{
+      marginTop: 25,
+      marginBottom: 30,
+      background: "#111827",
+      borderRadius: 16,
+      padding: 20,
+      border: "1px solid #334155"
+     }}
+    >
+     <h2 style={{ color: "#00ffc8" }}>
+      Executive AI Briefing
+     </h2>
 
-          <p>{briefing.summary}</p>
+     <p>{briefing.summary}</p>
 
-          <h3 style={{ color: "#facc15" }}>
-            Recommendation
-          </h3>
+     <h3 style={{ color: "#facc15" }}>
+      Recommendation
+     </h3>
 
-          <p>{briefing.recommendation}</p>
-        </div>
-      )}
+     <p>{briefing.recommendation}</p>
+    </div>
+   )}
 <KPICards kpis={kpis} />
 <ExecutiveWarRoom
-    summary={summary}
-    decision={decision}
-    attackBurst={attackBurst}
-    escalation={escalation}
-    loading={warRoomLoading}
-    message={warRoomMessage}
-    onDeclareIncident={declareIncident}
-    onCrisisMode={activateCrisisMode}
-    onNotifyBoard={notifyBoard}
-    onGenerateReport={generateExecutiveReport}
+  summary={summary}
+  decision={decision}
+  attackBurst={attackBurst}
+  escalation={escalation}
+  loading={warRoomLoading}
+  message={warRoomMessage}
+  onDeclareIncident={declareIncident}
+  onCrisisMode={activateCrisisMode}
+  onNotifyBoard={notifyBoard}
+  onGenerateReport={generateExecutiveReport}
 />
 
-      <div
-        style={{
-          marginTop: 40,
-          background: "#111827",
-          borderRadius: 16,
-          padding: 20
-        }}
-      >
-        <h2>📈 Enterprise Risk Trend</h2>
+   <div
+    style={{
+     marginTop: 40,
+     background: "#111827",
+     borderRadius: 16,
+     padding: 20
+    }}
+   >
+    <h2>Enterprise Risk Trend</h2>
 
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={riskTrend}>
-            <XAxis dataKey="day" />
-            <YAxis />
-            <Tooltip />
-            <Line
-              type="monotone"
-              dataKey="risk"
-              stroke="#00ffc8"
-              strokeWidth={3}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div
-        style={{
-          marginTop: 40,
-          background: "#111827",
-          borderRadius: 16,
-          padding: 20
-        }}
-      >
-        <h2>🎯 Threat Distribution</h2>
-
-        <ResponsiveContainer width="100%" height={350}>
-          <PieChart>
-            <Pie
-              data={threatDistribution}
-              dataKey="value"
-              nameKey="category"
-              outerRadius={120}
-              label
-            >
-              {threatDistribution.map((item, index) => (
-                <Cell
-                  key={index}
-                  fill={COLORS[index % COLORS.length]}
-                />
-              ))}
-            </Pie>
-
-            <Tooltip />
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-<div
-  style={{
-    marginTop: 40,
-    background: "#111827",
-    borderRadius: 16,
-    padding: 20
-  }}
->
-  <h2>📊 Executive KPI Trend</h2>
-
-  <ResponsiveContainer width="100%" height={320}>
-    <LineChart data={kpiHistory}>
-      <XAxis dataKey="time" />
+    <ResponsiveContainer width="100%" height={320}>
+     <LineChart data={riskTrend}>
+      <XAxis dataKey="day" />
       <YAxis />
       <Tooltip />
-
       <Line
-        type="monotone"
-        dataKey="security_score"
-        stroke="#22c55e"
-        strokeWidth={3}
+       type="monotone"
+       dataKey="risk"
+       stroke="#00ffc8"
+       strokeWidth={3}
       />
+     </LineChart>
+    </ResponsiveContainer>
+   </div>
 
-      <Line
-        type="monotone"
-        dataKey="enterprise_risk"
-        stroke="#ef4444"
-        strokeWidth={3}
-      />
+   <div
+    style={{
+     marginTop: 40,
+     background: "#111827",
+     borderRadius: 16,
+     padding: 20
+    }}
+   >
+    <h2>Threat Distribution</h2>
 
+    <ResponsiveContainer width="100%" height={350}>
+     <PieChart>
+      <Pie
+       data={threatDistribution}
+       dataKey="value"
+       nameKey="category"
+       outerRadius={120}
+       label
+      >
+       {threatDistribution.map((item, index) => (
+        <Cell
+         key={index}
+         fill={COLORS[index % COLORS.length]}
+        />
+       ))}
+      </Pie>
+
+      <Tooltip />
       <Legend />
-    </LineChart>
-  </ResponsiveContainer>
+     </PieChart>
+    </ResponsiveContainer>
+   </div>
+<div
+ style={{
+  marginTop: 40,
+  background: "#111827",
+  borderRadius: 16,
+  padding: 20
+ }}
+>
+ <h2>Executive KPI Trend</h2>
+
+ <ResponsiveContainer width="100%" height={320}>
+  <LineChart data={kpiHistory}>
+   <XAxis dataKey="time" />
+   <YAxis />
+   <Tooltip />
+
+   <Line
+    type="monotone"
+    dataKey="security_score"
+    stroke="#22c55e"
+    strokeWidth={3}
+   />
+
+   <Line
+    type="monotone"
+    dataKey="enterprise_risk"
+    stroke="#ef4444"
+    strokeWidth={3}
+   />
+
+   <Legend />
+  </LineChart>
+ </ResponsiveContainer>
 </div>
 
-      <div
+   <div
+    style={{
+     marginTop: 40,
+     background: "#111827",
+     borderRadius: 16,
+     padding: 20
+    }}
+   >
+    <h2> Executive Incident Timeline</h2>
+
+    <table
+     style={{
+      width: "100%",
+      borderCollapse: "collapse",
+      color: "white"
+     }}
+    >
+     <thead>
+      <tr>
+       <th align="left">ID</th>
+       <th align="left">Category</th>
+       <th align="left">Risk</th>
+       <th align="left">Status</th>
+       <th align="left">Time</th>
+      </tr>
+     </thead>
+
+     <tbody>
+      {alerts.map((item, index) => (
+       <tr
+        key={item.id}
         style={{
-          marginTop: 40,
-          background: "#111827",
-          borderRadius: 16,
-          padding: 20
+         borderTop: "1px solid #334155"
         }}
-      >
-        <h2>🚨 Executive Incident Timeline</h2>
-
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            color: "white"
-          }}
-        >
-          <thead>
-            <tr>
-              <th align="left">ID</th>
-              <th align="left">Category</th>
-              <th align="left">Risk</th>
-              <th align="left">Status</th>
-              <th align="left">Time</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {alerts.map((item, index) => (
-              <tr
-                key={item.id}
-                style={{
-                  borderTop: "1px solid #334155"
-                }}
-              >
-                <td>{item.id}</td>
-                <td>{item.category}</td>
-                <td>{item.risk_score}</td>
-                <td>{item.status}</td>
-                <td>{item.created_at}</td>
+       >
+        <td>{item.id}</td>
+        <td>{item.category}</td>
+        <td>{item.risk_score}</td>
+        <td>{item.status}</td>
+        <td>{item.created_at}</td>
 <td>
 
 <button
@@ -2728,79 +2779,79 @@ Investigate
 </button>
 
 </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+       </tr>
+      ))}
+     </tbody>
+    </table>
+   </div>
 
-      <div
+   <div
+    style={{
+     marginTop: 40,
+     background: "#111827",
+     borderRadius: 16,
+     padding: 20
+    }}
+   >
+    <h2> Live Threat Feed</h2>
+
+    <table
+     style={{
+      width: "100%",
+      borderCollapse: "collapse",
+      color: "white"
+     }}
+    >
+     <thead>
+      <tr>
+       <th align="left">ID</th>
+       <th align="left">Category</th>
+       <th align="left">Risk</th>
+       <th align="left">Status</th>
+       <th align="left">Time</th>
+      </tr>
+     </thead>
+
+     <tbody>
+      {liveFeed.map((item) => (
+       <tr
+        key={item.id}
         style={{
-          marginTop: 40,
-          background: "#111827",
-          borderRadius: 16,
-          padding: 20
+         borderTop: "1px solid #334155"
         }}
-      >
-        <h2>🌐 Live Threat Feed</h2>
-
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            color: "white"
-          }}
-        >
-          <thead>
-            <tr>
-              <th align="left">ID</th>
-              <th align="left">Category</th>
-              <th align="left">Risk</th>
-              <th align="left">Status</th>
-              <th align="left">Time</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {liveFeed.map((item) => (
-              <tr
-                key={item.id}
-                style={{
-                  borderTop: "1px solid #334155"
-                }}
-              >
-                <td>{item.id}</td>
-                <td>{item.category}</td>
-                <td>{item.risk_score}</td>
-                <td>{item.status}</td>
-                <td>{item.created_at}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+       >
+        <td>{item.id}</td>
+        <td>{item.category}</td>
+        <td>{item.risk_score}</td>
+        <td>{item.status}</td>
+        <td>{item.created_at}</td>
+       </tr>
+      ))}
+     </tbody>
+    </table>
+   </div>
 <div
-  style={{
-    marginTop: 40,
-    background: "#111827",
-    borderRadius: 16,
-    padding: 20,
-    border: "1px solid #334155"
-  }}
+ style={{
+  marginTop: 40,
+  background: "#111827",
+  borderRadius: 16,
+  padding: 20,
+  border: "1px solid #334155"
+ }}
 >
 
 <h2 style={{ color: "#00ffc8" }}>
-    📡 Live Executive Alert Center
+   Live Executive Alert Center
 </h2>
 
 <div
-  style={{
-    marginTop:40,
-    background:"#111827",
-    borderRadius:16,
-    padding:20,
-    border:"1px solid #334155"
-  }}
+ style={{
+  marginTop:40,
+  background:"#111827",
+  borderRadius:16,
+  padding:20,
+  border:"1px solid #334155"
+ }}
 >
 
 <h2 style={{color:"#00ffc8"}}>
@@ -2881,101 +2932,86 @@ Recommendation:
 </div>
 </div>
 
-  {liveExecutiveAlerts.length === 0 ? (
-
-  <p style={{ color:"#94a3b8" }}>
+{liveExecutiveAlerts.length === 0 ? (
+  <p style={{ color: "#94a3b8" }}>
     Waiting for live SOC events...
   </p>
-
 ) : (
+  liveExecutiveAlerts.map((alert, index) => {
+    const risk =
+      alert.node?.max_score ??
+      alert.node?.score ??
+      alert.data?.soc_core?.avg_risk ??
+      0;
 
-liveExecutiveAlerts.map((alert,index)=>{
+    const eventType =
+      alert.node?.category ??
+      alert.event_type ??
+      alert.type ??
+      "Security Event";
 
-const risk =
-  alert.node?.max_score ??
-  alert.node?.score ??
-  alert.data?.soc_core?.avg_risk ??
-  0;
+    return (
+      <div
+        key={index}
+        style={{
+          marginTop: 15,
+          padding: 15,
+          background: "#0f172a",
+          borderRadius: 10,
+          borderLeft:
+            risk >= 90
+              ? "5px solid #ef4444"
+              : risk >= 70
+                ? "5px solid #f97316"
+                : "5px solid #22c55e"
+        }}
+      >
+        <h3>{eventType}</h3>
 
-const eventType =
-  alert.node?.category ??
-  alert.event_type ??
-  alert.type ??
-  "Security Event";
+        <p>
+          <b>Risk Score:</b> {Number(risk).toFixed(1)}
+        </p>
 
+        <p>
+          <b>SOC Status:</b>{" "}
+          {alert.data?.soc_core?.status ?? "UNKNOWN"}
+        </p>
 
-return (
+        <p>
+          <b>Critical Threats:</b>{" "}
+          {alert.data?.soc_core?.critical_threats ?? 0}
+        </p>
 
-<div
-key={index}
-style={{
-marginTop:15,
-padding:15,
-background:"#0f172a",
-borderRadius:10,
-borderLeft:
-risk >= 90
-? "5px solid #ef4444"
-: risk >= 70
-? "5px solid #f97316"
-: "5px solid #22c55e"
-}}
->
-
-<h3>
-{eventType}
-</h3>
-
-<p>
-<b>Risk Score:</b> {Number(risk).toFixed(1)}
-</p>
-
-<p>
-<b>SOC Status:</b>{" "}
-{alert.data?.soc_core?.status ?? "UNKNOWN"}
-</p>
-
-<p>
-<b>Critical Threats:</b>{" "}
-{alert.data?.soc_core?.critical_threats ?? 0}
-</p>
-
-<p>
-<b>Threat Velocity:</b>{" "}
-{alert.data?.velocity?.status ?? "NORMAL"}
-</p>
-
-</div>
-
-);
-
-})
-
+        <p>
+          <b>Threat Velocity:</b>{" "}
+          {alert.data?.velocity?.status ?? "NORMAL"}
+        </p>
+      </div>
+    );
+  })
 )}
 
-</div>
-
 <div
-  style={{
-    marginTop: 35,
-    background: "#111827",
-    borderRadius: 16,
-    padding: 20,
-    border: "1px solid #334155"
-  }}
+ style={{
+  marginTop: 35,
+  background: "#111827",
+  borderRadius: 16,
+  padding: 20,
+  border: "1px solid #334155"
+ }}
 >
 
 <h2 style={{ color: "#00ffc8" }}>
-🎯 Executive Threat Matrix
+Executive Threat Matrix
 </h2>
 
 <div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(4,1fr)",
-    gap: 20,
-    marginTop: 20
-  }}
+ style={{
+  display: "grid",
+  gridTemplateColumns: "repeat(4,1fr)",
+  gap: 20,
+  marginTop: 20
+ }}
 >
 
 <div
@@ -3028,204 +3064,204 @@ textAlign:"center"
 
 </div>
 <div
-  style={{
-    marginTop: 30,
-    background: "#111827",
-    borderRadius: 16,
-    border: "1px solid #334155",
-    padding: 20
-  }}
+ style={{
+  marginTop: 30,
+  background: "#111827",
+  borderRadius: 16,
+  border: "1px solid #334155",
+  padding: 20
+ }}
 >
-  <h2 style={{ color: "#00ffc8" }}>
-    🛡 MITRE ATT&CK Live Kill Chain
-  </h2>
+ <h2 style={{ color: "#00ffc8" }}>
+   MITRE ATT&CK Live Kill Chain
+ </h2>
 
-  <div
+ <div
+  style={{
+   display: "flex",
+   flexWrap: "wrap",
+   gap: 12,
+   marginTop: 20
+  }}
+ >
+  {killChain.map((item) => (
+   <div
+    key={item.stage}
     style={{
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 12,
-      marginTop: 20
+     flex: 1,
+     minWidth: 150,
+     padding: 15,
+     borderRadius: 12,
+     textAlign: "center",
+     background: item.active ? "#dc2626" : "#1e293b",
+     color: "white",
+     transition: "all 0.4s ease",
+     border: item.active
+      ? "2px solid #ef4444"
+      : "1px solid #334155"
     }}
-  >
-    {killChain.map((item) => (
-      <div
-        key={item.stage}
-        style={{
-          flex: 1,
-          minWidth: 150,
-          padding: 15,
-          borderRadius: 12,
-          textAlign: "center",
-          background: item.active ? "#dc2626" : "#1e293b",
-          color: "white",
-          transition: "all 0.4s ease",
-          border: item.active
-            ? "2px solid #ef4444"
-            : "1px solid #334155"
-        }}
-      >
-        <strong>{item.stage}</strong>
+   >
+    <strong>{item.stage}</strong>
 
-        <div style={{ marginTop: 10 }}>
-          {item.active ? "ACTIVE" : "Inactive"}
-        </div>
-      </div>
-    ))}
-  </div>
+    <div style={{ marginTop: 10 }}>
+     {item.active ? "ACTIVE" : "Inactive"}
+    </div>
+   </div>
+  ))}
+ </div>
 </div>
 <div
-  style={{
-    marginTop: 30,
-    padding: 25,
-    background: "#111827",
-    border: "1px solid #334155",
-    borderRadius: 18
-  }}
+ style={{
+  marginTop: 30,
+  padding: 25,
+  background: "#111827",
+  border: "1px solid #334155",
+  borderRadius: 18
+ }}
 >
-  <h2 style={{ color: "#00ffc8" }}>
-    🤖 AI Executive Risk Forecast
-  </h2>
+ <h2 style={{ color: "#00ffc8" }}>
+   AI Executive Risk Forecast
+ </h2>
 
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-      gap: 20,
-      marginTop: 20
-    }}
-  >
-    <Card
-      title="Attack Probability"
-      value={`${riskForecast.probability}%`}
-    />
+ <div
+  style={{
+   display: "grid",
+   gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+   gap: 20,
+   marginTop: 20
+  }}
+ >
+  <Card
+   title="Attack Probability"
+   value={`${riskForecast.probability}%`}
+  />
 
-    <Card
-      title="Expected Threats"
-      value={riskForecast.expectedThreats}
-    />
+  <Card
+   title="Expected Threats"
+   value={riskForecast.expectedThreats}
+  />
 
-    <Card
-      title="Predicted Severity"
-      value={riskForecast.predictedSeverity}
-    />
-  </div>
+  <Card
+   title="Predicted Severity"
+   value={riskForecast.predictedSeverity}
+  />
+ </div>
 
-  <div
-    style={{
-      marginTop: 20,
-      padding: 20,
-      borderRadius: 12,
-      background: "#1e293b",
-      color: "#f8fafc"
-    }}
-  >
-    <strong>AI Recommendation</strong>
+ <div
+  style={{
+   marginTop: 20,
+   padding: 20,
+   borderRadius: 12,
+   background: "#1e293b",
+   color: "#f8fafc"
+  }}
+ >
+  <strong>AI Recommendation</strong>
 
-    <p style={{ marginTop: 10 }}>
-      {riskForecast.recommendation}
-    </p>
-  </div>
+  <p style={{ marginTop: 10 }}>
+   {riskForecast.recommendation}
+  </p>
+ </div>
 
 
 </div>
 
 <div
-  style={{
-    marginTop: 60,
-    paddingTop: 30,
-    clear: "both"
-  }}
+ style={{
+  marginTop: 60,
+  paddingTop: 30,
+  clear: "both"
+ }}
 >
-  <h2
-    style={{
-      color: "#00ffc8",
-      marginBottom: 25
-    }}
-  >
-    🌐 Live Executive Attack Graph
-  </h2>
+ <h2
+  style={{
+   color: "#00ffc8",
+   marginBottom: 25
+  }}
+ >
+   Live Executive Attack Graph
+ </h2>
 <div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-    gap: 15,
-    marginTop: 20,
-    marginBottom: 20
-  }}
+ style={{
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+  gap: 15,
+  marginTop: 20,
+  marginBottom: 20
+ }}
 >
-  <Card title="Attack Nodes" value={attackStats.totalNodes} />
-  <Card title="Attack Links" value={attackStats.totalLinks} />
-  <Card title="Critical Nodes" value={attackStats.criticalNodes} />
-  <Card title="Active Chains" value={attackStats.activeChains} />
+ <Card title="Attack Nodes" value={attackStats.totalNodes} />
+ <Card title="Attack Links" value={attackStats.totalLinks} />
+ <Card title="Critical Nodes" value={attackStats.criticalNodes} />
+ <Card title="Active Chains" value={attackStats.activeChains} />
 </div>
 
 
 
 <div
-  style={{
-    height: 550,
-    width: "100%",
-    overflow: "hidden",
-    marginBottom: 60
-  }}
+ style={{
+  height: 550,
+  width: "100%",
+  overflow: "hidden",
+  marginBottom: 60
+ }}
 >
 
 <AttackGraph
-  graphRef={graphRef}
-  attackGraph={attackGraph}
-  activeAttackPath={activeAttackPath}
-  highlightNodes={highlightNodes}
-  selectedNode={selectedNode}
-  setSelectedNode={setSelectedNode}
-  setSelectedIncident={setSelectedIncident}
-  setHighlightNodes={setHighlightNodes}
-  setHighlightLinks={setHighlightLinks}
-  updateKillChain={updateKillChain}
+ graphRef={graphRef}
+ attackGraph={attackGraph}
+ activeAttackPath={activeAttackPath}
+ highlightNodes={highlightNodes}
+ selectedNode={selectedNode}
+ setSelectedNode={setSelectedNode}
+ setSelectedIncident={setSelectedIncident}
+ setHighlightNodes={setHighlightNodes}
+ setHighlightLinks={setHighlightLinks}
+ updateKillChain={updateKillChain}
 />
 
 </div>
 {selectedNode && (
-  <div
-    style={{
-      marginTop: 20,
-      background: "#0f172a",
-      padding: 20,
-      borderRadius: 12,
-      border: "1px solid #334155"
-    }}
+ <div
+  style={{
+   marginTop: 20,
+   background: "#0f172a",
+   padding: 20,
+   borderRadius: 12,
+   border: "1px solid #334155"
+  }}
+ >
+  <h3 style={{ color: "#00ffc8" }}>
+   Threat Details
+  </h3>
+
+  <p>
+   <b>Category:</b> {selectedNode.category}
+  </p>
+
+  <p>
+   <b>Risk Score:</b> {selectedNode.max_score ?? selectedNode.score}
+  </p>
+
+  <p>
+   <b>ID:</b> {selectedNode.id}
+  </p>
+
+  <button
+   onClick={() => setSelectedNode(null)}
+   style={{
+    marginTop: 15,
+    padding: "10px 16px",
+    background: "#ef4444",
+    color: "#fff",
+    border: "none",
+    borderRadius: 8,
+    cursor: "pointer"
+   }}
   >
-    <h3 style={{ color: "#00ffc8" }}>
-      Threat Details
-    </h3>
-
-    <p>
-      <b>Category:</b> {selectedNode.category}
-    </p>
-
-    <p>
-      <b>Risk Score:</b> {selectedNode.max_score ?? selectedNode.score}
-    </p>
-
-    <p>
-      <b>ID:</b> {selectedNode.id}
-    </p>
-
-    <button
-      onClick={() => setSelectedNode(null)}
-      style={{
-        marginTop: 15,
-        padding: "10px 16px",
-        background: "#ef4444",
-        color: "#fff",
-        border: "none",
-        borderRadius: 8,
-        cursor: "pointer"
-      }}
-    >
-      Close
-    </button>
-  </div>
+   Close
+  </button>
+ </div>
 )}
 </div>
 
@@ -3234,80 +3270,80 @@ textAlign:"center"
 <div style={{ height: 70 }} />
 
 <div
-  style={{
-    clear: "both",
-    display: "block",
-    width: "100%",
-    marginTop: 80,
-    background: "#111827",
-    borderRadius: 16,
-    padding: 20,
-    border: "1px solid #334155"
-  }}
+ style={{
+  clear: "both",
+  display: "block",
+  width: "100%",
+  marginTop: 80,
+  background: "#111827",
+  borderRadius: 16,
+  padding: 20,
+  border: "1px solid #334155"
+ }}
 >
 
 <h2 style={{ color: "#00ffc8" }}>
-🎬 AI Attack Replay
+AI Attack Replay
 </h2>
 <div
-  style={{
-    display: "flex",
-    gap: 12,
-    alignItems: "center",
-    flexWrap: "wrap",
-    marginBottom: 20
-  }}
+ style={{
+  display: "flex",
+  gap: 12,
+  alignItems: "center",
+  flexWrap: "wrap",
+  marginBottom: 20
+ }}
 >
 
 <button
-  onClick={() => setReplayRunning(true)}
-  disabled={replayRunning || attackReplay.length === 0}
-  style={{
-    padding: "12px 20px",
-    background: "#00ffc8",
-    border: "none",
-    borderRadius: 10,
-    fontWeight: "bold",
-    cursor: "pointer"
-  }}
+ onClick={() => setReplayRunning(true)}
+ disabled={replayRunning || attackReplay.length === 0}
+ style={{
+  padding: "12px 20px",
+  background: "#00ffc8",
+  border: "none",
+  borderRadius: 10,
+  fontWeight: "bold",
+  cursor: "pointer"
+ }}
 >
-▶ Start Replay
+Start Replay
 </button>
 
 <button
-  onClick={() => setReplayRunning(false)}
-  style={{
-    padding: "12px 20px",
-    background: "#f59e0b",
-    border: "none",
-    borderRadius: 10,
-    fontWeight: "bold",
-    cursor: "pointer"
-  }}
+ onClick={() => setReplayRunning(false)}
+ style={{
+  padding: "12px 20px",
+  background: "#f59e0b",
+  border: "none",
+  borderRadius: 10,
+  fontWeight: "bold",
+  cursor: "pointer"
+ }}
 >
-⏸ Pause
+Pause
 </button>
 
 <button
-  onClick={() => {
-    setReplayRunning(false);
-    setReplayIndex(0);
-    setReplayGraph({
-      nodes: [],
-      links: []
-    });
-  }}
-  style={{
-    padding: "12px 20px",
-    background: "#ef4444",
-    color: "#fff",
-    border: "none",
-    borderRadius: 10,
-    fontWeight: "bold",
-    cursor: "pointer"
-  }}
+ onClick={() => {
+  setReplayRunning(false);
+  setReplayIndex(0);
+  setReplayGraph({
+   nodes: [],
+   links: []
+  });
+ }}
+ style={{
+  padding: "12px 20px",
+  background: "#ef4444",
+  color: "#fff",
+  border: "none",
+  borderRadius: 10,
+  fontWeight: "bold",
+  cursor: "pointer"
+ }}
 >
-⟲ Reset
+Reset
 </button>
 
 <label style={{ marginLeft: 15 }}>
@@ -3315,17 +3351,17 @@ Replay Speed
 </label>
 
 <select
-  value={replaySpeed}
-  onChange={(e)=>setReplaySpeed(Number(e.target.value))}
-  style={{
-    padding:8,
-    borderRadius:8
-  }}
+ value={replaySpeed}
+ onChange={(e)=>setReplaySpeed(Number(e.target.value))}
+ style={{
+  padding:8,
+  borderRadius:8
+ }}
 >
-  <option value={1500}>Slow</option>
-  <option value={1000}>Normal</option>
-  <option value={500}>Fast</option>
-  <option value={200}>Extreme</option>
+ <option value={1500}>Slow</option>
+ <option value={1000}>Normal</option>
+ <option value={500}>Fast</option>
+ <option value={200}>Extreme</option>
 </select>
 
 </div>
@@ -3334,14 +3370,14 @@ Replay Speed
 Replay Progress: {replayIndex} / {attackReplay.length}
 </p>
 <div
-  style={{
-    marginTop: 20,
-    marginBottom: 20,
-    display: "flex",
-    gap: 8,
-    overflowX: "auto",
-    paddingBottom: 10
-  }}
+ style={{
+  marginTop: 20,
+  marginBottom: 20,
+  display: "flex",
+  gap: 8,
+  overflowX: "auto",
+  paddingBottom: 10
+ }}
 >
 
 {attackReplay.map((item, index) => (
@@ -3378,16 +3414,16 @@ Risk {item.max_score ?? item.score}
 
 </div>
 <h2 style={{ color: "#00ffc8" }}>
-🌍 Global Threat Intelligence
+ Global Threat Intelligence
 </h2>
 
 <div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))",
-    gap: 15,
-    marginTop: 20
-  }}
+ style={{
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))",
+  gap: 15,
+  marginTop: 20
+ }}
 >
 
 {threatMap.map((item,index)=>(
@@ -3411,7 +3447,7 @@ transition:"0.3s"
 >
 
 <h3>
-🌍 {item.country}
+ {item.country}
 </h3>
 
 <p>
@@ -3447,7 +3483,7 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-🌎 Country Intelligence
+Ž Country Intelligence
 </h2>
 
 <p>
@@ -3489,22 +3525,22 @@ Close
 )}
 
 <div
-  style={{
-    marginTop: 40,
-    background: "#111827",
-    borderRadius: 16,
-    padding: 20,
-    border: "1px solid #334155"
-  }}
+ style={{
+  marginTop: 40,
+  background: "#111827",
+  borderRadius: 16,
+  padding: 20,
+  border: "1px solid #334155"
+ }}
 >
 
 <h2 style={{ color: "#00ffc8" }}>
-📈 AI Risk Forecast (Next 7 Days)
+AI Risk Forecast (Next 7 Days)
 </h2>
 
 <ResponsiveContainer
-  width="100%"
-  height={320}
+ width="100%"
+ height={320}
 >
 
 <LineChart data={forecast}>
@@ -3516,10 +3552,10 @@ Close
 <Tooltip />
 
 <Line
-  type="monotone"
-  dataKey="risk"
-  stroke="#00ffc8"
-  strokeWidth={3}
+ type="monotone"
+ dataKey="risk"
+ stroke="#00ffc8"
+ strokeWidth={3}
 />
 
 </LineChart>
@@ -3528,14 +3564,14 @@ Close
 
 </div>
 <div
-  style={{
-    marginTop:40,
-    background:"#111827",
-    border:"2px solid #00ffc8",
-    borderRadius:18,
-    padding:30,
-    boxShadow:"0 0 25px rgba(0,255,200,0.15)"
-  }}
+ style={{
+  marginTop:40,
+  background:"#111827",
+  border:"2px solid #00ffc8",
+  borderRadius:18,
+  padding:30,
+  boxShadow:"0 0 25px rgba(0,255,200,0.15)"
+ }}
 >
 
 <h2
@@ -3545,7 +3581,7 @@ fontSize:28,
 marginBottom:20
 }}
 >
-🤖 Executive AI Copilot
+ Executive AI Copilot
 </h2>
 
 <p
@@ -3558,54 +3594,54 @@ Ask questions about incidents, risks, trends or executive security posture.
 </p>
 
 <input
-  value={question}
-  onChange={(e)=>setQuestion(e.target.value)}
-  placeholder="Ask about security posture..."
-  style={{
-    width:"75%",
-    fontSize:16,
-    padding:12,
-    borderRadius:8,
-    background:"#0f172a",
-    color:"#fff",
-    border:"1px solid #334155"
-  }}
+ value={question}
+ onChange={(e)=>setQuestion(e.target.value)}
+ placeholder="Ask about security posture..."
+ style={{
+  width:"75%",
+  fontSize:16,
+  padding:12,
+  borderRadius:8,
+  background:"#0f172a",
+  color:"#fff",
+  border:"1px solid #334155"
+ }}
 />
 
 <button
-  onClick={askCopilot}
-  disabled={copilotLoading}
-  style={{
-    marginLeft:10,
-    padding:"12px 18px",
-    background:"#00ffc8",
+ onClick={askCopilot}
+ disabled={copilotLoading}
+ style={{
+  marginLeft:10,
+  padding:"12px 18px",
+  background:"#00ffc8",
 color:"#000",
 fontSize:16,
 fontWeight:"bold",
 cursor:"pointer",
-    border:"none",
-    borderRadius:8,
-    fontWeight:"bold"
-  }}
+  border:"none",
+  borderRadius:8,
+  fontWeight:"bold"
+ }}
 >
-  {copilotLoading ? "Thinking..." : "Ask"}
+ {copilotLoading ? "Thinking..." : "Ask"}
 </button>
 
 <div
-  style={{
-    marginTop:20,
-    background:"#0f172a",
-    color:"#fff",
-    padding:20,
-    borderRadius:12,
-    border:"1px solid #334155",
-    whiteSpace:"pre-wrap",
-    minHeight:180,
-    fontSize:15,
-    lineHeight:1.8
-  }}
+ style={{
+  marginTop:20,
+  background:"#0f172a",
+  color:"#fff",
+  padding:20,
+  borderRadius:12,
+  border:"1px solid #334155",
+  whiteSpace:"pre-wrap",
+  minHeight:180,
+  fontSize:15,
+  lineHeight:1.8
+ }}
 >
-  {copilot || "Ask a question to Executive AI Copilot..."}
+ {copilot || "Ask a question to Executive AI Copilot..."}
 </div>
 
 </div>
@@ -3619,34 +3655,45 @@ cursor:"pointer",
 }
 
 function Card({ title, value }) {
-  return (
-    <div
-      style={{
-        background: "#111827",
-        border: "1px solid #334155",
-        borderRadius: 16,
-        padding: 18,
-        textAlign: "center"
-      }}
-    >
-      <div
-        style={{
-          color: "#94a3b8",
-          marginBottom: 10
-        }}
-      >
-        {title}
-      </div>
+ return (
+  <div
+   style={{
+    background: "#111827",
+    border: "1px solid #334155",
+    borderRadius: 16,
+    padding: 18,
+    textAlign: "center"
+   }}
+  >
+   <div
+    style={{
+     color: "#94a3b8",
+     marginBottom: 10
+    }}
+   >
+    {title}
+   </div>
 
-      <div
-        style={{
-          fontSize: 24,
-          color: "#00ffc8",
-          fontWeight: "bold"
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
+   <div
+    style={{
+     fontSize: 24,
+     color: "#00ffc8",
+     fontWeight: "bold"
+    }}
+   >
+    {value}
+   </div>
+  </div>
+ );
 }
+
+
+
+
+
+
+
+
+
+
+
