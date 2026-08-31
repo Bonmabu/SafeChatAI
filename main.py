@@ -4852,27 +4852,27 @@ def executive_dashboard():
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM scans")
-    total_scans = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) AS total FROM scans")
+    total_scans = cursor.fetchone()["total"]
 
-    cursor.execute("SELECT COUNT(*) FROM alerts")
-    total_alerts = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) AS total FROM alerts")
+    total_alerts = cursor.fetchone()["total"]
 
-    cursor.execute("SELECT COUNT(*) FROM incidents")
-    total_incidents = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) AS total FROM incidents")
+    total_incidents = cursor.fetchone()["total"]
 
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE status='OPEN'
     """)
-    open_incidents = cursor.fetchone()[0]
+    open_incidents = cursor.fetchone()["total"]
 
     cursor.execute("""
-        SELECT AVG(risk_score)
+        SELECT AVG(risk_score) AS avg_risk
         FROM scans
     """)
-    avg_risk = cursor.fetchone()[0] or 0
+    avg_risk = cursor.fetchone()["avg_risk"] or 0
 
     security_score = max(0, 100 - avg_risk)
 
@@ -4886,6 +4886,7 @@ def executive_dashboard():
         "total_incidents": total_incidents,
         "open_incidents": open_incidents
     }
+
 @app.get("/executive/risk-trend")
 def executive_risk_trend():
 
