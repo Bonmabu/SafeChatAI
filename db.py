@@ -456,27 +456,32 @@ def get_executive_kpis():
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM scans")
-    total_scans = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) AS total FROM scans")
+    row = cursor.fetchone()
+    total_scans = row["total"] if row else 0
 
-    cursor.execute("SELECT COUNT(*) FROM alerts")
-    total_alerts = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) AS total FROM alerts")
+    row = cursor.fetchone()
+    total_alerts = row["total"] if row else 0
 
-    cursor.execute("SELECT COUNT(*) FROM incidents")
-    total_incidents = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) AS total FROM incidents")
+    row = cursor.fetchone()
+    total_incidents = row["total"] if row else 0
 
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE status='OPEN'
     """)
-    open_incidents = cursor.fetchone()[0]
+    row = cursor.fetchone()
+    open_incidents = row["total"] if row else 0
 
     cursor.execute("""
-        SELECT AVG(risk_score)
+        SELECT AVG(risk_score) AS average_risk
         FROM scans
     """)
-    avg_risk = cursor.fetchone()[0] or 0
+    row = cursor.fetchone()
+    avg_risk = row["average_risk"] if row and row["average_risk"] is not None else 0
 
     security_score = round(max(0, 100 - avg_risk), 2)
     enterprise_risk = round(avg_risk, 2)
