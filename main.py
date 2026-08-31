@@ -1,4 +1,4 @@
-﻿from fastapi import (
+from fastapi import (
     FastAPI,
     Header,
     Request,
@@ -2516,7 +2516,7 @@ async def analyze(payload: AnalyzeRequest):
         stage=stage,
         mitre=mitre,
         tenant_id=getattr(payload, "tenant_id", "demo"),
-        threat_intel=json.dumps(intel),
+        threat_intel=json.dumps(intel, default=str),
         correlation_id=corr_id
     )
 
