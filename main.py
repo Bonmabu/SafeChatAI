@@ -263,7 +263,7 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
 )
-# Ã°Å¸â€Â PHASE 9 AUTH SYSTEM
+# ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â PHASE 9 AUTH SYSTEM
 INCIDENT_DECLARED = False
 CRISIS_MODE = False
 ACTIVE_SESSIONS = {}
@@ -326,8 +326,8 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        print("Ã°Å¸â€œÂ¡ BROADCAST CALLED")
-        print("Ã°Å¸â€˜Â¥ CONNECTIONS:", len(self.active_connections))
+        print("ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¡ BROADCAST CALLED")
+        print("ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¥ CONNECTIONS:", len(self.active_connections))
 
         dead = []
 
@@ -336,7 +336,7 @@ class ConnectionManager:
                 await connection.send_json(message)
 
             except Exception as e:
-                print("Ã¢ÂÅ’ SEND FAILED:", e)
+                print("ÃƒÂ¢Ã‚ÂÃ…â€™ SEND FAILED:", e)
                 dead.append(connection)
 
         for d in dead:
@@ -1279,7 +1279,7 @@ def predict_breach_risk():
     # -------------------------
     risk_trend = (risk * 0.5) + (incidents * 2) + (alerts * 0.2) + (critical * 3)
 
-    # normalize to 0Ã¢â‚¬â€œ100 scale
+    # normalize to 0ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“100 scale
     forecast_score = min(100, risk_trend)
 
     # -------------------------
@@ -1287,13 +1287,13 @@ def predict_breach_risk():
     # -------------------------
     if forecast_score >= 75:
         probability = "HIGH"
-        window = "0Ã¢â‚¬â€œ24 HOURS"
+        window = "0ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“24 HOURS"
     elif forecast_score >= 50:
         probability = "MEDIUM"
-        window = "1Ã¢â‚¬â€œ3 DAYS"
+        window = "1ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“3 DAYS"
     elif forecast_score >= 25:
         probability = "LOW"
-        window = "3Ã¢â‚¬â€œ7 DAYS"
+        window = "3ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“7 DAYS"
     else:
         probability = "MINIMAL"
         window = "STABLE"
@@ -1322,7 +1322,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         "escalation": False
     }
 
-    # Ã°Å¸â€Â´ CRITICAL THREAT
+    # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â´ CRITICAL THREAT
     if score >= 90:
         decision["level"] = "CRITICAL"
         decision["actions"] = [
@@ -1332,7 +1332,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # Ã°Å¸Å¸Â  HIGH THREAT
+    # ÃƒÂ°Ã…Â¸Ã…Â¸Ã‚Â  HIGH THREAT
     elif score >= 80:
         decision["level"] = "HIGH"
         decision["actions"] = [
@@ -1342,7 +1342,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # Ã°Å¸Å¸Â¡ MEDIUM
+    # ÃƒÂ°Ã…Â¸Ã…Â¸Ã‚Â¡ MEDIUM
     elif score >= 50:
         decision["level"] = "MEDIUM"
         decision["actions"] = [
@@ -1350,7 +1350,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
             "MONITOR BEHAVIOR"
         ]
 
-    # Ã°Å¸Å¸Â¢ LOW
+    # ÃƒÂ°Ã…Â¸Ã…Â¸Ã‚Â¢ LOW
     else:
         decision["level"] = "LOW"
         decision["actions"] = ["LOG ONLY"]
@@ -2005,11 +2005,11 @@ def auto_tune_risk_model():
 
     avg_recent_risk = sum(x["score"] for x in recent[-10:]) / 10
 
-    # Ã°Å¸â€Â´ too many threats Ã¢â€ â€™ increase sensitivity
+    # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â´ too many threats ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ increase sensitivity
     if avg_recent_risk > 80:
         SOC_REASONING_STATE["risk_bias"] += 0.05
 
-    # Ã°Å¸Å¸Â¢ too safe Ã¢â€ â€™ reduce sensitivity
+    # ÃƒÂ°Ã…Â¸Ã…Â¸Ã‚Â¢ too safe ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ reduce sensitivity
     elif avg_recent_risk < 30:
         SOC_REASONING_STATE["risk_bias"] -= 0.03
 
@@ -2121,7 +2121,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
 
     elif category == "Harassment":
         add_graph_edge("User Report", "Harassment")
-    print("Ã¢Å“â€¦ GRAPH NODE ADDED")
+    print("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ GRAPH NODE ADDED")
     print(ATTACK_GRAPH)
 
     build_attack_clusters()
@@ -2135,7 +2135,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
             add_graph_edge(
                 existing_id,
                 corr_id,
-                f"{node['stage']} Ã¢â€ â€™ {stage}"
+                f"{node['stage']} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ {stage}"
             )
 
         elif abs(node.get("max_score", node.get("score", 0)) - score) <= 15:
@@ -2382,7 +2382,7 @@ def autonomous_soc_response(incident_id, category, score):
 async def analyze(payload: AnalyzeRequest):
     global LAST_CORRELATION_ID
 
-    print("Ã°Å¸â€Â¥ ANALYZE ENDPOINT HIT")
+    print("ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ ANALYZE ENDPOINT HIT")
 
     user = {
         "username": "developer",
@@ -3041,7 +3041,7 @@ async def startup():
     add_threat_intel_column()
     train_threat_model()
 
-    # Ã°Å¸â€Â¥ ADD THIS TEST NODE
+    # ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ ADD THIS TEST NODE
     await manager.broadcast({
         "type": "new_threat",
         "node": {
@@ -3052,7 +3052,7 @@ async def startup():
     })
 
     asyncio.create_task(soc_live_loop())
-    print("Ã°Å¸Å¡â‚¬ SOC SYSTEM STARTED")
+    print("ÃƒÂ°Ã…Â¸Ã…Â¡Ã¢â€šÂ¬ SOC SYSTEM STARTED")
 # =========================
 # DASHBOARD UI (MINIMAL)
 # =========================
@@ -3068,7 +3068,7 @@ def ui():
 
     <body style="background:#0b1220;color:white;font-family:Arial;">
 
-        <h1>Ã°Å¸â€Â¥ ENTERPRISE SOC SIEM</h1>
+        <h1>ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ ENTERPRISE SOC SIEM</h1>
 
         <pre id="feed">Connecting...</pre>
 
@@ -3862,7 +3862,7 @@ async def soc_chat(payload: dict):
     return result
 @app.post("/soc-ai-stream")
 async def soc_ai_stream(payload: dict):
-    print("Ã°Å¸â€Â¥ SOC-AI-STREAM ENDPOINT HIT")
+    print("ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ SOC-AI-STREAM ENDPOINT HIT")
 
     request = AnalyzeRequest(
         text=payload.get("text", "")
@@ -4356,7 +4356,7 @@ def ui_incident_timeline(corr_id: str):
 @app.websocket("/ws/soc")
 async def soc_stream(websocket: WebSocket):
 
-    print("Ã°Å¸â€Â¥ /ws/soc CONNECTED")
+    print("ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¥ /ws/soc CONNECTED")
 
     await manager.connect(websocket)
 
@@ -4997,7 +4997,7 @@ def customer_attack_trend(tenant_id: str):
 
     cursor.execute("""
         SELECT
-            strftime('%H:00', incidents.created_at) AS hour,
+            TO_CHAR(incidents.created_at, 'HH24:00') AS hour,
             COUNT(*) AS attacks,
             AVG(scans.risk_score) AS avg_score
         FROM incidents
@@ -7442,7 +7442,7 @@ async def declare_incident():
 
     event = add_executive_event(
         "INCIDENT",
-        "Ã°Å¸Å¡Â¨ Incident declared by Executive Commander",
+        "ÃƒÂ°Ã…Â¸Ã…Â¡Ã‚Â¨ Incident declared by Executive Commander",
         "CRITICAL"
     )
 
@@ -7473,7 +7473,7 @@ async def crisis_mode():
 
     event = add_executive_event(
         "CRISIS",
-        "Ã¢Å¡Â  Enterprise crisis mode activated",
+        "ÃƒÂ¢Ã…Â¡Ã‚Â  Enterprise crisis mode activated",
         "CRITICAL"
     )
 
@@ -7483,7 +7483,7 @@ async def crisis_mode():
 
     return {
         "success":True,
-        "message":"Ã¢Å¡Â  Executive Crisis Mode Activated",
+        "message":"ÃƒÂ¢Ã…Â¡Ã‚Â  Executive Crisis Mode Activated",
         "posture": EXECUTIVE_STATUS
     }
 
@@ -7492,7 +7492,7 @@ async def notify_board():
 
     event = add_executive_event(
         "BOARD",
-        "Ã°Å¸â€œÂ¢ Board members notified",
+        "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¢ Board members notified",
         "HIGH"
     )
 
@@ -7501,7 +7501,7 @@ async def notify_board():
 
     return {
         "success": True,
-        "message": "Ã°Å¸â€œÂ¢ Board Members Notified",
+        "message": "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¢ Board Members Notified",
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -7533,7 +7533,7 @@ async def generate_report():
 
     event = add_executive_event(
         "REPORT",
-        "Ã°Å¸â€œâ€ž Executive security report generated",
+        "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Å¾ Executive security report generated",
         "INFO"
     )
 
@@ -7542,7 +7542,7 @@ async def generate_report():
 
     return {
         "success": True,
-        "message": "Ã°Å¸â€œâ€ž Executive Report Generated",
+        "message": "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Å¾ Executive Report Generated",
         "report": report
     }
 
