@@ -22,26 +22,10 @@ from security_fabric import (
     get_security_events,
     get_security_event,
 )
-from event_correlation import (
-    init_event_correlation,
-    correlate_event,
-    get_event_correlations,
-    get_correlation_cluster,
-    get_correlation_clusters,
-    get_attack_campaign,
-    get_attack_campaigns,
-    get_campaign_timeline,
-)
-from security_fabric import (
-    init_security_fabric,
-    persist_security_event,
-    get_security_events,
-    get_security_event,
-)
 from replay_engine import add_replay_event, get_replay
 from attack_graph import add_event, get_graph
 from fastapi.responses import FileResponse
-from correlation import correlate_event, get_campaigns
+from correlation import get_campaigns as correlation_get_campaigns
 from passlib.context import CryptContext
 from ai.soc_brain import executive_reasoning
 from io import BytesIO
@@ -91,7 +75,7 @@ from threading import Thread
 from prediction_engine import learn, predict
 from kill_chain import analyze_kill_chain
 from sklearn.linear_model import LinearRegression
-from campaign_engine import detect_campaign as engine_detect_campaign, get_campaigns
+from campaign_engine import detect_campaign as engine_detect_campaign, get_campaigns as engine_get_campaigns
 from ai.soc_brain import (
     analyze_pattern,
     predict_next_attack,
@@ -3053,6 +3037,7 @@ async def soc_live_loop():
 async def startup():
     Thread(target=background_siem_processor, daemon=True).start()
     init_db()
+    init_event_correlation()
     add_threat_intel_column()
     train_threat_model()
 
@@ -4547,7 +4532,7 @@ def attack_campaign_investigation(campaign_id: str):
 @app.get("/campaigns")
 def campaigns():
 
-    return get_campaigns()
+    return correlation_get_campaigns()
 @app.get("/prediction")
 def prediction():
 
@@ -7575,6 +7560,7 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
+
 
 
 

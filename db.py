@@ -15,12 +15,21 @@ DATABASE_PATH = os.getenv(
 )
 
 def db_sql(sql):
-    """Use SQLite ? placeholders locally and PostgreSQL %s placeholders when DATABASE_URL is set."""
+    """Use SQLite ? placeholders locally and PostgreSQL %s placeholders on Render."""
     if DATABASE_URL:
         return sql.replace("?", "%s")
     return sql
 
+
 def get_conn():
+    if DATABASE_URL:
+        import psycopg
+        from psycopg.rows import dict_row
+
+        conn = psycopg.connect(DATABASE_URL)
+        conn.row_factory = dict_row
+        return conn
+
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -1342,4 +1351,5 @@ def get_executive_risk_forecast():
             "risk": 43
         }
     ]
+
 
