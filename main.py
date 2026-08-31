@@ -5444,12 +5444,13 @@ def executive_summary():
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS total
         FROM incidents
         WHERE risk_score >= 90
     """)
 
-    critical = cursor.fetchone()[0]
+    row = cursor.fetchone()
+    critical = row["total"] if row else 0
 
     conn.close()
 
