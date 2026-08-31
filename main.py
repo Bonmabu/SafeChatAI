@@ -190,6 +190,10 @@ origins = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+    "https://safechatai-1.onrender.com",
+    FRONTEND_URL,
 ]
 
 app.add_middleware(
@@ -7571,6 +7575,7 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
+
 
 
 
