@@ -584,6 +584,10 @@ setGraphData(prev => {
 
 break;
 
+        case "threat_intelligence":
+            console.log("[THREAT INTELLIGENCE]", msg.data || msg);
+            break;
+
         default:
             console.log("Unknown websocket event",msg);
     }
