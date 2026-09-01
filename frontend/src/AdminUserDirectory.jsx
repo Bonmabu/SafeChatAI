@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 
 const API =
@@ -16,7 +16,7 @@ export default function AdminUserDirectory() {
         localStorage.getItem("access_token");
 
       const res = await axios.get(
-        `${API}/admin/users`,
+        `${API}/executive/users`,
         {
           headers: token
             ? {
