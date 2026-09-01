@@ -1,4 +1,4 @@
-﻿from fastapi import (
+from fastapi import (
     FastAPI,
     Header,
     Request,
@@ -2214,6 +2214,171 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+
+class SignupRequest(BaseModel):
+    full_name: str
+    company_name: str
+    industry: str
+    email: str
+    username: str
+    password: str
+
+
+@app.post("/signup")
+def signup(request: SignupRequest):
+    full_name = request.full_name.strip()
+    company_name = request.company_name.strip()
+    industry = request.industry.strip()
+    email = request.email.strip().lower()
+    username = request.username.strip()
+
+    if not full_name or not company_name or not industry or not email or not username:
+        return {
+            "success": False,
+            "message": "All signup fields are required."
+        }
+
+    if len(request.password) < 8:
+        return {
+            "success": False,
+            "message": "Password must be at least 8 characters."
+        }
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        # Check username
+        cursor.execute(
+            db_sql("SELECT id FROM users WHERE username = ?"),
+            (username,)
+        )
+
+        if cursor.fetchone():
+            return {
+                "success": False,
+                "message": "Username already exists."
+            }
+
+        # Check email
+        cursor.execute(
+            db_sql("SELECT id FROM users WHERE email = ?"),
+            (email,)
+        )
+
+        if cursor.fetchone():
+            return {
+                "success": False,
+                "message": "Email already exists."
+            }
+
+        # Generate tenant ID
+        tenant_id = f"tenant_{username.lower()}"
+
+        # Check tenant
+        cursor.execute(
+            db_sql("SELECT id FROM tenants WHERE tenant_id = ?"),
+            (tenant_id,)
+        )
+
+        if cursor.fetchone():
+            return {
+                "success": False,
+                "message": "Unable to create tenant. Please choose another username."
+            }
+
+        # Create tenant
+        cursor.execute(
+            db_sql("""
+                INSERT INTO tenants (
+                    tenant_id,
+                    company_name,
+                    industry
+                )
+                VALUES (?, ?, ?)
+            """),
+            (
+                tenant_id,
+                company_name,
+                industry
+            )
+        )
+
+        # Hash password
+        password_hash = hash_password(request.password)
+
+        # Create customer user
+        cursor.execute(
+            db_sql("""
+                INSERT INTO users (
+                    username,
+                    full_name,
+                    email,
+                    password_hash,
+                    role,
+                    tenant_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+            """),
+            (
+                username,
+                full_name,
+                email,
+                password_hash,
+                "customer",
+                tenant_id
+            )
+        )
+
+        conn.commit()
+
+        # Immediately authenticate newly-created account
+        token = create_access_token(
+            {
+                "sub": username,
+                "role": "customer",
+                "tenant_id": tenant_id
+            }
+        )
+
+        return {
+            "success": True,
+            "message": "Account created successfully.",
+            "token": token,
+            "role": "customer",
+            "tenant_id": tenant_id
+        }
+
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+
+        print(
+            "SIGNUP DATABASE ERROR:",
+            str(e),
+            flush=True
+        )
+
+        return {
+            "success": False,
+            "message": "Username or email already exists."
+        }
+
+    except Exception as e:
+        conn.rollback()
+
+        print(
+            "SIGNUP ERROR:",
+            str(e),
+            flush=True
+        )
+
+        return {
+            "success": False,
+            "message": "Unable to create account."
+        }
+
+    finally:
+        conn.close()
 
 FAKE_USERS = {
     "admin": {
@@ -7680,4 +7845,3 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
-
