@@ -118,6 +118,44 @@ def get_conn():
 def init_db():
     conn = get_conn()
     cursor = conn.cursor()
+
+    # users table and account/session-control schema
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        full_name TEXT,
+        email TEXT,
+        password_hash TEXT NOT NULL,
+        role TEXT DEFAULT 'customer',
+        tenant_id TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reset_token TEXT,
+        reset_token_expires TIMESTAMP,
+        status TEXT DEFAULT 'active',
+        is_active INTEGER DEFAULT 1,
+        suspended_at TIMESTAMP,
+        blocked_at TIMESTAMP,
+        session_version INTEGER DEFAULT 0,
+        password_reset_required INTEGER DEFAULT 0,
+        mfa_enabled INTEGER DEFAULT 0
+    )
+    """)
+
+    for sql in [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMP",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_required INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled INTEGER DEFAULT 0"
+    ]:
+        try:
+            cursor.execute(sql)
+        except Exception:
+            pass
+
     
 
     # scans table
