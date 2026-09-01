@@ -204,16 +204,13 @@ def status():
     cur = conn.cursor()
 
     cur.execute("SELECT COUNT(*) FROM scans")
-    row = cur.fetchone()
-    scans = row["COUNT(*)"] if row is not None else 0
+    scans = cur.fetchone()[0]
 
     cur.execute("SELECT COUNT(*) FROM alerts")
-    row = cur.fetchone()
-    alerts = row["COUNT(*)"] if row is not None else 0
+    alerts = cur.fetchone()[0]
 
     cur.execute("SELECT COUNT(*) FROM incidents")
-    row = cur.fetchone()
-    incidents = row["COUNT(*)"] if row is not None else 0
+    incidents = cur.fetchone()[0]
 
     conn.close()
 
@@ -2214,171 +2211,6 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-
-class SignupRequest(BaseModel):
-    full_name: str
-    company_name: str
-    industry: str
-    email: str
-    username: str
-    password: str
-
-
-@app.post("/signup")
-def signup(request: SignupRequest):
-    full_name = request.full_name.strip()
-    company_name = request.company_name.strip()
-    industry = request.industry.strip()
-    email = request.email.strip().lower()
-    username = request.username.strip()
-
-    if not full_name or not company_name or not industry or not email or not username:
-        return {
-            "success": False,
-            "message": "All signup fields are required."
-        }
-
-    if len(request.password) < 8:
-        return {
-            "success": False,
-            "message": "Password must be at least 8 characters."
-        }
-
-    conn = get_conn()
-    cursor = conn.cursor()
-
-    try:
-        # Check username
-        cursor.execute(
-            db_sql("SELECT id FROM users WHERE username = ?"),
-            (username,)
-        )
-
-        if cursor.fetchone():
-            return {
-                "success": False,
-                "message": "Username already exists."
-            }
-
-        # Check email
-        cursor.execute(
-            db_sql("SELECT id FROM users WHERE email = ?"),
-            (email,)
-        )
-
-        if cursor.fetchone():
-            return {
-                "success": False,
-                "message": "Email already exists."
-            }
-
-        # Generate tenant ID
-        tenant_id = f"tenant_{username.lower()}"
-
-        # Check tenant
-        cursor.execute(
-            db_sql("SELECT id FROM tenants WHERE tenant_id = ?"),
-            (tenant_id,)
-        )
-
-        if cursor.fetchone():
-            return {
-                "success": False,
-                "message": "Unable to create tenant. Please choose another username."
-            }
-
-        # Create tenant
-        cursor.execute(
-            db_sql("""
-                INSERT INTO tenants (
-                    tenant_id,
-                    company_name,
-                    industry
-                )
-                VALUES (?, ?, ?)
-            """),
-            (
-                tenant_id,
-                company_name,
-                industry
-            )
-        )
-
-        # Hash password
-        password_hash = hash_password(request.password)
-
-        # Create customer user
-        cursor.execute(
-            db_sql("""
-                INSERT INTO users (
-                    username,
-                    full_name,
-                    email,
-                    password_hash,
-                    role,
-                    tenant_id
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-            """),
-            (
-                username,
-                full_name,
-                email,
-                password_hash,
-                "customer",
-                tenant_id
-            )
-        )
-
-        conn.commit()
-
-        # Immediately authenticate newly-created account
-        token = create_access_token(
-            {
-                "sub": username,
-                "role": "customer",
-                "tenant_id": tenant_id
-            }
-        )
-
-        return {
-            "success": True,
-            "message": "Account created successfully.",
-            "token": token,
-            "role": "customer",
-            "tenant_id": tenant_id
-        }
-
-    except sqlite3.IntegrityError as e:
-        conn.rollback()
-
-        print(
-            "SIGNUP DATABASE ERROR:",
-            str(e),
-            flush=True
-        )
-
-        return {
-            "success": False,
-            "message": "Username or email already exists."
-        }
-
-    except Exception as e:
-        conn.rollback()
-
-        print(
-            "SIGNUP ERROR:",
-            str(e),
-            flush=True
-        )
-
-        return {
-            "success": False,
-            "message": "Unable to create account."
-        }
-
-    finally:
-        conn.close()
 
 FAKE_USERS = {
     "admin": {
@@ -5352,16 +5184,13 @@ def debug_customer(tenant_id: str):
     cur = conn.cursor()
 
     cur.execute("SELECT COUNT(*) FROM scans WHERE tenant_id=?", (tenant_id,))
-    row = cur.fetchone()
-    scans = row["COUNT(*)"] if row is not None else 0
+    scans = cur.fetchone()[0]
 
     cur.execute("SELECT COUNT(*) FROM alerts WHERE tenant_id=?", (tenant_id,))
-    row = cur.fetchone()
-    alerts = row["COUNT(*)"] if row is not None else 0
+    alerts = cur.fetchone()[0]
 
     cur.execute("SELECT COUNT(*) FROM incidents WHERE tenant_id=?", (tenant_id,))
-    row = cur.fetchone()
-    incidents = row["COUNT(*)"] if row is not None else 0
+    incidents = cur.fetchone()[0]
 
     conn.close()
 
@@ -5466,78 +5295,37 @@ def executive_decision():
 
     kpi = get_executive_kpis()
 
-    # Enterprise risk remains the overall enterprise risk metric.
-    risk = float(kpi.get("enterprise_risk", 0) or 0)
+    risk = kpi.get("enterprise_risk", 0)
+    top = kpi.get("top_threat", "Unknown")
 
-    # Determine the executive top threat from actual high-risk incidents.
-    # Safe/low-risk events must never become the executive top threat.
-    conn = get_conn()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT category, COUNT(*) AS total
-        FROM incidents
-        WHERE risk_score >= 70
-          AND category IS NOT NULL
-          AND category != 'Safe'
-        GROUP BY category
-        ORDER BY total DESC, MAX(risk_score) DESC
-        LIMIT 1
-    """)
-
-    threat_row = cursor.fetchone()
-
-    conn.close()
-
-    if threat_row is not None:
-        try:
-            top = threat_row["category"]
-        except (KeyError, IndexError, TypeError):
-            try:
-                top = threat_row[0]
-            except (KeyError, IndexError, TypeError):
-                top = "No active high-risk threat"
-    else:
-        top = "No active high-risk threat"
-
-    # Executive risk decision.
     if risk >= 75:
         level = "Critical"
-        recommendation = (
-            "Immediate executive intervention required. "
-            "Prioritize high-risk incidents."
-        )
+        recommendation = "Immediate executive intervention required. Prioritize high-risk incidents."
         change = "Increasing"
-
+        
     elif risk >= 50:
         level = "High"
-        recommendation = (
-            "Review active threats and accelerate remediation."
-        )
+        recommendation = "Review active threats and accelerate remediation."
         change = "Elevated"
 
     elif risk >= 25:
         level = "Medium"
-        recommendation = (
-            "Monitor threat activity and review security controls."
-        )
+        recommendation = "Monitor threat activity and review security controls."
         change = "Stable"
 
     else:
         level = "Low"
-        recommendation = (
-            "Security posture is healthy. Continue monitoring."
-        )
+        recommendation = "Security posture is healthy. Continue monitoring."
         change = "Improving"
+
 
     return {
         "level": level,
         "top_threat": top,
         "risk_change": change,
         "recommendation": recommendation,
-        "enterprise_risk": round(risk, 2)
+        "enterprise_risk": risk
     }
-
 @app.get("/executive/priority-queue")
 def executive_priority_queue():
 
@@ -5831,10 +5619,7 @@ def executive_prediction():
         try:
             predicted = threat_row["category"]
         except (KeyError, IndexError, TypeError):
-            try:
-                predicted = threat_row[0]
-            except (KeyError, IndexError, TypeError):
-                predicted = "No active threat"
+            predicted = "No active threat"
     else:
         predicted = "No active threat"
 
@@ -6096,16 +5881,10 @@ def executive_strategy():
 
 
     cursor.execute("""
-        SELECT
-            category,
-            COUNT(*) AS total,
-            MAX(risk_score) AS max_risk,
-            AVG(risk_score) AS avg_risk
+        SELECT category, COUNT(*) as total
         FROM incidents
-        WHERE category IS NOT NULL
-          AND LOWER(category) != 'safe'
         GROUP BY category
-        ORDER BY max_risk DESC, avg_risk DESC, total DESC
+        ORDER BY total DESC
         LIMIT 3
     """)
 
@@ -6970,11 +6749,7 @@ def admin_change_user_status(
 ):
     status = status.strip().lower()
 
-    allowed = {
-        "active",
-        "suspended",
-        "blocked"
-    }
+    allowed = {"active", "suspended", "blocked"}
 
     if status not in allowed:
         raise HTTPException(
@@ -7120,12 +6895,12 @@ def admin_force_logout(
 
         return {
             "success": True,
-            "message": "All user sessions have been revoked."
+            "user_id": user_id,
+            "message": "All active sessions have been revoked."
         }
 
     finally:
         conn.close()
-
 
 @app.patch("/admin/users/{user_id}/role")
 def admin_change_user_role(
@@ -7845,3 +7620,4 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
+
