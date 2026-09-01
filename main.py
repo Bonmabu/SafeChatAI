@@ -1701,30 +1701,32 @@ def build_executive_payload():
 
     # Active threats
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM incidents
-        WHERE status='OPEN'
+        WHERE status = 'OPEN'
     """)
-    active_threats = cursor.fetchone()[0]
+    row = cursor.fetchone()
+    active_threats = row["count"] if row is not None else 0
 
     # Critical alerts
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM scans
         WHERE risk_score >= 90
     """)
-    critical_alerts = cursor.fetchone()[0]
+    row = cursor.fetchone()
+    critical_alerts = row["count"] if row is not None else 0
 
     # Blocked attacks
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM incidents
-        WHERE status='BLOCKED'
+        WHERE status = 'BLOCKED'
     """)
-    blocked_attacks = cursor.fetchone()[0]
+    row = cursor.fetchone()
+    blocked_attacks = row["count"] if row is not None else 0
 
     conn.close()
-
     return {
         "type": "executive_dashboard",
         "timestamp": datetime.utcnow().isoformat(),
@@ -5293,37 +5295,78 @@ def executive_decision():
 
     kpi = get_executive_kpis()
 
-    risk = kpi.get("enterprise_risk", 0)
-    top = kpi.get("top_threat", "Unknown")
+    # Enterprise risk remains the overall enterprise risk metric.
+    risk = float(kpi.get("enterprise_risk", 0) or 0)
 
+    # Determine the executive top threat from actual high-risk incidents.
+    # Safe/low-risk events must never become the executive top threat.
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT category, COUNT(*) AS total
+        FROM incidents
+        WHERE risk_score >= 70
+          AND category IS NOT NULL
+          AND category != 'Safe'
+        GROUP BY category
+        ORDER BY total DESC, MAX(risk_score) DESC
+        LIMIT 1
+    """)
+
+    threat_row = cursor.fetchone()
+
+    conn.close()
+
+    if threat_row is not None:
+        try:
+            top = threat_row["category"]
+        except (KeyError, IndexError, TypeError):
+            try:
+                top = threat_row[0]
+            except (KeyError, IndexError, TypeError):
+                top = "No active high-risk threat"
+    else:
+        top = "No active high-risk threat"
+
+    # Executive risk decision.
     if risk >= 75:
         level = "Critical"
-        recommendation = "Immediate executive intervention required. Prioritize high-risk incidents."
+        recommendation = (
+            "Immediate executive intervention required. "
+            "Prioritize high-risk incidents."
+        )
         change = "Increasing"
-        
+
     elif risk >= 50:
         level = "High"
-        recommendation = "Review active threats and accelerate remediation."
+        recommendation = (
+            "Review active threats and accelerate remediation."
+        )
         change = "Elevated"
 
     elif risk >= 25:
         level = "Medium"
-        recommendation = "Monitor threat activity and review security controls."
+        recommendation = (
+            "Monitor threat activity and review security controls."
+        )
         change = "Stable"
 
     else:
         level = "Low"
-        recommendation = "Security posture is healthy. Continue monitoring."
+        recommendation = (
+            "Security posture is healthy. Continue monitoring."
+        )
         change = "Improving"
-
 
     return {
         "level": level,
         "top_threat": top,
         "risk_change": change,
         "recommendation": recommendation,
-        "enterprise_risk": risk
+        "enterprise_risk": round(risk, 2)
     }
+
 @app.get("/executive/priority-queue")
 def executive_priority_queue():
 
@@ -5579,8 +5622,9 @@ def executive_prediction():
     conn = get_conn()
     cursor = conn.cursor()
 
+    # Highest-risk active threat category
     cursor.execute("""
-        SELECT category, COUNT(*) as total
+        SELECT category, COUNT(*) AS total
         FROM incidents
         WHERE risk_score >= 70
         GROUP BY category
@@ -5588,44 +5632,60 @@ def executive_prediction():
         LIMIT 1
     """)
 
-    row = cursor.fetchone()
+    threat_row = cursor.fetchone()
 
-
+    # Average incident risk
     cursor.execute("""
-        SELECT AVG(risk_score)
+        SELECT AVG(risk_score) AS avg_risk
         FROM incidents
     """)
 
-    avg = cursor.fetchone()[0] or 0
+    avg_row = cursor.fetchone()
+
+    if avg_row is not None:
+        try:
+            avg = float(avg_row["avg_risk"] or 0)
+        except (KeyError, IndexError, TypeError):
+            try:
+                avg = float(avg_row[0] or 0)
+            except (KeyError, IndexError, TypeError):
+                avg = 0
+    else:
+        avg = 0
 
     conn.close()
 
-
-    if row:
-        predicted = row["category"]
+    # Predicted threat
+    if threat_row is not None:
+        try:
+            predicted = threat_row["category"]
+        except (KeyError, IndexError, TypeError):
+            try:
+                predicted = threat_row[0]
+            except (KeyError, IndexError, TypeError):
+                predicted = "No active threat"
     else:
         predicted = "No active threat"
 
-
+    # Probability / forecast
     if avg >= 80:
         probability = 90
         forecast = "High probability of continued malicious activity."
-
     elif avg >= 50:
         probability = 65
         forecast = "Moderate threat activity expected."
-
+        forecast = "Moderate threat activity expected."
     else:
         probability = 30
         forecast = "Low threat activity expected."
-
 
     return {
         "predicted_threat": predicted,
         "probability": probability,
         "forecast": forecast,
-        "average_risk": round(avg,2)
+        "average_risk": round(avg, 2)
     }
+
 @app.get("/executive/remediation")
 def executive_remediation():
 
@@ -5866,10 +5926,16 @@ def executive_strategy():
 
 
     cursor.execute("""
-        SELECT category, COUNT(*) as total
+        SELECT
+            category,
+            COUNT(*) AS total,
+            MAX(risk_score) AS max_risk,
+            AVG(risk_score) AS avg_risk
         FROM incidents
+        WHERE category IS NOT NULL
+          AND LOWER(category) != 'safe'
         GROUP BY category
-        ORDER BY total DESC
+        ORDER BY max_risk DESC, avg_risk DESC, total DESC
         LIMIT 3
     """)
 
