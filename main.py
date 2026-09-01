@@ -1410,34 +1410,60 @@ def soc_metrics():
     cur = conn.cursor()
 
     # -------------------------
+    # DATABASE-DRIVER SAFE ROW VALUE
+    # -------------------------
+    def row_value(row, key, default=0):
+        if row is None:
+            return default
+
+        try:
+            return row[key]
+        except (KeyError, IndexError, TypeError):
+            try:
+                return row[0]
+            except (KeyError, IndexError, TypeError):
+                return default
+
+    # -------------------------
     # CORE COUNTS
     # -------------------------
-    cur.execute("SELECT COUNT(*) FROM scans")
-    row = cur.fetchone()
-    scans = row["count"] if row is not None else 0
-
-    cur.execute("SELECT COUNT(*) FROM alerts")
-    alerts = cur.fetchone()[0] or 0
-
-    cur.execute("SELECT COUNT(*) FROM incidents")
-    incidents = cur.fetchone()[0] or 0
+    cur.execute("""
+        SELECT COUNT(*) AS count
+        FROM scans
+    """)
+    scans = row_value(cur.fetchone(), "count", 0) or 0
 
     cur.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
+        FROM alerts
+    """)
+    alerts = row_value(cur.fetchone(), "count", 0) or 0
+
+    cur.execute("""
+        SELECT COUNT(*) AS count
+        FROM incidents
+    """)
+    incidents = row_value(cur.fetchone(), "count", 0) or 0
+
+    cur.execute("""
+        SELECT COUNT(*) AS count
         FROM incidents
         WHERE status = 'OPEN'
     """)
-    open_incidents = cur.fetchone()[0] or 0
+    open_incidents = row_value(cur.fetchone(), "count", 0) or 0
 
     # -------------------------
     # RISK ENGINE
     # -------------------------
-    cur.execute("SELECT AVG(risk_score) FROM scans")
-    avg_risk = cur.fetchone()[0]
+    cur.execute("""
+        SELECT AVG(risk_score) AS avg_risk
+        FROM scans
+    """)
+    avg_risk = row_value(cur.fetchone(), "avg_risk", 0)
 
     try:
         avg_risk = float(avg_risk or 0)
-    except:
+    except (TypeError, ValueError):
         avg_risk = 0
 
     avg_risk = round(avg_risk, 2)
@@ -1446,11 +1472,15 @@ def soc_metrics():
     # CRITICAL THREATS
     # -------------------------
     cur.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM scans
         WHERE risk_score >= 80
     """)
-    critical_threats = cur.fetchone()[0] or 0
+    critical_threats = row_value(
+        cur.fetchone(),
+        "count",
+        0
+    ) or 0
 
     conn.close()
 
@@ -1492,21 +1522,17 @@ def soc_metrics():
         status = "CRITICAL"
 
     return {
-    "total_scans": scans,
-    "total_alerts": alerts,
-    "total_incidents": incidents,
-    "open_incidents": open_incidents,
-    "avg_risk": avg_risk,
-    "critical_threats": critical_threats,
+        "total_scans": scans,
+        "total_alerts": alerts,
+        "total_incidents": incidents,
+        "open_incidents": open_incidents,
+        "avg_risk": avg_risk,
+        "critical_threats": critical_threats,
+        "security_score": round(soc_health, 2),
+        "soc_health": round(soc_health, 2),
+        "status": status
+    }
 
-    # Frontend expects this
-    "security_score": round(soc_health, 2),
-
-    # Keep this too
-    "soc_health": round(soc_health, 2),
-
-    "status": status
-}
 def train_threat_model():
     conn = get_conn()
     cur = conn.cursor()
