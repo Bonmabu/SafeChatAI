@@ -5518,7 +5518,8 @@ def executive_threat_intelligence():
         WHERE risk_score >= 80
     """)
 
-    high_risk = cursor.fetchone()[0]
+    row = cursor.fetchone()
+    high_risk = row["count"] if row is not None else 0
 
     conn.close()
 
@@ -5763,21 +5764,23 @@ def executive_scorecard():
 
 
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM incidents
         WHERE risk_score >= 80
     """)
 
-    high_risk = cursor.fetchone()[0]
+    row = cursor.fetchone()
+    high_risk = row["count"] if row is not None else 0
 
 
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM incidents
         WHERE status != 'OPEN'
     """)
 
-    resolved = cursor.fetchone()[0]
+    row = cursor.fetchone()
+    resolved = row["count"] if row is not None else 0
 
 
     conn.close()
@@ -7578,4 +7581,6 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
+
+
 
