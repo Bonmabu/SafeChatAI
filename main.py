@@ -3026,7 +3026,13 @@ async def soc_live_loop():
             )
 
         except Exception as e:
-            print("SOC LOOP ERROR:", e)
+            import traceback
+            print("========== SOC LOOP ERROR ==========")
+            print("EXCEPTION TYPE:", type(e).__name__)
+            print("EXCEPTION VALUE:", repr(e))
+            print("EXCEPTION STR:", str(e))
+            traceback.print_exc()
+            print("====================================")
 
         await asyncio.sleep(5)
 # =========================
@@ -5700,24 +5706,23 @@ def executive_compliance():
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM incidents
         WHERE status = 'OPEN'
     """)
 
-    open_incidents = cursor.fetchone()[0]
-
+    row = cursor.fetchone()
+    open_incidents = row["count"] if row is not None else 0
 
     cursor.execute("""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM alerts
     """)
 
-    alerts = cursor.fetchone()[0]
-
+    row = cursor.fetchone()
+    alerts = row["count"] if row is not None else 0
 
     conn.close()
-
 
     if open_incidents >= 40:
         score = 45
@@ -5740,7 +5745,6 @@ def executive_compliance():
             "Maintain current security governance controls."
         )
 
-
     return {
         "compliance_score": score,
         "status": status,
@@ -5748,6 +5752,7 @@ def executive_compliance():
         "total_alerts": alerts,
         "recommendation": recommendation
     }
+
 @app.get("/executive/scorecard")
 def executive_scorecard():
 
@@ -7573,14 +7578,4 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
-
-
-
-
-
-
-
-
-
-
 
