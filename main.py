@@ -1413,7 +1413,8 @@ def soc_metrics():
     # CORE COUNTS
     # -------------------------
     cur.execute("SELECT COUNT(*) FROM scans")
-    scans = cur.fetchone()[0] or 0
+    row = cur.fetchone()
+    scans = row["count"] if row is not None else 0
 
     cur.execute("SELECT COUNT(*) FROM alerts")
     alerts = cur.fetchone()[0] or 0
@@ -5850,11 +5851,12 @@ def executive_strategy():
 
 
     cursor.execute("""
-        SELECT AVG(risk_score)
+        SELECT AVG(risk_score) AS avg_risk
         FROM incidents
     """)
 
-    avg_risk = cursor.fetchone()[0] or 0
+    row = cursor.fetchone()
+    avg_risk = row["avg_risk"] if row is not None else 0
 
 
     conn.close()
@@ -7581,6 +7583,4 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
-
-
 
