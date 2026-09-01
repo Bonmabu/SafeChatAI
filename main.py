@@ -204,13 +204,16 @@ def status():
     cur = conn.cursor()
 
     cur.execute("SELECT COUNT(*) FROM scans")
-    scans = cur.fetchone()[0]
+    row = cur.fetchone()
+    scans = row["COUNT(*)"] if row is not None else 0
 
     cur.execute("SELECT COUNT(*) FROM alerts")
-    alerts = cur.fetchone()[0]
+    row = cur.fetchone()
+    alerts = row["COUNT(*)"] if row is not None else 0
 
     cur.execute("SELECT COUNT(*) FROM incidents")
-    incidents = cur.fetchone()[0]
+    row = cur.fetchone()
+    incidents = row["COUNT(*)"] if row is not None else 0
 
     conn.close()
 
@@ -5184,13 +5187,16 @@ def debug_customer(tenant_id: str):
     cur = conn.cursor()
 
     cur.execute("SELECT COUNT(*) FROM scans WHERE tenant_id=?", (tenant_id,))
-    scans = cur.fetchone()[0]
+    row = cur.fetchone()
+    scans = row["COUNT(*)"] if row is not None else 0
 
     cur.execute("SELECT COUNT(*) FROM alerts WHERE tenant_id=?", (tenant_id,))
-    alerts = cur.fetchone()[0]
+    row = cur.fetchone()
+    alerts = row["COUNT(*)"] if row is not None else 0
 
     cur.execute("SELECT COUNT(*) FROM incidents WHERE tenant_id=?", (tenant_id,))
-    incidents = cur.fetchone()[0]
+    row = cur.fetchone()
+    incidents = row["COUNT(*)"] if row is not None else 0
 
     conn.close()
 
