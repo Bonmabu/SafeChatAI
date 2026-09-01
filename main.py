@@ -5680,7 +5680,6 @@ def executive_prediction():
     elif avg >= 50:
         probability = 65
         forecast = "Moderate threat activity expected."
-        forecast = "Moderate threat activity expected."
     else:
         probability = 30
         forecast = "Low threat activity expected."
