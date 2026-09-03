@@ -1,4 +1,4 @@
-import sqlite3
+﻿import sqlite3
 
 import os
 from dotenv import load_dotenv
@@ -2395,46 +2395,68 @@ def get_replay_events(tenant_id="demo", limit=500):
     conn = get_conn()
     cursor = conn.cursor()
 
-    _ensure_replay_table(cursor)
+    try:
+        _ensure_replay_table(cursor)
 
-    cursor.execute(
-        """
-        SELECT
-            id,
-            tenant_id,
-            replay_time,
-            category,
-            stage,
-            source_ip,
-            hostname,
-            username,
-            created_at
-        FROM threat_replay_events
-        WHERE tenant_id = ?
-        ORDER BY id ASC
-        LIMIT ?
-        """,
-        (str(tenant_id), int(limit))
-    )
+        cursor.execute(
+            """
+            SELECT
+                id,
+                tenant_id,
+                replay_time,
+                category,
+                stage,
+                source_ip,
+                hostname,
+                username,
+                created_at
+            FROM threat_replay_events
+            WHERE tenant_id = ?
+            ORDER BY id ASC
+            LIMIT ?
+            """,
+            (str(tenant_id), int(limit))
+        )
 
-    rows = cursor.fetchall()
-    conn.commit()
-    conn.close()
+        rows = cursor.fetchall()
 
-    return [
-        {
-            "id": row[0],
-            "tenant_id": row[1],
-            "time": row[2],
-            "category": row[3],
-            "stage": row[4],
-            "source_ip": row[5],
-            "hostname": row[6],
-            "username": row[7],
-            "created_at": row[8],
-        }
-        for row in rows
-    ]
+        result = []
+        for row in rows:
+            if hasattr(row, "keys"):
+                keys = list(row.keys())
+                result.append({
+                    "id": row[keys[0]],
+                    "tenant_id": row[keys[1]],
+                    "time": row[keys[2]],
+                    "category": row[keys[3]],
+                    "stage": row[keys[4]],
+                    "source_ip": row[keys[5]],
+                    "hostname": row[keys[6]],
+                    "username": row[keys[7]],
+                    "created_at": row[keys[8]],
+                })
+            else:
+                result.append({
+                    "id": row[0],
+                    "tenant_id": row[1],
+                    "time": row[2],
+                    "category": row[3],
+                    "stage": row[4],
+                    "source_ip": row[5],
+                    "hostname": row[6],
+                    "username": row[7],
+                    "created_at": row[8],
+                })
+
+        conn.commit()
+        return result
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 
 
 def clear_replay_events(tenant_id="demo"):
@@ -2459,3 +2481,4 @@ def clear_replay_events(tenant_id="demo"):
         "tenant_id": str(tenant_id),
         "status": "cleared"
     }
+
