@@ -3592,6 +3592,58 @@ async def analyze(payload: AnalyzeRequest):
     )
 
     print("INCIDENT ID =", incident_id)
+
+    # ---------------------------------------
+    # SECURITY DATA FABRIC + CAMPAIGN CORRELATION
+    # ---------------------------------------
+    try:
+        correlation_event = {
+            "event_id": str(uuid4()),
+            "tenant_id": getattr(payload, "tenant_id", "demo") or "demo",
+            "timestamp": now_ts(),
+            "source": "safechat_analyze",
+            "event_type": "analyze_event",
+            "actor": "developer",
+            "user": "developer",
+            "device": "safechat-analyze",
+            "application": "SafeChat AI",
+            "threat_category": category,
+            "mitre_technique": mitre,
+            "risk_score": score,
+            "confidence": confidence,
+            "severity": status,
+            "status": "OPEN",
+            "correlation_id": corr_id,
+            "evidence": json.dumps({
+                "message": payload.text,
+                "matches": matches
+            }, default=str),
+            "raw_event": json.dumps({
+                "source": "analyze",
+                "category": category,
+                "score": score
+            }, default=str)
+        }
+
+        persisted_correlation_event = persist_security_event(
+            correlation_event
+        )
+
+        correlation_result = correlate_event(
+            persisted_correlation_event
+        )
+
+        print(
+            "SECURITY FABRIC CORRELATION =",
+            correlation_result
+        )
+
+    except Exception as correlation_error:
+        print(
+            "SECURITY FABRIC CORRELATION ERROR =",
+            repr(correlation_error)
+        )
+
 # -------------------------
 # Update attack graph FIRST
 # -------------------------
