@@ -158,13 +158,6 @@ def init_event_correlation():
         )
     """))
 
-    try:
-        cur.execute(db_sql("""
-            ALTER TABLE attack_campaigns
-            ADD COLUMN threat_dna TEXT
-        """))
-    except Exception:
-        pass
 
     cur.execute(db_sql("""
         CREATE TABLE IF NOT EXISTS attack_campaign_edges (
@@ -2068,3 +2061,4 @@ def get_correlation_clusters(
     conn.close()
 
     return [dict(row) for row in rows]
+
