@@ -2632,9 +2632,8 @@ def get_gmail_service():
 
     if gmail_token_hex:
         try:
-            token_json = bytes.fromhex(
-                "".join(gmail_token_hex.split())
-            ).decode("utf-8")
+            gmail_token_hex = "".join(gmail_token_hex.split()).strip('"').strip("'")
+            token_json = bytes.fromhex(gmail_token_hex).decode("utf-8")
             creds = Credentials.from_authorized_user_info(
                 json.loads(token_json),
                 GMAIL_SCOPES
