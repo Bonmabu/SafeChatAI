@@ -952,18 +952,20 @@ def get_threat_anomaly_score():
     last_24h_expression = db_recent_hours_expression("created_at", 24)
 
     cur.execute(f"""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM scans
         WHERE {last_hour_expression}
     """)
-    last_hour = cur.fetchone()[0]
+    row = cur.fetchone()
+    last_hour = row["count"]
 
     cur.execute(f"""
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM scans
         WHERE {last_24h_expression}
     """)
-    last_24h = cur.fetchone()[0]
+    row = cur.fetchone()
+    last_24h = row["count"]
 
     conn.close()
 
