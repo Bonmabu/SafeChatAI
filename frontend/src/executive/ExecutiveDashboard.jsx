@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import ForceGraph2D from "react-force-graph-2d";
 import CountUp from "react-countup";
@@ -34,6 +34,14 @@ import {
 } from "recharts";
 
 const API = import.meta.env.VITE_API_BASE;
+
+const authToken =
+  localStorage.getItem("access_token") ||
+  localStorage.getItem("token") ||
+  localStorage.getItem("jwt");
+
+axios.defaults.headers.common["Authorization"] =
+  authToken ? `Bearer ${authToken}` : "";
 
 const COLORS = [
  "#ef4444",
@@ -1459,7 +1467,7 @@ borderRadius:8
  attackGraph={attackGraph}
 
  securityPosture={securityPosture}
-
+ digitalTwin={digitalTwin}
 />
 
  <div className="executive-grid-wide">
@@ -3686,6 +3694,8 @@ function Card({ title, value }) {
   </div>
  );
 }
+
+
 
 
 

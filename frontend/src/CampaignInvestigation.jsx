@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./CampaignInvestigation.css";
 
 const API_BASE =
@@ -29,6 +29,50 @@ export default function CampaignInvestigation() {
   const [selectedId, setSelectedId] = useState("");
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [investigation, setInvestigation] = useState(null);
+  const [forensicInvestigation, setForensicInvestigation] = useState(null);
+const [evidenceGraph, setEvidenceGraph] = useState(null);
+const [evidenceGraphLoading, setEvidenceGraphLoading] = useState(false);
+    
+  useEffect(() => {
+    let active = true;
+
+    const loadEvidenceGraph = async () => {
+      if (!selectedId) {
+        if (active) setEvidenceGraph(null);
+        return;
+      }
+
+      setEvidenceGraphLoading(true);
+
+      try {
+        const response = await axios.get(
+          `${API_BASE}/forensics/evidence-graph?incident_id=${encodeURIComponent(selectedId)}`,
+          { headers: authHeaders() }
+        );
+
+        if (active) {
+          setEvidenceGraph(response.data);
+        }
+      } catch (err) {
+        console.warn("[EVIDENCE GRAPH] Unavailable:", err);
+        if (active) setEvidenceGraph(null);
+      } finally {
+        if (active) setEvidenceGraphLoading(false);
+      }
+    };
+
+    loadEvidenceGraph();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedId]);
+
+  const [forensicLoading, setForensicLoading] = useState(false);
+const [threatReplay, setThreatReplay] = useState(null);
+const [replayIndex, setReplayIndex] = useState(0);
+const [replayStepData, setReplayStepData] = useState(null);
+
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [eventLoading, setEventLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -78,7 +122,51 @@ export default function CampaignInvestigation() {
     }
   }
 
-  useEffect(() => {
+  const loadReplayStep = async (index) => {
+  try {
+    const response = await axios.get(
+      `${API_BASE}/attack-replay/step?index=${index}`,
+      { headers: authHeaders() }
+    );
+
+    setReplayStepData(response.data);
+    setReplayIndex(response.data?.index ?? index);
+  } catch (err) {
+    console.warn("[REPLAY] Step unavailable:", err);
+  }
+};
+
+useEffect(() => {
+  let active = true;
+
+  const loadThreatReplay = async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE}/attack-replay`,
+        { headers: authHeaders() }
+      );
+
+      if (active) {
+        setThreatReplay(response.data);
+        if ((response.data?.count ?? 0) > 0) {
+          loadReplayStep(0);
+        }
+      }
+    } catch (err) {
+      if (active) {
+        setThreatReplay(null);
+      }
+    }
+  };
+
+  loadThreatReplay();
+
+  return () => {
+    active = false;
+  };
+}, []);
+
+useEffect(() => {
     let active = true;
 
     async function initialLoad() {
@@ -181,6 +269,61 @@ export default function CampaignInvestigation() {
       active = false;
     };
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setForensicInvestigation(null);
+      return;
+    }
+
+    let active = true;
+
+    async function loadForensicInvestigation() {
+      setForensicLoading(true);
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/forensics/investigation/${selectedId}`,
+          {
+            headers: authHeaders(),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Forensic investigation request failed: ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        if (active) {
+          setForensicInvestigation(data);
+        }
+      } catch (err) {
+        console.warn(
+          "[FORENSICS] Investigation unavailable:",
+          err
+        );
+
+        if (active) {
+          setForensicInvestigation(null);
+        }
+      } finally {
+        if (active) {
+          setForensicLoading(false);
+        }
+      }
+    }
+
+    loadForensicInvestigation();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedId]);
+
+
 
   useEffect(() => {
     const configuredWs =
@@ -1105,7 +1248,7 @@ export default function CampaignInvestigation() {
 
                     <strong>
                       {Array.isArray(investigation?.replay)
-                        ? investigation.replay.length
+                        ? (investigation.replay ?? threatReplay?.timeline).length
                         : investigation?.replay?.events?.length ??
                           investigation?.replay?.timeline?.length ??
                           0}
@@ -1192,9 +1335,196 @@ export default function CampaignInvestigation() {
                   {investigation?.replay && (
                     <span>
                       Campaign ? Replay
+
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "8px" }}>
+                      <button
+                        type="button"
+                        disabled={replayIndex <= 0}
+                        onClick={() => loadReplayStep(replayIndex - 1)}
+                      >
+                        Previous
+                      </button>
+
+                      <span>
+                        Step {replayIndex + 1} / {replayStepData?.count ?? threatReplay?.count ?? 0}
+                      </span>
+
+                      <button
+                        type="button"
+                        disabled={
+                          replayIndex >=
+                          ((replayStepData?.count ?? threatReplay?.count ?? 0) - 1)
+                        }
+                        onClick={() => loadReplayStep(replayIndex + 1)}
+                      >
+                        Next
+                      </button>
+                    </div>
+
+                    {replayStepData?.event && (
+                      <div style={{ marginTop: "8px" }}>
+                        <strong>{replayStepData.event.category}</strong>
+                        {" ? "}
+                        {replayStepData.event.stage}
+                      </div>
+                    )}
                     </span>
                   )}
                 </div>
+              </section>
+
+              <section className="campaign-card campaign-card-wide">
+                <div className="campaign-card-header-row">
+                  <div className="campaign-card-title">
+                    ?? Digital Forensics & Evidence Integrity
+                  </div>
+                </div>
+
+                {forensicLoading ? (
+                  <div className="campaign-loading">
+                    Loading forensic investigation...
+                  </div>
+                ) : forensicInvestigation?.success ? (
+                  <div className="campaign-intel-grid">
+                    <div className="campaign-intel-item">
+                      <span>Incident</span>
+                      <strong>
+                        {forensicInvestigation.incident_id || selectedId}
+                      </strong>
+                    </div>
+
+                    <div className="campaign-intel-item">
+                      <span>Evidence Collected</span>
+                      <strong>
+                        {forensicInvestigation.evidence_count || 0}
+                      </strong>
+                    </div>
+
+                    <div className="campaign-intel-item">
+                      <span>Investigation Status</span>
+                      <strong>
+                        {forensicInvestigation.investigation_status || "pending"}
+                      </strong>
+                    </div>
+
+                    <div className="campaign-intel-item">
+                      <span>Evidence Integrity</span>
+                      <strong>
+                        {forensicInvestigation.evidence_integrity || "unknown"}
+                      </strong>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="campaign-empty">
+                    No forensic evidence is currently available for this campaign.
+                  </div>
+                )}
+
+                {forensicInvestigation?.evidence?.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: 20,
+                      maxHeight: 420,
+                      overflowY: "auto",
+                    }}
+                  >
+                    {forensicInvestigation.evidence.map((item) => (
+                      <div
+                        key={item.id}
+                        className="campaign-card"
+                        style={{ marginBottom: 12 }}
+                      >
+                        <div className="campaign-card-header-row">
+                          <strong>
+                            {item.artifact_name || "Evidence Artifact"}
+                          </strong>
+
+                          <span>
+                            {item.artifact_type || "artifact"}
+                          </span>
+                        </div>
+
+                        <div className="campaign-intel-grid">
+                          <div className="campaign-intel-item">
+                            <span>SHA-256 Integrity</span>
+                            <strong>
+                              {item.integrity?.status ||
+                                item.evidence_integrity?.status ||
+                                "unknown"}
+                            </strong>
+                          </div>
+
+                          <div className="campaign-intel-item">
+                            <span>Custody Events</span>
+                            <strong>
+                              {item.custody?.length || 0}
+                            </strong>
+                          </div>
+
+                          <div className="campaign-intel-item">
+                            <span>Chain Status</span>
+                            <strong>
+                              {item.custody_integrity?.status || "unknown"}
+                            </strong>
+                          </div>
+
+                          <div className="campaign-intel-item">
+                            <span>Chain Verified</span>
+                            <strong>
+                              {item.custody_integrity?.verified
+                                ? "VERIFIED"
+                                : "PENDING"}
+                            </strong>
+                          </div>
+                        </div>
+
+                        {item.sha256 && (
+                          <div
+                            style={{
+                              marginTop: 14,
+                              fontFamily: "monospace",
+                              fontSize: 12,
+                              wordBreak: "break-all",
+                            }}
+                          >
+                            SHA-256: {item.sha256}
+                          </div>
+                        )}
+
+                        {item.custody?.length > 0 && (
+                          <div style={{ marginTop: 16 }}>
+                            <strong>Chain of Custody</strong>
+
+                            {item.custody.map((event) => (
+                              <div
+                                key={event.id}
+                                style={{
+                                  marginTop: 10,
+                                  paddingTop: 10,
+                                  borderTop:
+                                    "1px solid rgba(255,255,255,0.08)",
+                                }}
+                              >
+                                <strong>{event.action}</strong>
+
+                                <div>
+                                  {event.from_custodian || "Unknown"} ?{" "}
+                                  {event.to_custodian || "Unknown"}
+                                </div>
+
+                                {event.location && (
+                                  <small>
+                                    Location: {event.location}
+                                  </small>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
 
               {selectedEvent && (

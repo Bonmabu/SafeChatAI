@@ -1,4 +1,4 @@
-﻿import sqlite3
+import sqlite3
 
 import os
 from dotenv import load_dotenv
@@ -1532,3 +1532,927 @@ def get_executive_risk_forecast():
     ]
 
 
+
+
+def save_digital_twin_snapshot(twin, tenant_id="demo"):
+    """Persist the current Digital Twin state."""
+    import json
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS digital_twin_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT DEFAULT 'demo',
+            snapshot TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute(
+        """
+        INSERT INTO digital_twin_snapshots (tenant_id, snapshot)
+        VALUES (?, ?)
+        """,
+        (tenant_id, json.dumps(twin))
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_latest_digital_twin_snapshot(tenant_id="demo"):
+    """Return the latest persisted Digital Twin state."""
+    import json
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS digital_twin_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT DEFAULT 'demo',
+            snapshot TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute(
+        """
+        SELECT snapshot
+        FROM digital_twin_snapshots
+        WHERE tenant_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (tenant_id,)
+    )
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    snapshot = row["snapshot"] if isinstance(row, dict) else row[0]
+    return json.loads(snapshot)
+
+
+
+# ============================================================
+# DIGITAL FORENSICS
+# ============================================================
+
+
+def _ensure_evidence_graph_table(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS evidence_graph (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT DEFAULT 'demo',
+            incident_id TEXT,
+            node_type TEXT,
+            node_key TEXT,
+            node_label TEXT,
+            relation TEXT,
+            source_id TEXT,
+            metadata TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+
+def save_evidence_graph_node(
+    incident_id,
+    node_type,
+    node_key,
+    node_label=None,
+    relation=None,
+    source_id=None,
+    metadata=None,
+    tenant_id="demo"
+):
+    import json
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    _ensure_evidence_graph_table(cursor)
+
+    cursor.execute(
+        """
+        INSERT INTO evidence_graph
+        (
+            tenant_id,
+            incident_id,
+            node_type,
+            node_key,
+            node_label,
+            relation,
+            source_id,
+            metadata
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            str(tenant_id),
+            str(incident_id),
+            str(node_type),
+            str(node_key),
+            node_label,
+            relation,
+            source_id,
+            json.dumps(metadata or {}, default=str)
+        )
+    )
+
+    conn.commit()
+    graph_id = cursor.lastrowid
+    conn.close()
+
+    return {
+        "id": graph_id,
+        "tenant_id": str(tenant_id),
+        "incident_id": str(incident_id),
+        "node_type": str(node_type),
+        "node_key": str(node_key),
+        "node_label": node_label,
+        "relation": relation,
+        "source_id": source_id,
+        "metadata": metadata or {},
+        "status": "stored"
+    }
+
+
+def get_evidence_graph(incident_id=None, tenant_id="demo", limit=500):
+    import json
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    _ensure_evidence_graph_table(cursor)
+
+    if incident_id is None:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                tenant_id,
+                incident_id,
+                node_type,
+                node_key,
+                node_label,
+                relation,
+                source_id,
+                metadata,
+                created_at
+            FROM evidence_graph
+            WHERE tenant_id = ?
+            ORDER BY id ASC
+            LIMIT ?
+            """,
+            (str(tenant_id), int(limit))
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                tenant_id,
+                incident_id,
+                node_type,
+                node_key,
+                node_label,
+                relation,
+                source_id,
+                metadata,
+                created_at
+            FROM evidence_graph
+            WHERE tenant_id = ?
+              AND incident_id = ?
+            ORDER BY id ASC
+            LIMIT ?
+            """,
+            (str(tenant_id), str(incident_id), int(limit))
+        )
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = []
+
+    for row in rows:
+        try:
+            metadata = json.loads(row[8] or "{}")
+        except Exception:
+            metadata = {}
+
+        result.append({
+            "id": row[0],
+            "tenant_id": row[1],
+            "incident_id": row[2],
+            "node_type": row[3],
+            "node_key": row[4],
+            "node_label": row[5],
+            "relation": row[6],
+            "source_id": row[7],
+            "metadata": metadata,
+            "created_at": row[9]
+        })
+
+    return result
+
+def save_forensic_evidence(
+    incident_id,
+    artifact_type,
+    artifact_name,
+    artifact_data=None,
+    sha256=None,
+    source=None,
+    collector=None,
+    tenant_id="demo"
+):
+    """Persist a forensic evidence artifact with integrity metadata."""
+    import json
+    import hashlib
+
+    artifact_data = artifact_data if artifact_data is not None else {}
+
+    if sha256 is None:
+        payload = json.dumps(
+            artifact_data,
+            sort_keys=True,
+            default=str
+        ).encode("utf-8")
+        sha256 = hashlib.sha256(payload).hexdigest()
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS forensic_evidence (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT DEFAULT 'demo',
+            incident_id TEXT NOT NULL,
+            artifact_type TEXT,
+            artifact_name TEXT,
+            artifact_data TEXT,
+            sha256 TEXT,
+            source TEXT,
+            collector TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute(
+        """
+        INSERT INTO forensic_evidence
+        (
+            tenant_id,
+            incident_id,
+            artifact_type,
+            artifact_name,
+            artifact_data,
+            sha256,
+            source,
+            collector
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            tenant_id,
+            str(incident_id),
+            str(artifact_type),
+            str(artifact_name),
+            json.dumps(artifact_data, default=str),
+            str(sha256),
+            source,
+            collector
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "incident_id": str(incident_id),
+        "artifact_type": str(artifact_type),
+        "artifact_name": str(artifact_name),
+        "sha256": str(sha256),
+        "source": source,
+        "collector": collector,
+        "status": "stored"
+    }
+
+
+def get_forensic_evidence(incident_id=None, tenant_id="demo", limit=100):
+    """Return persisted forensic evidence."""
+    import json
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS forensic_evidence (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT DEFAULT 'demo',
+            incident_id TEXT NOT NULL,
+            artifact_type TEXT,
+            artifact_name TEXT,
+            artifact_data TEXT,
+            sha256 TEXT,
+            source TEXT,
+            collector TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    if incident_id is None:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                incident_id,
+                artifact_type,
+                artifact_name,
+                artifact_data,
+                sha256,
+                source,
+                collector,
+                created_at
+            FROM forensic_evidence
+            WHERE tenant_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (tenant_id, int(limit))
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                incident_id,
+                artifact_type,
+                artifact_name,
+                artifact_data,
+                sha256,
+                source,
+                collector,
+                created_at
+            FROM forensic_evidence
+            WHERE tenant_id = ?
+              AND incident_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (tenant_id, str(incident_id), int(limit))
+        )
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = []
+
+    for row in rows:
+        if isinstance(row, dict):
+            item = dict(row)
+        else:
+            item = {
+                "id": row[0],
+                "incident_id": row[1],
+                "artifact_type": row[2],
+                "artifact_name": row[3],
+                "artifact_data": row[4],
+                "sha256": row[5],
+                "source": row[6],
+                "collector": row[7],
+                "created_at": row[8]
+            }
+
+        try:
+            item["artifact_data"] = json.loads(item["artifact_data"])
+        except Exception:
+            pass
+
+        result.append(item)
+
+    return result
+
+
+# ============================================================
+# FORENSIC CHAIN OF CUSTODY
+# ============================================================
+
+def _ensure_forensic_custody_table(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS forensic_custody (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            evidence_id INTEGER NOT NULL,
+            tenant_id TEXT DEFAULT 'demo',
+            action TEXT NOT NULL,
+            from_custodian TEXT,
+            to_custodian TEXT,
+            location TEXT,
+            notes TEXT,
+            previous_hash TEXT,
+            event_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+
+def add_forensic_custody_event(
+    evidence_id,
+    action,
+    from_custodian=None,
+    to_custodian=None,
+    location=None,
+    notes=None,
+    tenant_id="demo"
+):
+    """Append a tamper-evident chain-of-custody event."""
+
+    import hashlib
+    import json
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    _ensure_forensic_custody_table(cursor)
+
+    cursor.execute(
+        """
+        SELECT id
+        FROM forensic_evidence
+        WHERE id = ? AND tenant_id = ?
+        """,
+        (int(evidence_id), tenant_id)
+    )
+
+    evidence = cursor.fetchone()
+
+    if not evidence:
+        conn.close()
+        return {
+            "evidence_id": int(evidence_id),
+            "status": "evidence_not_found"
+        }
+
+    cursor.execute(
+        """
+        SELECT event_hash
+        FROM forensic_custody
+        WHERE evidence_id = ? AND tenant_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (int(evidence_id), tenant_id)
+    )
+
+    previous = cursor.fetchone()
+
+    if previous:
+        if isinstance(previous, dict):
+            previous_hash = previous["event_hash"]
+        else:
+            previous_hash = previous[0]
+    else:
+        previous_hash = "GENESIS"
+
+    payload = {
+        "evidence_id": int(evidence_id),
+        "tenant_id": str(tenant_id),
+        "action": str(action),
+        "from_custodian": from_custodian,
+        "to_custodian": to_custodian,
+        "location": location,
+        "notes": notes,
+        "previous_hash": previous_hash
+    }
+
+    event_hash = hashlib.sha256(
+        json.dumps(
+            payload,
+            sort_keys=True,
+            default=str
+        ).encode("utf-8")
+    ).hexdigest()
+
+    cursor.execute(
+        """
+        INSERT INTO forensic_custody
+        (
+            evidence_id,
+            tenant_id,
+            action,
+            from_custodian,
+            to_custodian,
+            location,
+            notes,
+            previous_hash,
+            event_hash
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            int(evidence_id),
+            tenant_id,
+            str(action),
+            from_custodian,
+            to_custodian,
+            location,
+            notes,
+            previous_hash,
+            event_hash
+        )
+    )
+
+    custody_id = cursor.lastrowid
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "custody_id": custody_id,
+        "evidence_id": int(evidence_id),
+        "action": str(action),
+        "previous_hash": previous_hash,
+        "event_hash": event_hash,
+        "status": "recorded"
+    }
+
+
+def get_forensic_custody(evidence_id, tenant_id="demo"):
+    """Return the complete chain of custody for evidence."""
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    _ensure_forensic_custody_table(cursor)
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            evidence_id,
+            action,
+            from_custodian,
+            to_custodian,
+            location,
+            notes,
+            previous_hash,
+            event_hash,
+            created_at
+        FROM forensic_custody
+        WHERE evidence_id = ?
+          AND tenant_id = ?
+        ORDER BY id ASC
+        """,
+        (int(evidence_id), tenant_id)
+    )
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = []
+
+    for row in rows:
+        result.append(dict(row))
+
+    return result
+
+
+def verify_forensic_custody(evidence_id, tenant_id="demo"):
+    """Verify the hash-linked chain of custody."""
+
+    import hashlib
+    import json
+
+    events = get_forensic_custody(
+        evidence_id,
+        tenant_id
+    )
+
+    previous_hash = "GENESIS"
+
+    for event in events:
+
+        payload = {
+            "evidence_id": int(event["evidence_id"]),
+            "tenant_id": str(tenant_id),
+            "action": str(event["action"]),
+            "from_custodian": event["from_custodian"],
+            "to_custodian": event["to_custodian"],
+            "location": event["location"],
+            "notes": event["notes"],
+            "previous_hash": previous_hash
+        }
+
+        calculated_hash = hashlib.sha256(
+            json.dumps(
+                payload,
+                sort_keys=True,
+                default=str
+            ).encode("utf-8")
+        ).hexdigest()
+
+        if (
+            event["previous_hash"] != previous_hash
+            or event["event_hash"] != calculated_hash
+        ):
+            return {
+                "evidence_id": int(evidence_id),
+                "verified": False,
+                "broken_at": event["id"],
+                "status": "chain_broken"
+            }
+
+        previous_hash = event["event_hash"]
+
+    return {
+        "evidence_id": int(evidence_id),
+        "verified": True,
+        "events": len(events),
+        "latest_hash": previous_hash,
+        "status": "chain_verified"
+    }
+
+
+
+def verify_forensic_evidence(evidence_id, tenant_id="demo"):
+    """Verify the stored forensic artifact hash."""
+    import json
+    import hashlib
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT artifact_data, sha256
+        FROM forensic_evidence
+        WHERE id = ? AND tenant_id = ?
+        """,
+        (int(evidence_id), tenant_id)
+    )
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return {
+            "evidence_id": evidence_id,
+            "verified": False,
+            "status": "not_found"
+        }
+
+    if isinstance(row, dict):
+        artifact_data = row["artifact_data"]
+        stored_hash = row["sha256"]
+    else:
+        artifact_data = row[0]
+        stored_hash = row[1]
+
+    try:
+        parsed = json.loads(artifact_data)
+    except Exception:
+        parsed = artifact_data
+
+    payload = json.dumps(
+        parsed,
+        sort_keys=True,
+        default=str
+    ).encode("utf-8")
+
+    calculated_hash = hashlib.sha256(payload).hexdigest()
+
+    return {
+        "evidence_id": int(evidence_id),
+        "verified": calculated_hash == stored_hash,
+        "stored_sha256": stored_hash,
+        "calculated_sha256": calculated_hash,
+        "status": "verified" if calculated_hash == stored_hash else "integrity_mismatch"
+    }
+
+def save_remediation_audit(incident_id, category, score, actions, status="completed", tenant_id="demo"):
+    """Persist an AI remediation execution record."""
+    import json
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS remediation_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT DEFAULT 'demo',
+            incident_id TEXT,
+            category TEXT,
+            score REAL,
+            actions TEXT NOT NULL,
+            status TEXT DEFAULT 'completed',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute(
+        """
+        INSERT INTO remediation_audit
+        (tenant_id, incident_id, category, score, actions, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            tenant_id,
+            str(incident_id),
+            str(category),
+            float(score or 0),
+            json.dumps(actions or []),
+            status
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_remediation_audit(tenant_id="demo", limit=100):
+    """Return recent AI remediation executions."""
+    import json
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT incident_id, category, score, actions, status, created_at
+        FROM remediation_audit
+        WHERE tenant_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        (tenant_id, int(limit))
+    )
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = []
+
+    for row in rows:
+        if isinstance(row, dict):
+            item = dict(row)
+        else:
+            item = {
+                "incident_id": row[0],
+                "category": row[1],
+                "score": row[2],
+                "actions": row[3],
+                "status": row[4],
+                "created_at": row[5]
+            }
+
+        try:
+            item["actions"] = json.loads(item["actions"])
+        except Exception:
+            pass
+
+        result.append(item)
+
+    return result
+
+
+# ============================================================
+# PHASE 30 ? THREAT REPLAY PERSISTENCE
+# ============================================================
+
+def _ensure_replay_table(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_replay_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT DEFAULT 'demo',
+            replay_time TEXT,
+            category TEXT,
+            stage TEXT,
+            source_ip TEXT,
+            hostname TEXT,
+            username TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+
+def save_replay_event(event, tenant_id="demo"):
+    """Persist a normalized threat replay event."""
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    _ensure_replay_table(cursor)
+
+    cursor.execute(
+        """
+        INSERT INTO threat_replay_events
+        (
+            tenant_id,
+            replay_time,
+            category,
+            stage,
+            source_ip,
+            hostname,
+            username
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            str(tenant_id),
+            event.get("time"),
+            event.get("category"),
+            event.get("stage"),
+            event.get("source_ip"),
+            event.get("hostname"),
+            event.get("username"),
+        )
+    )
+
+    conn.commit()
+    replay_id = cursor.lastrowid
+    conn.close()
+
+    return {
+        "id": replay_id,
+        "tenant_id": str(tenant_id),
+        **event,
+        "status": "stored"
+    }
+
+
+def get_replay_events(tenant_id="demo", limit=500):
+    """Return persisted threat replay events in chronological order."""
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    _ensure_replay_table(cursor)
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            tenant_id,
+            replay_time,
+            category,
+            stage,
+            source_ip,
+            hostname,
+            username,
+            created_at
+        FROM threat_replay_events
+        WHERE tenant_id = ?
+        ORDER BY id ASC
+        LIMIT ?
+        """,
+        (str(tenant_id), int(limit))
+    )
+
+    rows = cursor.fetchall()
+    conn.commit()
+    conn.close()
+
+    return [
+        {
+            "id": row[0],
+            "tenant_id": row[1],
+            "time": row[2],
+            "category": row[3],
+            "stage": row[4],
+            "source_ip": row[5],
+            "hostname": row[6],
+            "username": row[7],
+            "created_at": row[8],
+        }
+        for row in rows
+    ]
+
+
+def clear_replay_events(tenant_id="demo"):
+    """Clear persisted replay events for a tenant."""
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    _ensure_replay_table(cursor)
+
+    cursor.execute(
+        "DELETE FROM threat_replay_events WHERE tenant_id = ?",
+        (str(tenant_id),)
+    )
+
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    return {
+        "deleted": deleted,
+        "tenant_id": str(tenant_id),
+        "status": "cleared"
+    }

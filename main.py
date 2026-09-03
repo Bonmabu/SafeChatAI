@@ -1,4 +1,7 @@
-﻿from pathlib import Path
+from db import get_forensic_evidence, get_forensic_custody, verify_forensic_evidence, verify_forensic_custody
+from db import add_forensic_custody_event, get_forensic_custody, verify_forensic_custody
+from db import save_forensic_evidence, get_forensic_evidence, verify_forensic_evidence
+from pathlib import Path
 from googleapiclient.discovery import build as gmail_build
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -28,7 +31,7 @@ from security_fabric import (
     get_security_events,
     get_security_event,
 )
-from replay_engine import add_replay_event, get_replay
+from replay_engine import add_replay_event, get_replay, replay_timeline, replay_step
 from attack_graph import add_event, get_graph
 from fastapi.responses import FileResponse
 from correlation import get_campaigns as correlation_get_campaigns
@@ -113,7 +116,7 @@ LOCK = threading.Lock()
 from ml_model import predict
 from sklearn.ensemble import IsolationForest
 MODEL = IsolationForest(contamination=0.05)
-from db import create_scan
+from db import create_scan, save_digital_twin_snapshot, get_latest_digital_twin_snapshot, save_remediation_audit
 
 from db import (
     init_db,
@@ -147,6 +150,7 @@ from db import (
     add_threat_intel_column,
     save_incident,
     get_executive_threat_map
+, save_forensic_evidence, get_forensic_evidence, verify_forensic_evidence
 )
 # =========================
 # APPLICATION CONFIGURATION
@@ -208,6 +212,301 @@ pwd_context = CryptContext(
 )
 
 init_db()
+
+
+
+
+# ============================================================
+# PHASE 28 — DIGITAL FORENSICS API
+# ============================================================
+
+
+
+@app.post("/forensics/evidence/{evidence_id}/custody")
+async def create_forensic_custody_event(
+    evidence_id: int,
+    payload: dict
+):
+    """Record a forensic chain-of-custody event."""
+
+    result = add_forensic_custody_event(
+        evidence_id=evidence_id,
+        action=payload.get("action", "UNKNOWN"),
+        from_custodian=payload.get("from_custodian"),
+        to_custodian=payload.get("to_custodian"),
+        location=payload.get("location"),
+        notes=payload.get("notes"),
+        tenant_id=payload.get("tenant_id", "demo")
+    )
+
+    if result.get("status") == "evidence_not_found":
+        raise HTTPException(
+            status_code=404,
+            detail="Forensic evidence not found."
+        )
+
+    return {
+        "success": True,
+        "custody": result
+    }
+
+
+@app.get("/forensics/evidence/{evidence_id}/custody")
+async def list_forensic_custody(
+    evidence_id: int,
+    tenant_id: str = "demo"
+):
+    """Return the complete chain of custody."""
+
+    return {
+        "success": True,
+        "evidence_id": evidence_id,
+        "custody": get_forensic_custody(
+            evidence_id=evidence_id,
+            tenant_id=tenant_id
+        )
+    }
+
+
+@app.get("/forensics/evidence/{evidence_id}/custody/verify")
+async def verify_forensic_custody_api(
+    evidence_id: int,
+    tenant_id: str = "demo"
+):
+    """Verify the hash-linked forensic custody chain."""
+
+    return {
+        "success": True,
+        "verification": verify_forensic_custody(
+            evidence_id=evidence_id,
+            tenant_id=tenant_id
+        )
+    }
+
+
+
+
+# ============================================================
+# PHASE 28 — FORENSIC INVESTIGATION WORKFLOW
+# ============================================================
+
+
+
+@app.get("/forensics/evidence-graph")
+async def evidence_graph(
+    incident_id: str = None,
+    tenant_id: str = "demo",
+    limit: int = 500
+):
+    """Return the persisted evidence graph for an incident or tenant."""
+
+    from db import get_evidence_graph
+
+    nodes = get_evidence_graph(
+        incident_id=incident_id,
+        tenant_id=tenant_id,
+        limit=limit
+    )
+
+    graph_nodes = []
+    graph_edges = []
+
+    for item in nodes:
+        node_id = f"{item.get('node_type')}:{item.get('node_key')}"
+
+        graph_nodes.append({
+            "id": node_id,
+            "type": item.get("node_type"),
+            "key": item.get("node_key"),
+            "label": item.get("node_label") or item.get("node_key"),
+            "metadata": item.get("metadata") or {},
+            "source_id": item.get("source_id")
+        })
+
+        if item.get("source_id"):
+            graph_edges.append({
+                "source": str(item.get("source_id")),
+                "target": node_id,
+                "relation": item.get("relation") or "related_to"
+            })
+
+    return {
+        "success": True,
+        "tenant_id": tenant_id,
+        "incident_id": incident_id,
+        "node_count": len(graph_nodes),
+        "edge_count": len(graph_edges),
+        "nodes": graph_nodes,
+        "edges": graph_edges,
+        "status": "ready"
+    }
+
+
+@app.post("/forensics/evidence-graph")
+async def create_evidence_graph_node(payload: dict):
+    """Persist one Evidence Graph node."""
+
+    from db import save_evidence_graph_node
+
+    result = save_evidence_graph_node(
+        incident_id=payload.get("incident_id"),
+        node_type=payload.get("node_type"),
+        node_key=payload.get("node_key"),
+        node_label=payload.get("node_label"),
+        relation=payload.get("relation"),
+        source_id=payload.get("source_id"),
+        metadata=payload.get("metadata") or {},
+        tenant_id=payload.get("tenant_id", "demo")
+    )
+
+    return {
+        "success": True,
+        "node": result,
+        "status": "stored"
+    }
+
+@app.get("/forensics/investigation/{incident_id}")
+async def forensic_investigation(
+    incident_id: str,
+    tenant_id: str = "demo"
+):
+    """
+    Return the complete forensic investigation view for an incident:
+    evidence, integrity status, custody history and custody integrity.
+    """
+
+    evidence = get_forensic_evidence(
+        incident_id=incident_id,
+        tenant_id=tenant_id,
+        limit=100
+    )
+
+    investigation_evidence = []
+
+    for item in evidence:
+        evidence_id = int(item["id"])
+
+        custody = get_forensic_custody(
+            evidence_id=evidence_id,
+            tenant_id=tenant_id
+        )
+
+        evidence_verification = verify_forensic_evidence(
+            evidence_id=evidence_id,
+            tenant_id=tenant_id
+        )
+
+        custody_verification = verify_forensic_custody(
+            evidence_id=evidence_id,
+            tenant_id=tenant_id
+        )
+
+        investigation_evidence.append({
+            "evidence": item,
+            "custody": custody,
+            "integrity": evidence_verification,
+            "custody_integrity": custody_verification
+        })
+
+        try:
+            from db import save_evidence_graph_node
+
+            evidence_node_key = f"evidence:{evidence_id}"
+
+            save_evidence_graph_node(
+                incident_id=incident_id,
+                node_type="evidence",
+                node_key=evidence_node_key,
+                node_label=item.get("artifact_name") or evidence_node_key,
+                relation="supports",
+                source_id=f"incident:{incident_id}",
+                metadata={
+                    "artifact_type": item.get("artifact_type"),
+                    "sha256": item.get("sha256"),
+                    "source": item.get("source"),
+                    "collector": item.get("collector")
+                },
+                tenant_id=tenant_id
+            )
+        except Exception as exc:
+            print(f"[EVIDENCE GRAPH] Persistence warning: {exc}")
+
+    return {
+        "success": True,
+        "incident_id": incident_id,
+        "tenant_id": tenant_id,
+        "evidence_count": len(investigation_evidence),
+        "evidence": investigation_evidence,
+        "investigation_status": (
+            "verified"
+            if all(
+                item["integrity"].get("verified") is True
+                and item["custody_integrity"].get("verified") is True
+                for item in investigation_evidence
+            )
+            else "integrity_review_required"
+        )
+    }
+
+
+@app.post("/forensics/evidence")
+async def create_forensic_evidence(payload: dict):
+    """Collect and persist a forensic evidence artifact."""
+    incident_id = payload.get("incident_id")
+
+    if not incident_id:
+        raise HTTPException(
+            status_code=400,
+            detail="incident_id is required"
+        )
+
+    result = save_forensic_evidence(
+        incident_id=incident_id,
+        artifact_type=payload.get("artifact_type", "unknown"),
+        artifact_name=payload.get("artifact_name", "unnamed"),
+        artifact_data=payload.get("artifact_data", {}),
+        sha256=payload.get("sha256"),
+        source=payload.get("source", "SOC"),
+        collector=payload.get("collector", "SafeChat AI"),
+        tenant_id=payload.get("tenant_id", "demo")
+    )
+
+    return {
+        "success": True,
+        "evidence": result
+    }
+
+
+@app.get("/forensics/evidence")
+async def list_forensic_evidence(
+    incident_id: str = None,
+    tenant_id: str = "demo",
+    limit: int = 100
+):
+    """Return forensic evidence for an incident or tenant."""
+    return {
+        "success": True,
+        "evidence": get_forensic_evidence(
+            incident_id=incident_id,
+            tenant_id=tenant_id,
+            limit=limit
+        )
+    }
+
+
+@app.get("/forensics/evidence/{evidence_id}/verify")
+async def verify_forensic_evidence_api(
+    evidence_id: int,
+    tenant_id: str = "demo"
+):
+    """Verify forensic evidence integrity using SHA-256."""
+    return {
+        "success": True,
+        "verification": verify_forensic_evidence(
+            evidence_id=evidence_id,
+            tenant_id=tenant_id
+        )
+    }
 
 
 @app.get("/status")
@@ -378,6 +677,16 @@ ATTACK_GRAPH = {
     "clusters": {},
     "last_node": None
 }
+
+DIGITAL_TWIN_CACHE = {}
+
+try:
+    DIGITAL_TWIN_CACHE = {"demo": get_latest_digital_twin_snapshot()}
+    if DIGITAL_TWIN_CACHE.get("demo"):
+        print("[Digital Twin] Latest persisted snapshot restored.")
+except Exception as exc:
+    print(f"[Digital Twin] Restore warning: {exc}")
+
 LAST_ATTACK_NODE = None
 ACTIVE_INCIDENTS = {}
 
@@ -1383,44 +1692,57 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
 
     return decision
 def auto_response_engine(category: str, score: float, corr_id: str):
+    """AI-driven remediation decision engine."""
+
+    category = str(category or "Unknown")
+    score = float(score or 0)
 
     actions = []
 
-    # ---------------- HIGH RISK AUTO RESPONSE ----------------
     if score >= 80:
-        actions.append("BLOCK SOURCE IMMEDIATELY")
-        actions.append("ESCALATE TO SOC LEVEL 2")
-        actions.append("ISOLATE SESSION")
-
-        ensure_timeline(corr_id)
-        ATTACK_TIMELINE[corr_id].append({
-            "type": "auto_response",
-            "action": "BLOCK + ISOLATE",
-            "severity": "CRITICAL",
-            "timestamp": now_ts()
-        })
-
-    # ---------------- MEDIUM RISK ----------------
+        actions = [
+            "QUARANTINE_MESSAGE",
+            "BLOCK_SOURCE",
+            "ESCALATE_INCIDENT",
+            "CREATE_REMEDIATION_TASK"
+        ]
+        priority = "CRITICAL"
+        decision = "Immediate containment and remediation required."
     elif score >= 50:
-        actions.append("INCREASE MONITORING")
-        actions.append("FLAG FOR ANALYST REVIEW")
-
-        ensure_timeline(corr_id)
-        ATTACK_TIMELINE[corr_id].append({
-            "type": "auto_response",
-            "action": "MONITORING MODE",
-            "severity": "MEDIUM",
-            "timestamp": now_ts()
-        })
-
-    # ---------------- LOW RISK ----------------
+        actions = [
+            "FLAG_INCIDENT",
+            "MONITOR_SOURCE",
+            "CREATE_REMEDIATION_TASK"
+        ]
+        priority = "HIGH"
+        decision = "Enhanced monitoring and remediation recommended."
     else:
-        actions.append("LOG ONLY")
+        actions = [
+            "MONITOR_SOURCE"
+        ]
+        priority = "LOW"
+        decision = "Continue monitoring; no aggressive containment required."
 
-    return {
+    remediation = {
+        "correlation_id": corr_id,
         "category": category,
         "score": score,
-        "actions": actions
+        "priority": priority,
+        "decision": decision,
+        "actions": actions,
+        "automated": True,
+        "status": "recommended"
+    }
+
+    return {
+        "type": "auto_response",
+        "correlation_id": corr_id,
+        "category": category,
+        "score": score,
+        "priority": priority,
+        "decision": decision,
+        "actions": actions,
+        "remediation": remediation
     }
 
 
@@ -2769,54 +3091,80 @@ def close_incident(incident_id):
     }
 def autonomous_soc_response(incident_id, category, score):
 
-    actions = SOC_PLAYBOOKS.get(category, [])
+    score = float(score or 0)
+
+    ai_plan = auto_response_engine(
+        category=category,
+        score=score,
+        corr_id=str(incident_id)
+    )
+
+    actions = ai_plan.get("actions", [])
 
     if not actions:
+        actions = SOC_PLAYBOOKS.get(category, [])
 
-        if score >= 90:
-            actions = [
-                "BLOCK_SOURCE",
-                "ISOLATE_ENDPOINT",
-                "ESCALATE_SOC"
-            ]
-
-        elif score >= 80:
-            actions = [
-                "QUARANTINE_MESSAGE",
-                "NOTIFY_ADMIN"
-            ]
-
-        elif score >= 60:
-            actions = [
-                "FLAG_FOR_REVIEW"
-            ]
-
-        else:
-            actions = [
-                "LOG_ONLY"
-            ]
+    executed = []
 
     for action in actions:
 
         if action == "BLOCK_SOURCE":
             block_source(incident_id)
+            executed.append(action)
 
         elif action == "ISOLATE_ENDPOINT":
             isolate_endpoint(incident_id)
+            executed.append(action)
 
         elif action == "QUARANTINE_MESSAGE":
             quarantine_message(incident_id)
+            executed.append(action)
 
         elif action == "NOTIFY_ADMIN":
             notify_admin(incident_id)
+            executed.append(action)
 
         elif action == "FLAG_FOR_REVIEW":
             flag_for_review(incident_id)
+            executed.append(action)
 
-        elif action == "LOG_ONLY":
-            print(f"[SOC] Logged incident {incident_id}")
+        elif action in {"ESCALATE_INCIDENT", "ESCALATE_SOC"}:
+            notify_admin(incident_id)
+            executed.append(action)
 
-    return actions
+        elif action == "CREATE_REMEDIATION_TASK":
+            print(f"[AI REMEDIATION] Task created for incident {incident_id}")
+            executed.append(action)
+
+        elif action in {"MONITOR_SOURCE", "LOG_ONLY"}:
+            print(f"[SOC] Monitoring incident {incident_id}")
+            executed.append(action)
+
+        elif action in {"RESET_CREDENTIALS", "FORCE_MFA", "RUN_AV_SCAN", "DISABLE_NETWORK"}:
+            print(f"[AI REMEDIATION] {action} queued for incident {incident_id}")
+            executed.append(action)
+
+    result = {
+        **ai_plan,
+        "actions": actions,
+        "executed_actions": executed,
+        "execution_status": "completed",
+        "incident_id": incident_id
+    }
+
+    try:
+        save_remediation_audit(
+            incident_id=incident_id,
+            category=category,
+            score=score,
+            actions=executed,
+            status="completed"
+        )
+    except Exception as exc:
+        print(f"[AI REMEDIATION] Audit persistence warning: {exc}")
+
+    return result
+
     class LoginRequest(BaseModel):
         username: str
         password: str
@@ -5814,7 +6162,7 @@ def customer_attack_trend(tenant_id: str = Depends(get_customer_tenant)):
         FROM incidents
         JOIN scans
             ON incidents.scan_id = scans.id
-        WHERE incidents.tenant_id = %s
+        WHERE incidents.tenant_id = ?
         ORDER BY incidents.created_at ASC
     """, (tenant_id,))
 
@@ -8320,32 +8668,87 @@ def build_mitre_matrix():
         "Collection": min(100, round(total * 0.14)),
         "Exfiltration": min(100, round(critical * 0.20))
     }
-def build_enterprise_digital_twin():
+def build_enterprise_digital_twin(tenant_id="demo"):
 
-    return {
-        "Internet": 28,
-        "Firewall": 12,
-        "Email Gateway": 33,
-        "Identity": 24,
-        "Enterprise Servers": 41,
-        "Databases": 18,
-        "Finance": 9,
-        "attack_paths": len(ATTACK_GRAPH["edges"]),
-        "protected_assets": build_security_posture()["protected_assets"]
+    nodes = list(ATTACK_GRAPH.get("nodes", {}).values())
+    edges = ATTACK_GRAPH.get("edges", [])
+
+    asset_keywords = {
+        "Internet": ["internet", "external", "ip", "network", "recon"],
+        "Firewall": ["firewall", "gateway", "blocked", "defense"],
+        "Email Gateway": ["email", "phishing", "spam", "mail"],
+        "Identity": ["identity", "credential", "login", "password"],
+        "Enterprise Servers": ["server", "endpoint", "host", "malware", "ransomware", "execution"],
+        "Databases": ["database", "sql", "collection", "exfiltration"],
+        "Finance": ["bank", "finance", "payment", "fraud"]
     }
 
-# ==============================
-# EXECUTIVE WAR ROOM ACTIONS
-# ==============================
+    def node_text(node):
+        return " ".join(
+            str(node.get(field, ""))
+            for field in ("category", "stage", "mitre", "type", "name", "label")
+        ).lower()
 
-CRISIS_MODE = False
-EXECUTIVE_STATUS = {
-    "posture": "NORMAL",
-    "risk_level": "LOW",
-    "reason": "No active incidents",
-    "updated": datetime.utcnow().isoformat()
-}
+    asset_counts = {}
 
+    for asset, keywords in asset_keywords.items():
+        asset_counts[asset] = sum(
+            1 for node in nodes
+            if any(keyword in node_text(node) for keyword in keywords)
+        )
+
+    asset_paths = []
+
+    for edge in edges:
+        if isinstance(edge, dict):
+            source = str(edge.get("source", ""))
+            target = str(edge.get("target", ""))
+            category = str(edge.get("category", "CORRELATED_ATTACK"))
+        else:
+            continue
+
+        source_text = source.lower()
+        target_text = target.lower()
+
+        matched_assets = [
+            asset for asset, keywords in asset_keywords.items()
+            if any(
+                keyword in source_text or keyword in target_text
+                for keyword in keywords
+            )
+        ]
+
+        for asset in matched_assets:
+            asset_paths.append({
+                "asset": asset,
+                "source": source,
+                "target": target,
+                "category": category
+            })
+
+    twin = {
+        **asset_counts,
+        "attack_paths": len(edges),
+        "protected_assets": build_security_posture()["protected_assets"],
+        "asset_paths": asset_paths,
+        "total_nodes": len(nodes),
+        "total_edges": len(edges)
+    }
+
+    global DIGITAL_TWIN_CACHE
+
+    if nodes or edges:
+        DIGITAL_TWIN_CACHE[tenant_id] = twin
+        try:
+            save_digital_twin_snapshot(twin, tenant_id=tenant_id)
+        except Exception as exc:
+            print(f"[Digital Twin] Persistence warning: {exc}")
+        return twin
+
+    if DIGITAL_TWIN_CACHE.get(tenant_id):
+        return DIGITAL_TWIN_CACHE[tenant_id]
+
+    return twin
 
 def update_executive_posture(
     posture,
@@ -8510,23 +8913,25 @@ async def executive_live_events():
 async def executive_posture():
 
     return EXECUTIVE_STATUS
+@app.get("/attack-replay/step")
+def attack_replay_step(
+    index: int = 0,
+    tenant_id: str = "demo",
+    limit: int = 500
+):
+    return replay_step(
+        index=index,
+        tenant_id=tenant_id,
+        limit=limit
+    )
+
+
 @app.get("/attack-replay")
-def attack_replay():
-
-    return get_replay()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def attack_replay(
+    tenant_id: str = "demo",
+    limit: int = 500
+):
+    return replay_timeline(
+        tenant_id=tenant_id,
+        limit=limit
+    )
