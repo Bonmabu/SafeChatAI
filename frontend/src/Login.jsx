@@ -283,7 +283,7 @@ navigate("/dashboard");
 
     {error && (
       <div className="login-error">
-        <span>âš </span>
+        <span>⚠️ </span>
         <span>{error}</span>
       </div>
     )}
@@ -332,7 +332,7 @@ navigate("/dashboard");
           setError("");
         }}
       >
-        â† Back to sign in
+        ← Back to sign in
       </button>
 
     </div>
@@ -370,7 +370,7 @@ navigate("/dashboard");
           ====================================================== */}
           {error && (
             <div className="login-error">
-              <span>âš </span>
+              <span>⚠️ </span>
               <span>{error}</span>
             </div>
           )}
@@ -413,7 +413,7 @@ navigate("/dashboard");
                 <div className="input-wrapper">
 
                   <span className="input-icon">
-                    â—ˆ
+                    ◈
                   </span>
 
                   <input
@@ -751,7 +751,7 @@ navigate("/dashboard");
 
           <span>SAFECHAT AI SOC</span>
 
-          <span>â€¢</span>
+          <span>•</span>
 
           <span>SECURE ACCESS</span>
 

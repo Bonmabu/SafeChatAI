@@ -219,7 +219,7 @@ init_db()
 
 
 # ============================================================
-# PHASE 28 â€” DIGITAL FORENSICS API
+# PHASE 28 — DIGITAL FORENSICS API
 # ============================================================
 
 
@@ -289,7 +289,7 @@ async def verify_forensic_custody_api(
 
 
 # ============================================================
-# PHASE 28 â€” FORENSIC INVESTIGATION WORKFLOW
+# PHASE 28 — FORENSIC INVESTIGATION WORKFLOW
 # ============================================================
 
 
@@ -577,7 +577,7 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
 )
-# ðŸ” PHASE 9 AUTH SYSTEM
+# 🔍 PHASE 9 AUTH SYSTEM
 INCIDENT_DECLARED = False
 CRISIS_MODE = False
 ACTIVE_SESSIONS = {}
@@ -642,8 +642,8 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        print("ðŸ“¡ BROADCAST CALLED")
-        print("ðŸ‘¥ CONNECTIONS:", len(self.active_connections))
+        print("📡 BROADCAST CALLED")
+        print("👥 CONNECTIONS:", len(self.active_connections))
 
         dead = []
 
@@ -652,7 +652,7 @@ class ConnectionManager:
                 await connection.send_json(message)
 
             except Exception as e:
-                print("âŒ SEND FAILED:", e)
+                print("❌ SEND FAILED:", e)
                 dead.append(connection)
 
         for d in dead:
@@ -1625,7 +1625,7 @@ def predict_breach_risk():
     # -------------------------
     risk_trend = (risk * 0.5) + (incidents * 2) + (alerts * 0.2) + (critical * 3)
 
-    # normalize to 0â€“100 scale
+    # normalize to 0–100 scale
     forecast_score = min(100, risk_trend)
 
     # -------------------------
@@ -1633,13 +1633,13 @@ def predict_breach_risk():
     # -------------------------
     if forecast_score >= 75:
         probability = "HIGH"
-        window = "0â€“24 HOURS"
+        window = "0–24 HOURS"
     elif forecast_score >= 50:
         probability = "MEDIUM"
-        window = "1â€“3 DAYS"
+        window = "1–3 DAYS"
     elif forecast_score >= 25:
         probability = "LOW"
-        window = "3â€“7 DAYS"
+        window = "3–7 DAYS"
     else:
         probability = "MINIMAL"
         window = "STABLE"
@@ -1668,7 +1668,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         "escalation": False
     }
 
-    # ðŸ”´ CRITICAL THREAT
+    # 🔍´ CRITICAL THREAT
     if score >= 90:
         decision["level"] = "CRITICAL"
         decision["actions"] = [
@@ -1678,7 +1678,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # ðŸŸ  HIGH THREAT
+# 🟠 HIGH THREAT
     elif score >= 80:
         decision["level"] = "HIGH"
         decision["actions"] = [
@@ -1688,7 +1688,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # ðŸŸ¡ MEDIUM
+    # 🟡 MEDIUM
     elif score >= 50:
         decision["level"] = "MEDIUM"
         decision["actions"] = [
@@ -1696,7 +1696,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
             "MONITOR BEHAVIOR"
         ]
 
-    # ðŸŸ¢ LOW
+    # 🟢 LOW
     else:
         decision["level"] = "LOW"
         decision["actions"] = ["LOG ONLY"]
@@ -2438,11 +2438,11 @@ def auto_tune_risk_model():
 
     avg_recent_risk = sum(x["score"] for x in recent[-10:]) / 10
 
-    # âš ï¸ too many threats âš ï¸ increase sensitivity
+    # ⚠️ too many threats ⚠️ increase sensitivity
     if avg_recent_risk > 80:
         SOC_REASONING_STATE["risk_bias"] += 0.05
 
-    # ðŸŸ¢ too safe â†’ reduce sensitivity
+    # 🟢 too safe → reduce sensitivity
     elif avg_recent_risk < 30:
         SOC_REASONING_STATE["risk_bias"] -= 0.03
 
@@ -2569,7 +2569,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
 
     elif category == "Harassment":
         add_graph_edge("User Report", "Harassment")
-    print("âœ… GRAPH NODE ADDED")
+    print("✅ GRAPH NODE ADDED")
     print(ATTACK_GRAPH)
 
     build_attack_clusters()
@@ -2583,7 +2583,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
             add_graph_edge(
                 existing_id,
                 corr_id,
-                f"{node['stage']} â†’ {stage}"
+                f"{node['stage']} → {stage}"
             )
 
         elif abs(node.get("max_score", node.get("score", 0)) - score) <= 15:
@@ -3462,7 +3462,7 @@ async def whatsapp_webhook(request: Request):
 async def analyze(payload: AnalyzeRequest):
     global LAST_CORRELATION_ID
 
-    print("ðŸ”Ž ANALYZE ENDPOINT HIT")
+    print("🔍Ž ANALYZE ENDPOINT HIT")
 
     user = {
         "username": "developer",
@@ -4233,7 +4233,7 @@ async def startup():
     add_threat_intel_column()
     train_threat_model()
 
-    # ðŸ§ª ADD THIS TEST NODE
+    # 🧪 ADD THIS TEST NODE
     await manager.broadcast({
         "type": "new_threat",
         "node": {
@@ -4244,7 +4244,7 @@ async def startup():
     })
 
     asyncio.create_task(soc_live_loop())
-    print("ðŸš€ SOC SYSTEM STARTED")
+    print("🚀 SOC SYSTEM STARTED")
 # =========================
 # DASHBOARD UI (MINIMAL)
 # =========================
@@ -4281,7 +4281,7 @@ def ui():
 
     <body style="background:#0b1220;color:white;font-family:Arial;">
 
-        <h1>ðŸ›¡ï¸ ENTERPRISE SOC SIEM</h1>
+        <h1>🛡️ ENTERPRISE SOC SIEM</h1>
 
         <pre id="feed">Connecting...</pre>
 
@@ -5075,7 +5075,7 @@ async def soc_chat(payload: dict):
     return result
 @app.post("/soc-ai-stream")
 async def soc_ai_stream(payload: dict):
-    print("ðŸ¤– SOC-AI-STREAM ENDPOINT HIT")
+    print("🤖 SOC-AI-STREAM ENDPOINT HIT")
 
     request = AnalyzeRequest(
         text=payload.get("text", "")
@@ -5620,7 +5620,7 @@ def ui_incident_timeline(corr_id: str):
 @app.websocket("/ws/soc")
 async def soc_stream(websocket: WebSocket):
 
-    print("ðŸ”Œ /ws/soc CONNECTED")
+    print("🔍Œ /ws/soc CONNECTED")
 
     await manager.connect(websocket)
 
@@ -9329,7 +9329,7 @@ async def declare_incident():
 
     event = add_executive_event(
         "INCIDENT",
-        "ðŸš¨ Incident declared by Executive Commander",
+        "🚨 Incident declared by Executive Commander",
         "CRITICAL"
     )
 
@@ -9360,7 +9360,7 @@ async def crisis_mode():
 
     event = add_executive_event(
         "CRISIS",
-        "âš  Enterprise crisis mode activated",
+        "⚠️  Enterprise crisis mode activated",
         "CRITICAL"
     )
 
@@ -9370,7 +9370,7 @@ async def crisis_mode():
 
     return {
         "success":True,
-        "message":"âš  Executive Crisis Mode Activated",
+        "message":"⚠️  Executive Crisis Mode Activated",
         "posture": EXECUTIVE_STATUS
     }
 
@@ -9379,7 +9379,7 @@ async def notify_board():
 
     event = add_executive_event(
         "BOARD",
-        "ðŸ“¢ Board members notified",
+        "📢 Board members notified",
         "HIGH"
     )
 
@@ -9388,7 +9388,7 @@ async def notify_board():
 
     return {
         "success": True,
-        "message": "ðŸ“¢ Board Members Notified",
+        "message": "📢 Board Members Notified",
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -9420,7 +9420,7 @@ async def generate_report():
 
     event = add_executive_event(
         "REPORT",
-        "ðŸ“„ Executive security report generated",
+        "📄 Executive security report generated",
         "INFO"
     )
 
@@ -9429,7 +9429,7 @@ async def generate_report():
 
     return {
         "success": True,
-        "message": "ðŸ“„ Executive Report Generated",
+        "message": "📄 Executive Report Generated",
         "report": report
     }
 

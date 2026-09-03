@@ -124,7 +124,7 @@ useEffect(() => {
   
 
   ws.onopen = () => {
-    console.log("âœ… WS CONNECTED");
+    console.log("✅ WS CONNECTED");
   };
 
   ws.onmessage = (event) => {
@@ -281,11 +281,11 @@ if (type === "threat_intelligence") {
     links: prev.links
   }));
 
-  return;   // ðŸ”¥ ADD THIS (important)
+  return;   // 🔍¥ ADD THIS (important)
 }
 };
   ws.onerror = (err) => {
-    console.error("âŒ WS ERROR", err);
+    console.error("❌ WS ERROR", err);
   };
 
   ws.onclose = () => {
@@ -556,7 +556,7 @@ table td {
   >
 
     <h2 style={{color:"#38bdf8"}}>
-      ðŸ“ˆ SOC Metrics
+      📈 SOC Metrics
     </h2>
 
     <ResponsiveContainer width="100%" height={300}>
@@ -634,7 +634,7 @@ style={{
   fontWeight:"700"
 }}
 >
-ðŸ¤– AI Threat Intelligence
+🤖 AI Threat Intelligence
 </h2>
 
     <div
@@ -695,7 +695,7 @@ style={{
   fontWeight:"700"
 }}
 >
-ðŸ§  AI SOC Analyst
+🧠  AI SOC Analyst
 </h2>
 
     <div
@@ -716,7 +716,7 @@ style={{
             borderBottom: "1px solid #374151"
           }}
         >
-          âœ… {item}
+          ✅ {item}
         </div>
       ))}
     </div>
@@ -781,19 +781,19 @@ style={{
   fontWeight:"700"
 }}
 >
-ðŸ“„ Incident Reports
+📄 Incident Reports
 </h2>
 
           <div>
             <button onClick={() => window.open(`${API_BASE}/reports/pdf`)}>
-              ðŸ“„ PDF
+              📄 PDF
             </button>
 
             <button
               style={{ marginLeft: 10 }}
               onClick={() => window.open(`${API_BASE}/reports/csv`)}
             >
-              ðŸ“Š CSV
+              📊 CSV
             </button>
           </div>
         </div>
@@ -838,7 +838,7 @@ style={{
   fontWeight:"700"
 }}
 >
-ðŸŽ¯ Threat Hunting Workspace
+🎯 Threat Hunting Workspace
 </h2>
 
   <div
@@ -901,7 +901,7 @@ style={{
       border: "1px solid #334155"
     }}
   >
-    <h2>ðŸ•µï¸ Investigation Workspace</h2>
+    <h2>🕵️ Investigation Workspace</h2>
 
     <div
       style={{
@@ -985,19 +985,19 @@ style={{
       }}
     >
       <button onClick={() => assignIncident(selectedIncident.id)}>
-        ðŸ‘¤ Assign
+        👤 Assign
       </button>
 
       <button onClick={() => investigateIncident(selectedIncident.id)}>
-        ðŸ” Investigate
+        🔍 Investigate
       </button>
 
       <button onClick={() => resolveIncident(selectedIncident.id)}>
-        âœ… Resolve
+        ✅ Resolve
       </button>
 
       <button onClick={() => setSelectedIncident(null)}>
-        âŒ Close
+        ❌ Close
       </button>
     </div>
   </div>
@@ -1018,7 +1018,7 @@ style={{
         fontWeight: "700"
       }}
     >
-      ðŸ“Š Security Analytics
+      📊 Security Analytics
     </h2>
 
     <div

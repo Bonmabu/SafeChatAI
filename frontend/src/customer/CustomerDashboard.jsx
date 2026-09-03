@@ -747,7 +747,7 @@ function startLiveStream() {
       color: "#22c55e"
     }}
   >
-    ðŸ§  Root Cause Detected: <b>{rootNode.id}</b>
+    🧠  Root Cause Detected: <b>{rootNode.id}</b>
   </div>
 )}
 
@@ -831,7 +831,7 @@ function startLiveStream() {
   }}
 >
   <h3 style={{ color: "#00ffc8" }}>
-    ðŸ§  Live Threat Intelligence
+    🧠  Live Threat Intelligence
   </h3>
 
   <p>
@@ -881,7 +881,7 @@ function startLiveStream() {
     <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
     <h3 style={{ color: "#38bdf8" }}>
-      ðŸ§  Autonomous SOC Brain
+      🧠  Autonomous SOC Brain
     </h3>
 
     <p>
@@ -1025,7 +1025,7 @@ function startLiveStream() {
 </div>
 
 <h3 style={{ color: "#00ffc8", marginBottom: 10 }}>
-  ðŸ§  SOC AI Chat Analyzer
+  🧠  SOC AI Chat Analyzer
 </h3>
   {/* CHAT LOG */}
   <div style={{
@@ -1173,7 +1173,7 @@ onClick={async () => {
       cursor: "pointer"
     }}
   >
-    {chatLoading ? "Analyzing..." : "ðŸ§  Analyze"}
+    {chatLoading ? "Analyzing..." : "🧠  Analyze"}
   </button>
 </div>
 <div
@@ -1450,7 +1450,7 @@ onClick={async () => {
       cursor: generating ? "not-allowed" : "pointer"
     }}
   >
-    {generating ? "Analyzing..." : "ðŸ§  Generate Incident Summary"}
+    {generating ? "Analyzing..." : "🧠  Generate Incident Summary"}
   </button>
 
 </div>
@@ -1500,7 +1500,7 @@ setReplayProgress(0);
       cursor: "pointer"
     }}
   >
-    â¸ Pause
+    ⏸ Pause
   </button>
 
   <button
@@ -1518,7 +1518,7 @@ setReplayProgress(0);
       cursor: "pointer"
     }}
   >
-    â¹ Stop
+    ⏹ Stop
   </button>
 
 </div>
@@ -1534,7 +1534,7 @@ setReplayProgress(0);
       color: "#9ca3af"
     }}
   >
-    <h4 style={{ color: "#00ffc8" }}>ðŸ§  AI Incident Summary</h4>
+    <h4 style={{ color: "#00ffc8" }}>🧠  AI Incident Summary</h4>
 {aiSummary?.campaign && (
   <div className="ai-card">
     <h3>🎯 Attack Campaign Intelligence</h3>
