@@ -1,4 +1,10 @@
+﻿from pathlib import Path
+from googleapiclient.discovery import build as gmail_build
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+
 from fastapi import (
+    Query,
     FastAPI,
     Header,
     Request,
@@ -74,6 +80,7 @@ from reportlab.platypus import SimpleDocTemplate, Table
 from threading import Thread
 from prediction_engine import learn, predict
 from kill_chain import analyze_kill_chain
+from ml_model import predict
 from sklearn.linear_model import LinearRegression
 from campaign_engine import detect_campaign as engine_detect_campaign, get_campaigns as engine_get_campaigns
 from ai.soc_brain import (
@@ -103,6 +110,7 @@ ATTACK_TIMELINE = {}
 
 LOCK = threading.Lock()
 
+from ml_model import predict
 from sklearn.ensemble import IsolationForest
 MODEL = IsolationForest(contamination=0.05)
 from db import create_scan
@@ -145,6 +153,11 @@ from db import (
 # =========================
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
+WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
+WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
+WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
@@ -263,7 +276,7 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
 )
-# ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â PHASE 9 AUTH SYSTEM
+# ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â PHASE 9 AUTH SYSTEM
 INCIDENT_DECLARED = False
 CRISIS_MODE = False
 ACTIVE_SESSIONS = {}
@@ -328,8 +341,8 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        print("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ BROADCAST CALLED")
-        print("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ CONNECTIONS:", len(self.active_connections))
+        print("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ BROADCAST CALLED")
+        print("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¹Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ CONNECTIONS:", len(self.active_connections))
 
         dead = []
 
@@ -338,7 +351,7 @@ class ConnectionManager:
                 await connection.send_json(message)
 
             except Exception as e:
-                print("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ SEND FAILED:", e)
+                print("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ SEND FAILED:", e)
                 dead.append(connection)
 
         for d in dead:
@@ -468,6 +481,11 @@ async def push_event(event_type: str, payload: dict):
     event = build_event(event_type, payload)
 
     validate_event(event)
+
+    # -------------------------
+    # SECURITY DATA FABRIC
+    # -------------------------
+    persist_security_event(event)
 
     # -------------------------
     # EVENT ROUTING MAP
@@ -1281,7 +1299,7 @@ def predict_breach_risk():
     # -------------------------
     risk_trend = (risk * 0.5) + (incidents * 2) + (alerts * 0.2) + (critical * 3)
 
-    # normalize to 0ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“100 scale
+    # normalize to 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ100 scale
     forecast_score = min(100, risk_trend)
 
     # -------------------------
@@ -1289,13 +1307,13 @@ def predict_breach_risk():
     # -------------------------
     if forecast_score >= 75:
         probability = "HIGH"
-        window = "0ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“24 HOURS"
+        window = "0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ24 HOURS"
     elif forecast_score >= 50:
         probability = "MEDIUM"
-        window = "1ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“3 DAYS"
+        window = "1ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ3 DAYS"
     elif forecast_score >= 25:
         probability = "LOW"
-        window = "3ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“7 DAYS"
+        window = "3ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ7 DAYS"
     else:
         probability = "MINIMAL"
         window = "STABLE"
@@ -1324,7 +1342,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         "escalation": False
     }
 
-    # ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´ CRITICAL THREAT
+    # ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´ CRITICAL THREAT
     if score >= 90:
         decision["level"] = "CRITICAL"
         decision["actions"] = [
@@ -1334,7 +1352,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  HIGH THREAT
+    # ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  HIGH THREAT
     elif score >= 80:
         decision["level"] = "HIGH"
         decision["actions"] = [
@@ -1344,7 +1362,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ MEDIUM
+    # ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ MEDIUM
     elif score >= 50:
         decision["level"] = "MEDIUM"
         decision["actions"] = [
@@ -1352,7 +1370,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
             "MONITOR BEHAVIOR"
         ]
 
-    # ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ LOW
+    # ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ LOW
     else:
         decision["level"] = "LOW"
         decision["actions"] = ["LOG ONLY"]
@@ -2081,11 +2099,11 @@ def auto_tune_risk_model():
 
     avg_recent_risk = sum(x["score"] for x in recent[-10:]) / 10
 
-    # ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´ too many threats ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ increase sensitivity
+    # ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´ too many threats ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ increase sensitivity
     if avg_recent_risk > 80:
         SOC_REASONING_STATE["risk_bias"] += 0.05
 
-    # ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ too safe ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ reduce sensitivity
+    # ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ too safe ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ reduce sensitivity
     elif avg_recent_risk < 30:
         SOC_REASONING_STATE["risk_bias"] -= 0.03
 
@@ -2197,7 +2215,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
 
     elif category == "Harassment":
         add_graph_edge("User Report", "Harassment")
-    print("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ GRAPH NODE ADDED")
+    print("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ GRAPH NODE ADDED")
     print(ATTACK_GRAPH)
 
     build_attack_clusters()
@@ -2211,7 +2229,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
             add_graph_edge(
                 existing_id,
                 corr_id,
-                f"{node['stage']} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ {stage}"
+                f"{node['stage']} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ {stage}"
             )
 
         elif abs(node.get("max_score", node.get("score", 0)) - score) <= 15:
@@ -2243,6 +2261,163 @@ def build_attack_clusters():
 class AnalyzeRequest(BaseModel):
     text: str
 
+
+
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+GMAIL_TOKEN_FILE = Path("gmail_token.json")
+
+
+def get_gmail_service():
+    if not GMAIL_TOKEN_FILE.exists():
+        raise HTTPException(
+            status_code=503,
+            detail="Gmail is not connected. Run connect_gmail.py first."
+        )
+
+    creds = Credentials.from_authorized_user_file(
+        str(GMAIL_TOKEN_FILE),
+        GMAIL_SCOPES
+    )
+
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        GMAIL_TOKEN_FILE.write_text(
+            creds.to_json(),
+            encoding="utf-8"
+        )
+
+    if not creds.valid:
+        raise HTTPException(
+            status_code=503,
+            detail="Gmail authorization is invalid or expired."
+        )
+
+    return gmail_build(
+        "gmail",
+        "v1",
+        credentials=creds
+    )
+
+
+
+@app.get("/gmail/analyze")
+def gmail_analyze(
+    max_results: int = 10,
+    q: str | None = None,
+    user=Depends(get_current_user)
+):
+    max_results = max(1, min(max_results, 50))
+
+    service = get_gmail_service()
+
+    request = service.users().messages().list(
+        userId="me",
+        maxResults=max_results,
+        q=q
+    )
+
+    message_list = request.execute().get("messages", [])
+
+    results = []
+
+    for item in message_list:
+        message = service.users().messages().get(
+            userId="me",
+            id=item["id"],
+            format="metadata",
+            metadataHeaders=["From", "To", "Subject", "Date"]
+        ).execute()
+
+        headers = {
+            h["name"].lower(): h["value"]
+            for h in message.get("payload", {}).get("headers", [])
+        }
+
+        sender = headers.get("from")
+        recipient = headers.get("to")
+        subject = headers.get("subject")
+        date = headers.get("date")
+        snippet = message.get("snippet", "")
+
+        analysis_text = "\n".join(
+            part for part in [
+                subject,
+                sender,
+                snippet
+            ] if part
+        )
+
+        category, score, stage, mitre, confidence, matches = classify_threat(
+            analysis_text
+        )
+
+        try:
+            ml_result = predict(analysis_text)
+        except Exception as exc:
+            ml_result = {
+                "status": "Unavailable",
+                "score": 0,
+                "category": "Unknown",
+                "explanation": str(exc)
+            }
+
+        results.append({
+            "message_id": item["id"],
+            "thread_id": message.get("threadId"),
+            "date": date,
+            "sender": sender,
+            "recipient": recipient,
+            "subject": subject,
+            "snippet": snippet,
+            "category": category,
+            "score": score,
+            "status": calculate_status(score),
+            "stage": stage,
+            "mitre": mitre,
+            "confidence": confidence,
+            "matches": matches,
+            "ml": ml_result
+        })
+
+    return {
+        "success": True,
+        "source": "gmail",
+        "count": len(results),
+        "results": results
+    }
+
+
+@app.get("/gmail/status")
+def gmail_status():
+    service = get_gmail_service()
+    profile = service.users().getProfile(userId="me").execute()
+
+    return {
+        "success": True,
+        "connected": True,
+        "email": profile.get("emailAddress"),
+        "messages_total": profile.get("messagesTotal", 0),
+    }
+
+
+class EmailWebhookRequest(BaseModel):
+    text: str
+    sender: str | None = None
+    recipient: str | None = None
+    subject: str | None = None
+    tenant_id: str | None = "demo"
+
+class EmailAnalyzeRequest(BaseModel):
+    text: str
+    sender: str | None = None
+    recipient: str | None = None
+    subject: str | None = None
+    tenant_id: str | None = "demo"
+
+class WhatsAppAnalyzeRequest(BaseModel):
+    text: str
+    sender: str | None = None
+    tenant_id: str | None = "demo"
 
 class ThreatHuntRequest(BaseModel):
     category: str | None = None
@@ -2532,17 +2707,296 @@ def autonomous_soc_response(incident_id, category, score):
         username: str
         password: str
 
+@app.post("/email/webhook")
+def email_webhook(payload: EmailWebhookRequest):
+    text = payload.text.strip()
+
+    if not text:
+        raise HTTPException(
+            status_code=400,
+            detail="Inbound email text is required."
+        )
+
+    analysis_text = "\n".join(
+        part for part in [
+            payload.subject,
+            payload.sender,
+            text
+        ] if part
+    )
+
+    category, score, stage, mitre, confidence, matches = classify_threat(
+        analysis_text
+    )
+
+    try:
+        ml_result = predict(analysis_text)
+    except Exception as exc:
+        ml_result = {
+            "status": "Unavailable",
+            "score": 0,
+            "category": "Unknown",
+            "explanation": str(exc)
+        }
+
+    return {
+        "success": True,
+        "source": "email_webhook",
+        "sender": payload.sender,
+        "recipient": payload.recipient,
+        "subject": payload.subject,
+        "tenant_id": payload.tenant_id or "demo",
+        "category": category,
+        "score": score,
+        "status": calculate_status(score),
+        "stage": stage,
+        "mitre": mitre,
+        "confidence": confidence,
+        "matches": matches,
+        "ml": ml_result
+    }
+
+@app.post("/email/analyze")
+def email_analyze(
+    payload: EmailAnalyzeRequest,
+    user=Depends(get_current_user)
+):
+    text = payload.text.strip()
+
+    if not text:
+        raise HTTPException(
+            status_code=400,
+            detail="Email message text is required."
+        )
+
+    analysis_text = "\n".join(
+        part for part in [
+            payload.subject,
+            payload.sender,
+            text
+        ] if part
+    )
+
+    category, score, stage, mitre, confidence, matches = classify_threat(
+        analysis_text
+    )
+
+    try:
+        ml_result = predict(analysis_text)
+    except Exception as exc:
+        ml_result = {
+            "status": "Unavailable",
+            "score": 0,
+            "category": "Unknown",
+            "explanation": str(exc)
+        }
+
+    return {
+        "success": True,
+        "source": "email",
+        "sender": payload.sender,
+        "recipient": payload.recipient,
+        "subject": payload.subject,
+        "tenant_id": payload.tenant_id or "demo",
+        "category": category,
+        "score": score,
+        "status": calculate_status(score),
+        "stage": stage,
+        "mitre": mitre,
+        "confidence": confidence,
+        "matches": matches,
+        "ml": ml_result
+    }
+
+@app.post("/whatsapp/analyze")
+def whatsapp_analyze(payload: WhatsAppAnalyzeRequest):
+    text = payload.text.strip()
+
+    if not text:
+        raise HTTPException(
+            status_code=400,
+            detail="WhatsApp message text is required."
+        )
+
+    category, score, stage, mitre, confidence, matches = classify_threat(text)
+
+    try:
+        ml_result = predict(text)
+    except Exception as exc:
+        ml_result = {
+            "status": "Unavailable",
+            "score": 0,
+            "category": "Unknown",
+            "explanation": str(exc)
+        }
+
+    return {
+        "source": "whatsapp",
+        "sender": payload.sender,
+        "tenant_id": payload.tenant_id or "demo",
+        "category": category,
+        "score": score,
+        "status": calculate_status(score),
+        "stage": stage,
+        "mitre": mitre,
+        "confidence": confidence,
+        "matches": matches,
+        "ml": ml_result
+    }
+
+
+# ============================================================
+# META WHATSAPP CLOUD API WEBHOOK
+# ============================================================
+
+@app.get("/whatsapp/webhook")
+def whatsapp_webhook_verify(
+    hub_mode: str | None = Query(None, alias="hub.mode"),
+    hub_verify_token: str | None = Query(None, alias="hub.verify_token"),
+    hub_challenge: str | None = Query(None, alias="hub.challenge")
+):
+    """
+    Meta webhook verification endpoint.
+
+    Meta sends:
+      hub.mode
+      hub.verify_token
+      hub.challenge
+
+    FastAPI converts the underscore parameters from the query string.
+    """
+
+    if hub_mode == "subscribe" and hub_verify_token == WHATSAPP_VERIFY_TOKEN:
+        return int(hub_challenge or "0")
+
+    raise HTTPException(
+        status_code=403,
+        detail="WhatsApp webhook verification failed."
+    )
+
+
+@app.post("/whatsapp/webhook")
+async def whatsapp_webhook(request: Request):
+    """
+    Receives inbound WhatsApp Cloud API messages from Meta,
+    extracts text messages, and sends them through the existing
+    SafeChat AI threat-classification + ML pipeline.
+    """
+
+    body = await request.body()
+
+    signature = request.headers.get("X-Hub-Signature-256", "")
+
+    if WHATSAPP_APP_SECRET:
+        expected = "sha256=" + hmac.new(
+            WHATSAPP_APP_SECRET.encode("utf-8"),
+            body,
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(signature, expected):
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid WhatsApp webhook signature."
+            )
+
+    payload = await request.json()
+
+    results = []
+
+    for entry in payload.get("entry", []):
+        for change in entry.get("changes", []):
+            value = change.get("value", {})
+
+            for message in value.get("messages", []):
+
+                message_type = message.get("type")
+
+                # SafeChat currently analyzes text messages.
+                if message_type != "text":
+                    results.append({
+                        "message_id": message.get("id"),
+                        "status": "ignored",
+                        "reason": f"Unsupported message type: {message_type}"
+                    })
+                    continue
+
+                text_body = (
+                    message.get("text", {})
+                    .get("body", "")
+                    .strip()
+                )
+
+                if not text_body:
+                    continue
+
+                sender = message.get("from")
+                message_id = message.get("id")
+                timestamp = message.get("timestamp")
+
+                category, score, stage, mitre, confidence, matches = (
+                    classify_threat(text_body)
+                )
+
+                try:
+                    ml_result = predict(text_body)
+                except Exception as exc:
+                    ml_result = {
+                        "status": "Unavailable",
+                        "score": 0,
+                        "category": "Unknown",
+                        "explanation": str(exc)
+                    }
+
+                result = {
+                    "source": "whatsapp_cloud",
+                    "message_id": message_id,
+                    "sender": sender,
+                    "timestamp": timestamp,
+                    "tenant_id": "demo",
+                    "text": text_body,
+                    "category": category,
+                    "score": score,
+                    "status": calculate_status(score),
+                    "stage": stage,
+                    "mitre": mitre,
+                    "confidence": confidence,
+                    "matches": matches,
+                    "ml": ml_result
+                }
+
+                results.append(result)
+
+    return {
+        "success": True,
+        "source": "whatsapp_cloud",
+        "messages_received": len(results),
+        "results": results
+    }
+
+
 @app.post("/analyze")
 async def analyze(payload: AnalyzeRequest):
     global LAST_CORRELATION_ID
 
-    print("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ ANALYZE ENDPOINT HIT")
+    print("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ ANALYZE ENDPOINT HIT")
 
     user = {
         "username": "developer",
         "role": "admin"
     }
     category, score, stage, mitre, confidence, matches = classify_threat(payload.text)
+
+    # Phase 12 ML secondary signal
+    try:
+        ml_result = predict(payload.text)
+    except Exception as exc:
+        ml_result = {
+            "status": "Unavailable",
+            "score": 0,
+            "category": "Unknown",
+            "explanation": str(exc)
+        }
 
     event = {
     "category": category,
@@ -2884,6 +3338,7 @@ async def analyze(payload: AnalyzeRequest):
     # RESPONSE
     # ---------------------------------------
     return {
+        "ml": ml_result,
     "success": True,
     "data": {
         "category": category,
@@ -2912,7 +3367,8 @@ async def analyze(payload: AnalyzeRequest):
         "campaign_events": campaign["events"],
 
         "kill_chain": kill_chain,
-        "prediction_engine": prediction_engine
+        "prediction_engine": prediction_engine,
+        "ml": ml_result
     }
 }
 # =========================
@@ -3231,7 +3687,7 @@ async def startup():
     add_threat_intel_column()
     train_threat_model()
 
-    # ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ ADD THIS TEST NODE
+    # ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ ADD THIS TEST NODE
     await manager.broadcast({
         "type": "new_threat",
         "node": {
@@ -3242,10 +3698,31 @@ async def startup():
     })
 
     asyncio.create_task(soc_live_loop())
-    print("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ SOC SYSTEM STARTED")
+    print("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ SOC SYSTEM STARTED")
 # =========================
 # DASHBOARD UI (MINIMAL)
 # =========================
+
+@app.post("/soar/respond")
+def soar_respond(
+    incident_id: str,
+    category: str,
+    score: float,
+    user=Depends(get_current_user)
+):
+    result = autonomous_soc_response(
+        incident_id,
+        category,
+        score
+    )
+
+    return {
+        "success": True,
+        "incident_id": incident_id,
+        "category": category,
+        "score": score,
+        "response": result
+    }
 
 @app.get("/ui", response_class=HTMLResponse)
 def ui():
@@ -3258,7 +3735,7 @@ def ui():
 
     <body style="background:#0b1220;color:white;font-family:Arial;">
 
-        <h1>ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ ENTERPRISE SOC SIEM</h1>
+        <h1>ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ ENTERPRISE SOC SIEM</h1>
 
         <pre id="feed">Connecting...</pre>
 
@@ -3331,15 +3808,15 @@ async def enrich_intelligence(payload: dict):
 
     iocs = payload.get("iocs", [])
 
-    results = analyze_iocs(iocs)
+    results = enrich_iocs(iocs)
 
     for item in results:
         save_threat_ioc(item)
 
     return {
-    "count": len(results),
-    "results": results
-}
+        "count": len(results),
+        "results": results
+    }
 @app.get("/events/{event_type}")
 def get_events(event_type: str):
 
@@ -4052,7 +4529,7 @@ async def soc_chat(payload: dict):
     return result
 @app.post("/soc-ai-stream")
 async def soc_ai_stream(payload: dict):
-    print("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ SOC-AI-STREAM ENDPOINT HIT")
+    print("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ SOC-AI-STREAM ENDPOINT HIT")
 
     request = AnalyzeRequest(
         text=payload.get("text", "")
@@ -4546,7 +5023,7 @@ def ui_incident_timeline(corr_id: str):
 @app.websocket("/ws/soc")
 async def soc_stream(websocket: WebSocket):
 
-    print("ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ /ws/soc CONNECTED")
+    print("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥ /ws/soc CONNECTED")
 
     await manager.connect(websocket)
 
@@ -5218,7 +5695,7 @@ def customer_attack_trend(tenant_id: str = Depends(get_customer_tenant)):
 
     cursor.execute("""
         SELECT
-            TO_CHAR(incidents.created_at, 'HH24:00') AS hour,
+            strftime('%H:00', incidents.created_at) AS hour,
             COUNT(*) AS attacks,
             AVG(scans.risk_score) AS avg_score
         FROM incidents
@@ -7214,6 +7691,86 @@ def admin_change_user_tenant(
         conn.close()
 
 
+@app.get("/admin/tenants")
+def admin_list_tenants(user=Depends(require_admin)):
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(db_sql("""
+            SELECT
+                tenant_id,
+                COUNT(*) AS user_count
+            FROM users
+            WHERE tenant_id IS NOT NULL
+              AND TRIM(tenant_id) <> ''
+            GROUP BY tenant_id
+            ORDER BY tenant_id
+        """))
+
+        tenants = [
+            {
+                "tenant_id": row[0],
+                "user_count": row[1]
+            }
+            for row in cursor.fetchall()
+        ]
+
+        return {
+            "success": True,
+            "tenant_count": len(tenants),
+            "tenants": tenants
+        }
+
+    finally:
+        conn.close()
+
+
+@app.get("/admin/tenants/{tenant_id}/users")
+def admin_tenant_users(
+    tenant_id: str,
+    user=Depends(require_admin)
+):
+    tenant_id = tenant_id.strip()
+
+    if not tenant_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Tenant ID is required."
+        )
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(db_sql("""
+            SELECT id, username, email, role, tenant_id
+            FROM users
+            WHERE tenant_id = ?
+            ORDER BY id
+        """), (tenant_id,))
+
+        users = [
+            {
+                "id": row[0],
+                "username": row[1],
+                "email": row[2],
+                "role": row[3],
+                "tenant_id": row[4]
+            }
+            for row in cursor.fetchall()
+        ]
+
+        return {
+            "success": True,
+            "tenant_id": tenant_id,
+            "user_count": len(users),
+            "users": users
+        }
+
+    finally:
+        conn.close()
+
 @app.post("/admin/users/{user_id}/password-reset")
 def admin_password_reset(
     user_id: int,
@@ -7708,7 +8265,7 @@ async def declare_incident():
 
     event = add_executive_event(
         "INCIDENT",
-        "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨ Incident declared by Executive Commander",
+        "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨ Incident declared by Executive Commander",
         "CRITICAL"
     )
 
@@ -7739,7 +8296,7 @@ async def crisis_mode():
 
     event = add_executive_event(
         "CRISIS",
-        "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  Enterprise crisis mode activated",
+        "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  Enterprise crisis mode activated",
         "CRITICAL"
     )
 
@@ -7749,7 +8306,7 @@ async def crisis_mode():
 
     return {
         "success":True,
-        "message":"ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  Executive Crisis Mode Activated",
+        "message":"ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  Executive Crisis Mode Activated",
         "posture": EXECUTIVE_STATUS
     }
 
@@ -7758,7 +8315,7 @@ async def notify_board():
 
     event = add_executive_event(
         "BOARD",
-        "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Board members notified",
+        "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Board members notified",
         "HIGH"
     )
 
@@ -7767,7 +8324,7 @@ async def notify_board():
 
     return {
         "success": True,
-        "message": "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Board Members Notified",
+        "message": "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Board Members Notified",
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -7799,7 +8356,7 @@ async def generate_report():
 
     event = add_executive_event(
         "REPORT",
-        "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Executive security report generated",
+        "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ Executive security report generated",
         "INFO"
     )
 
@@ -7808,7 +8365,7 @@ async def generate_report():
 
     return {
         "success": True,
-        "message": "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ Executive Report Generated",
+        "message": "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ Executive Report Generated",
         "report": report
     }
 
@@ -7826,3 +8383,18 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
