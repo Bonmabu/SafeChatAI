@@ -1,4 +1,4 @@
-from db import get_forensic_evidence, get_forensic_custody, verify_forensic_evidence, verify_forensic_custody
+﻿from db import get_forensic_evidence, get_forensic_custody, verify_forensic_evidence, verify_forensic_custody
 from db import add_forensic_custody_event, get_forensic_custody, verify_forensic_custody
 from db import save_forensic_evidence, get_forensic_evidence, verify_forensic_evidence
 from pathlib import Path
@@ -64,6 +64,7 @@ from ai.threat_intel import enrich_iocs
 from ai.threat_intel import enrich_incident
 from ai.threat_intel import analyze_iocs
 from ai.copilot import soc_copilot
+from ai.investigation_agent import investigate_incident as run_investigation_agent
 from collections import Counter
 from ai.campaign import detect_campaign as ai_detect_campaign
 from ai.correlation import correlate_incidents
@@ -218,7 +219,7 @@ init_db()
 
 
 # ============================================================
-# PHASE 28 — DIGITAL FORENSICS API
+# PHASE 28 â€” DIGITAL FORENSICS API
 # ============================================================
 
 
@@ -288,7 +289,7 @@ async def verify_forensic_custody_api(
 
 
 # ============================================================
-# PHASE 28 — FORENSIC INVESTIGATION WORKFLOW
+# PHASE 28 â€” FORENSIC INVESTIGATION WORKFLOW
 # ============================================================
 
 
@@ -576,7 +577,7 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
 )
-# 🔐 PHASE 9 AUTH SYSTEM
+# ðŸ” PHASE 9 AUTH SYSTEM
 INCIDENT_DECLARED = False
 CRISIS_MODE = False
 ACTIVE_SESSIONS = {}
@@ -641,8 +642,8 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        print("📡 BROADCAST CALLED")
-        print("👥 CONNECTIONS:", len(self.active_connections))
+        print("ðŸ“¡ BROADCAST CALLED")
+        print("ðŸ‘¥ CONNECTIONS:", len(self.active_connections))
 
         dead = []
 
@@ -651,7 +652,7 @@ class ConnectionManager:
                 await connection.send_json(message)
 
             except Exception as e:
-                print("❌ SEND FAILED:", e)
+                print("âŒ SEND FAILED:", e)
                 dead.append(connection)
 
         for d in dead:
@@ -1609,7 +1610,7 @@ def predict_breach_risk():
     # -------------------------
     risk_trend = (risk * 0.5) + (incidents * 2) + (alerts * 0.2) + (critical * 3)
 
-    # normalize to 0–100 scale
+    # normalize to 0â€“100 scale
     forecast_score = min(100, risk_trend)
 
     # -------------------------
@@ -1617,13 +1618,13 @@ def predict_breach_risk():
     # -------------------------
     if forecast_score >= 75:
         probability = "HIGH"
-        window = "0–24 HOURS"
+        window = "0â€“24 HOURS"
     elif forecast_score >= 50:
         probability = "MEDIUM"
-        window = "1–3 DAYS"
+        window = "1â€“3 DAYS"
     elif forecast_score >= 25:
         probability = "LOW"
-        window = "3–7 DAYS"
+        window = "3â€“7 DAYS"
     else:
         probability = "MINIMAL"
         window = "STABLE"
@@ -1652,7 +1653,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         "escalation": False
     }
 
-    # 🔴 CRITICAL THREAT
+    # ðŸ”´ CRITICAL THREAT
     if score >= 90:
         decision["level"] = "CRITICAL"
         decision["actions"] = [
@@ -1662,7 +1663,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # 🟠 HIGH THREAT
+    # ðŸŸ  HIGH THREAT
     elif score >= 80:
         decision["level"] = "HIGH"
         decision["actions"] = [
@@ -1672,7 +1673,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # 🟡 MEDIUM
+    # ðŸŸ¡ MEDIUM
     elif score >= 50:
         decision["level"] = "MEDIUM"
         decision["actions"] = [
@@ -1680,7 +1681,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
             "MONITOR BEHAVIOR"
         ]
 
-    # 🟢 LOW
+    # ðŸŸ¢ LOW
     else:
         decision["level"] = "LOW"
         decision["actions"] = ["LOG ONLY"]
@@ -2422,11 +2423,11 @@ def auto_tune_risk_model():
 
     avg_recent_risk = sum(x["score"] for x in recent[-10:]) / 10
 
-    # ⚠️ too many threats ⚠️ increase sensitivity
+    # âš ï¸ too many threats âš ï¸ increase sensitivity
     if avg_recent_risk > 80:
         SOC_REASONING_STATE["risk_bias"] += 0.05
 
-    # 🟢 too safe → reduce sensitivity
+    # ðŸŸ¢ too safe â†’ reduce sensitivity
     elif avg_recent_risk < 30:
         SOC_REASONING_STATE["risk_bias"] -= 0.03
 
@@ -2538,7 +2539,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
 
     elif category == "Harassment":
         add_graph_edge("User Report", "Harassment")
-    print("✅ GRAPH NODE ADDED")
+    print("âœ… GRAPH NODE ADDED")
     print(ATTACK_GRAPH)
 
     build_attack_clusters()
@@ -2552,7 +2553,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
             add_graph_edge(
                 existing_id,
                 corr_id,
-                f"{node['stage']} → {stage}"
+                f"{node['stage']} â†’ {stage}"
             )
 
         elif abs(node.get("max_score", node.get("score", 0)) - score) <= 15:
@@ -3442,7 +3443,7 @@ async def whatsapp_webhook(request: Request):
 async def analyze(payload: AnalyzeRequest):
     global LAST_CORRELATION_ID
 
-    print("🔎 ANALYZE ENDPOINT HIT")
+    print("ðŸ”Ž ANALYZE ENDPOINT HIT")
 
     user = {
         "username": "developer",
@@ -4202,7 +4203,7 @@ async def startup():
     add_threat_intel_column()
     train_threat_model()
 
-    # 🧪 ADD THIS TEST NODE
+    # ðŸ§ª ADD THIS TEST NODE
     await manager.broadcast({
         "type": "new_threat",
         "node": {
@@ -4213,7 +4214,7 @@ async def startup():
     })
 
     asyncio.create_task(soc_live_loop())
-    print("🚀 SOC SYSTEM STARTED")
+    print("ðŸš€ SOC SYSTEM STARTED")
 # =========================
 # DASHBOARD UI (MINIMAL)
 # =========================
@@ -4250,7 +4251,7 @@ def ui():
 
     <body style="background:#0b1220;color:white;font-family:Arial;">
 
-        <h1>🛡️ ENTERPRISE SOC SIEM</h1>
+        <h1>ðŸ›¡ï¸ ENTERPRISE SOC SIEM</h1>
 
         <pre id="feed">Connecting...</pre>
 
@@ -5044,7 +5045,7 @@ async def soc_chat(payload: dict):
     return result
 @app.post("/soc-ai-stream")
 async def soc_ai_stream(payload: dict):
-    print("🤖 SOC-AI-STREAM ENDPOINT HIT")
+    print("ðŸ¤– SOC-AI-STREAM ENDPOINT HIT")
 
     request = AnalyzeRequest(
         text=payload.get("text", "")
@@ -5090,6 +5091,56 @@ Confidence:
 """
 
     else:
+
+        # ---------------------------------------
+        # PHASE 39 — LIVE AI INVESTIGATION
+        # ---------------------------------------
+        live_investigation = None
+
+        try:
+            live_score = float(ai.get("score", 0) or 0)
+
+            if live_score >= 80:
+                live_incidents = get_incidents("demo")
+
+                live_iocs = []
+
+                for ioc_type in ("urls", "emails", "ips"):
+                    for indicator in ai.get("iocs", {}).get(ioc_type, []) or []:
+                        live_iocs.append({
+                            "category": ai.get("category", "Unknown"),
+                            "type": ioc_type,
+                            "threat_type": ai.get("category", "Unknown"),
+                            "ioc": indicator
+                        })
+
+                live_target = {
+                    "id": ai.get("incident_id"),
+                    "category": ai.get("category", "Unknown"),
+                    "risk_score": live_score,
+                    "status": "OPEN",
+                    "mitre": ai.get("mitre"),
+                    "affected_users": [],
+                    "affected_devices": [],
+                    "event_count": 1
+                }
+
+                live_investigation = run_investigation_agent(
+                    live_target,
+                    incidents=live_incidents,
+                    iocs=live_iocs
+                )
+
+                print(
+                    "PHASE 39 LIVE INVESTIGATION =",
+                    live_investigation
+                )
+
+        except Exception as investigation_error:
+            print(
+                "PHASE 39 LIVE INVESTIGATION ERROR =",
+                repr(investigation_error)
+            )
 
         reply = f"""
 Threat Assessment Complete
@@ -5158,7 +5209,8 @@ Confidence:
     return {
         "success": True,
         "reply": reply,
-        "data": ai
+        "data": ai,
+        "ai_investigation_agent": live_investigation
     }
 
 
@@ -5538,7 +5590,7 @@ def ui_incident_timeline(corr_id: str):
 @app.websocket("/ws/soc")
 async def soc_stream(websocket: WebSocket):
 
-    print("🔌 /ws/soc CONNECTED")
+    print("ðŸ”Œ /ws/soc CONNECTED")
 
     await manager.connect(websocket)
 
@@ -5724,6 +5776,84 @@ def attack_campaign_investigation(campaign_id: str, user=Depends(get_current_use
             "cluster_id": cluster_id,
         },
     }
+
+    # ---------------------------------------
+    # PHASE 39 AI INVESTIGATION AGENT
+    # ---------------------------------------
+    try:
+        campaign_tenant = campaign.get("tenant_id", "demo") or "demo"
+
+        agent_incidents = get_incidents(campaign_tenant)
+
+        agent_iocs = []
+
+        threat_dna = investigation.get("threat_dna") or {}
+
+        # Threat DNA currently exposes a singular ioc_profile.
+        # Normalize it into the Investigation Agent IOC contract.
+        ioc_profile = threat_dna.get("ioc_profile")
+
+        if isinstance(ioc_profile, dict) and ioc_profile:
+            agent_iocs.append({
+                "category": campaign.get(
+                    "primary_category",
+                    campaign.get("category", "Unknown")
+                ),
+                "type": "campaign_ioc_profile",
+                "threat_type": campaign.get(
+                    "primary_category",
+                    campaign.get("category", "Unknown")
+                ),
+                "users": ioc_profile.get("users", []),
+                "event_ids": ioc_profile.get("event_ids", [])
+            })
+
+        # Preserve compatibility if future Threat DNA versions expose
+        # multiple IOC profiles.
+        for ioc in threat_dna.get("ioc_profiles", []) or []:
+            if isinstance(ioc, dict):
+                agent_iocs.append(ioc)
+
+        agent_target = {
+            "id": campaign.get("campaign_id"),
+            "category": campaign.get(
+                "primary_category",
+                campaign.get("category", "Unknown")
+            ),
+            "risk_score": campaign.get(
+                "risk_score",
+                campaign.get("score", 0)
+            ),
+            "status": campaign.get("status", "ACTIVE"),
+            "mitre": (
+                (campaign.get("mitre_techniques") or [None])[0]
+            ),
+            "affected_users": campaign.get("affected_users", []),
+            "affected_devices": campaign.get("affected_devices", []),
+            "event_count": campaign.get("event_count", 0),
+        }
+
+        investigation_agent = run_investigation_agent(
+            agent_target,
+            incidents=agent_incidents,
+            iocs=agent_iocs
+        )
+
+    except Exception as investigation_error:
+        print(
+            "PHASE 39 INVESTIGATION AGENT ERROR =",
+            repr(investigation_error)
+        )
+
+        investigation_agent = {
+            "agent": "SafeChat Investigation Agent",
+            "status": "error",
+            "findings": [],
+            "evidence": [],
+            "recommended_actions": [],
+            "confidence": 0
+        }
+    investigation["ai_investigation_agent"] = investigation_agent
 
     return {
         "success": True,
@@ -6571,11 +6701,170 @@ def executive_live_feed():
 @app.post("/executive/copilot", dependencies=[Depends(require_executive_access)])
 def executive_copilot(data: dict):
 
-    question = data.get("question", "")
+    question = str(data.get("question", "") or "").strip()
 
     kpis = get_executive_kpis()
 
-    answer = f"""
+    # ---------------------------------------
+    # PHASE 39 — CAMPAIGN-AWARE EXECUTIVE COPILOT
+    # ---------------------------------------
+    campaign_id = None
+
+    for token in question.split():
+        cleaned = token.strip(".,!?;:()[]{}")
+        if cleaned.upper().startswith("CAMP-"):
+            campaign_id = cleaned.upper()
+            break
+
+    if campaign_id:
+        try:
+            campaign = get_attack_campaign(campaign_id)
+
+            if campaign:
+                campaign_result = attack_campaign_investigation(
+                    campaign_id,
+                    user=None
+                )
+
+                if campaign_result.get("success"):
+                    campaign_investigation = campaign_result.get(
+                        "investigation",
+                        {}
+                    )
+
+                    campaign_agent = campaign_investigation.get(
+                        "ai_investigation_agent",
+                        {}
+                    )
+
+                    campaign_findings = campaign_agent.get(
+                        "findings",
+                        []
+                    )
+
+                    campaign_recommendations = campaign_agent.get(
+                        "recommended_actions",
+                        []
+                    )
+
+                    campaign_confidence = campaign_agent.get(
+                        "confidence",
+                        0
+                    )
+
+                    campaign_summary = "\n".join(
+                        f"- {finding}"
+                        for finding in campaign_findings
+                    ) or "- No campaign-specific findings generated."
+
+                    campaign_actions = "\n".join(
+                        f"- {action}"
+                        for action in campaign_recommendations
+                    ) or "- Continue monitoring campaign activity."
+
+                    return {
+                        "answer": f"""
+Enterprise security posture analysis:
+
+Security Score: {kpis.get('security_score', 'N/A')}%
+
+Enterprise Risk:
+{kpis.get('enterprise_risk', 'N/A')}
+
+Campaign Investigation:
+
+Campaign ID:
+{campaign_id}
+
+Campaign Category:
+{campaign.get('primary_category', campaign.get('category', 'Unknown'))}
+
+Campaign Status:
+{campaign.get('status', 'UNKNOWN')}
+
+Correlated Events:
+{campaign.get('event_count', 0)}
+
+Risk Score:
+{campaign.get('risk_score', campaign.get('score', 'N/A'))}
+
+AI Investigation:
+
+{campaign_summary}
+
+Recommended Actions:
+
+{campaign_actions}
+
+Investigation Confidence:
+{campaign_confidence}%
+""",
+                        "agent": campaign_agent.get(
+                            "agent",
+                            "SafeChat Investigation Agent"
+                        ),
+                        "status": campaign_agent.get(
+                            "status",
+                            "completed"
+                        ),
+                        "campaign_id": campaign_id,
+                        "investigation": campaign_investigation,
+                        "findings": campaign_findings,
+                        "recommendations": campaign_recommendations,
+                        "confidence": campaign_confidence
+                    }
+
+        except Exception as campaign_error:
+            print(
+                "PHASE 39 CAMPAIGN COPILOT ERROR =",
+                repr(campaign_error)
+            )
+
+    try:
+        executive_incidents = get_incidents("demo")
+
+        copilot_result = soc_copilot(
+            question,
+            incidents=executive_incidents,
+            iocs=[]
+        )
+
+        investigation = copilot_result.get(
+            "investigation",
+            {}
+        )
+
+        findings = investigation.get(
+            "findings",
+            []
+        )
+
+        recommendations = investigation.get(
+            "recommended_actions",
+            copilot_result.get("recommendations", [])
+        )
+
+        if findings:
+            investigation_summary = "\n".join(
+                f"- {finding}"
+                for finding in findings
+            )
+        else:
+            investigation_summary = (
+                "- No incident-specific findings were generated."
+            )
+
+        if recommendations:
+            recommendation_summary = "\n".join(
+                f"- {recommendation}"
+                for recommendation in recommendations
+            )
+        else:
+            recommendation_summary = (
+                "- Continue monitoring enterprise activity."
+            )
+
+        answer = f"""
 Enterprise security posture analysis:
 
 Security Score: {kpis.get('security_score', 'N/A')}%
@@ -6589,17 +6878,74 @@ Total Incidents:
 Open Incidents:
 {kpis.get('open_incidents', 0)}
 
-Analysis:
-The current risk level is influenced by active incidents,
-threat activity and historical scan patterns.
+AI Investigation:
+
+{investigation_summary}
+
+Recommended Actions:
+
+{recommendation_summary}
+
+Investigation Confidence:
+{investigation.get('confidence', copilot_result.get('confidence', 0))}%
+"""
+
+        return {
+            "answer": answer,
+            "agent": copilot_result.get(
+                "agent",
+                "SafeChat Investigation Agent"
+            ),
+            "status": copilot_result.get(
+                "status",
+                "completed"
+            ),
+            "investigation": investigation,
+            "findings": findings,
+            "recommendations": recommendations,
+            "confidence": investigation.get(
+                "confidence",
+                copilot_result.get("confidence", 0)
+            )
+        }
+
+    except Exception as copilot_error:
+        print(
+            "PHASE 39 EXECUTIVE COPILOT ERROR =",
+            repr(copilot_error)
+        )
+
+        return {
+            "answer": f"""
+Enterprise security posture analysis:
+
+Security Score: {kpis.get('security_score', 'N/A')}%
+
+Enterprise Risk:
+{kpis.get('enterprise_risk', 'N/A')}
+
+Total Incidents:
+{kpis.get('total_incidents', 0)}
+
+Open Incidents:
+{kpis.get('open_incidents', 0)}
+
+AI Investigation:
+The Investigation Agent could not complete the
+incident analysis for this request.
 
 Recommendation:
 Review high-risk incidents and prioritize remediation.
-"""
-
-    return {
-        "answer": answer
-    }
+""",
+            "agent": "SafeChat Investigation Agent",
+            "status": "error",
+            "investigation": {},
+            "findings": [],
+            "recommendations": [
+                "Review high-risk incidents and prioritize remediation."
+            ],
+            "confidence": 0
+        }
 @app.get("/executive/decision", dependencies=[Depends(require_executive_access)])
 def executive_decision():
 
@@ -8953,7 +9299,7 @@ async def declare_incident():
 
     event = add_executive_event(
         "INCIDENT",
-        "🚨 Incident declared by Executive Commander",
+        "ðŸš¨ Incident declared by Executive Commander",
         "CRITICAL"
     )
 
@@ -8984,7 +9330,7 @@ async def crisis_mode():
 
     event = add_executive_event(
         "CRISIS",
-        "⚠ Enterprise crisis mode activated",
+        "âš  Enterprise crisis mode activated",
         "CRITICAL"
     )
 
@@ -8994,7 +9340,7 @@ async def crisis_mode():
 
     return {
         "success":True,
-        "message":"⚠ Executive Crisis Mode Activated",
+        "message":"âš  Executive Crisis Mode Activated",
         "posture": EXECUTIVE_STATUS
     }
 
@@ -9003,7 +9349,7 @@ async def notify_board():
 
     event = add_executive_event(
         "BOARD",
-        "📢 Board members notified",
+        "ðŸ“¢ Board members notified",
         "HIGH"
     )
 
@@ -9012,7 +9358,7 @@ async def notify_board():
 
     return {
         "success": True,
-        "message": "📢 Board Members Notified",
+        "message": "ðŸ“¢ Board Members Notified",
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -9044,7 +9390,7 @@ async def generate_report():
 
     event = add_executive_event(
         "REPORT",
-        "📄 Executive security report generated",
+        "ðŸ“„ Executive security report generated",
         "INFO"
     )
 
@@ -9053,7 +9399,7 @@ async def generate_report():
 
     return {
         "success": True,
-        "message": "📄 Executive Report Generated",
+        "message": "ðŸ“„ Executive Report Generated",
         "report": report
     }
 
@@ -9089,3 +9435,14 @@ def attack_replay(
         tenant_id=tenant_id,
         limit=limit
     )
+
+
+
+
+
+
+
+
+
+
+
