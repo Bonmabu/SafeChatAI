@@ -1,10 +1,4 @@
-﻿from pathlib import Path
-from googleapiclient.discovery import build as gmail_build
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-
-from fastapi import (
-    Query,
+﻿from fastapi import (
     FastAPI,
     Header,
     Request,
@@ -80,7 +74,6 @@ from reportlab.platypus import SimpleDocTemplate, Table
 from threading import Thread
 from prediction_engine import learn, predict
 from kill_chain import analyze_kill_chain
-from ml_model import predict
 from sklearn.linear_model import LinearRegression
 from campaign_engine import detect_campaign as engine_detect_campaign, get_campaigns as engine_get_campaigns
 from ai.soc_brain import (
@@ -110,7 +103,6 @@ ATTACK_TIMELINE = {}
 
 LOCK = threading.Lock()
 
-from ml_model import predict
 from sklearn.ensemble import IsolationForest
 MODEL = IsolationForest(contamination=0.05)
 from db import create_scan
@@ -153,11 +145,6 @@ from db import (
 # =========================
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-
-WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
-WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
-WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
-WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
@@ -276,7 +263,7 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
 )
-# 🔐 PHASE 9 AUTH SYSTEM
+# ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â PHASE 9 AUTH SYSTEM
 INCIDENT_DECLARED = False
 CRISIS_MODE = False
 ACTIVE_SESSIONS = {}
@@ -284,9 +271,7 @@ ALERT_LOG = []
 USER_ROLES = {
     "admin": ["read", "write", "delete", "analyze"],
     "analyst": ["read", "analyze"],
-    "viewer": ["read"],
-    "customer": ["read", "analyze"],
-    "executive": ["read", "analyze"]
+    "viewer": ["read"]
 }
 def hash_password(password: str):
     return pwd_context.hash(password)
@@ -341,8 +326,8 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        print("📡 BROADCAST CALLED")
-        print("👥 CONNECTIONS:", len(self.active_connections))
+        print("ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¡ BROADCAST CALLED")
+        print("ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¥ CONNECTIONS:", len(self.active_connections))
 
         dead = []
 
@@ -351,7 +336,7 @@ class ConnectionManager:
                 await connection.send_json(message)
 
             except Exception as e:
-                print("❌ SEND FAILED:", e)
+                print("ÃƒÆ’Ã‚Â¢Ãƒâ€šÃ‚ÂÃƒâ€¦Ã¢â‚¬â„¢ SEND FAILED:", e)
                 dead.append(connection)
 
         for d in dead:
@@ -481,11 +466,6 @@ async def push_event(event_type: str, payload: dict):
     event = build_event(event_type, payload)
 
     validate_event(event)
-
-    # -------------------------
-    # SECURITY DATA FABRIC
-    # -------------------------
-    persist_security_event(event)
 
     # -------------------------
     # EVENT ROUTING MAP
@@ -1299,7 +1279,7 @@ def predict_breach_risk():
     # -------------------------
     risk_trend = (risk * 0.5) + (incidents * 2) + (alerts * 0.2) + (critical * 3)
 
-    # normalize to 0–100 scale
+    # normalize to 0ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ100 scale
     forecast_score = min(100, risk_trend)
 
     # -------------------------
@@ -1307,13 +1287,13 @@ def predict_breach_risk():
     # -------------------------
     if forecast_score >= 75:
         probability = "HIGH"
-        window = "0–24 HOURS"
+        window = "0ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ24 HOURS"
     elif forecast_score >= 50:
         probability = "MEDIUM"
-        window = "1–3 DAYS"
+        window = "1ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ3 DAYS"
     elif forecast_score >= 25:
         probability = "LOW"
-        window = "3–7 DAYS"
+        window = "3ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ7 DAYS"
     else:
         probability = "MINIMAL"
         window = "STABLE"
@@ -1342,7 +1322,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         "escalation": False
     }
 
-    # 🔴 CRITICAL THREAT
+    # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â´ CRITICAL THREAT
     if score >= 90:
         decision["level"] = "CRITICAL"
         decision["actions"] = [
@@ -1352,7 +1332,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # 🟠 HIGH THREAT
+    # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â  HIGH THREAT
     elif score >= 80:
         decision["level"] = "HIGH"
         decision["actions"] = [
@@ -1362,7 +1342,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
         ]
         decision["escalation"] = True
 
-    # 🟡 MEDIUM
+    # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¡ MEDIUM
     elif score >= 50:
         decision["level"] = "MEDIUM"
         decision["actions"] = [
@@ -1370,7 +1350,7 @@ def soc_decision_engine(category: str, score: float, corr_id: str):
             "MONITOR BEHAVIOR"
         ]
 
-    # 🟢 LOW
+    # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¢ LOW
     else:
         decision["level"] = "LOW"
         decision["actions"] = ["LOG ONLY"]
@@ -1430,60 +1410,33 @@ def soc_metrics():
     cur = conn.cursor()
 
     # -------------------------
-    # DATABASE-DRIVER SAFE ROW VALUE
-    # -------------------------
-    def row_value(row, key, default=0):
-        if row is None:
-            return default
-
-        try:
-            return row[key]
-        except (KeyError, IndexError, TypeError):
-            try:
-                return row[0]
-            except (KeyError, IndexError, TypeError):
-                return default
-
-    # -------------------------
     # CORE COUNTS
     # -------------------------
-    cur.execute("""
-        SELECT COUNT(*) AS count
-        FROM scans
-    """)
-    scans = row_value(cur.fetchone(), "count", 0) or 0
+    cur.execute("SELECT COUNT(*) FROM scans")
+    scans = cur.fetchone()[0] or 0
+
+    cur.execute("SELECT COUNT(*) FROM alerts")
+    alerts = cur.fetchone()[0] or 0
+
+    cur.execute("SELECT COUNT(*) FROM incidents")
+    incidents = cur.fetchone()[0] or 0
 
     cur.execute("""
-        SELECT COUNT(*) AS count
-        FROM alerts
-    """)
-    alerts = row_value(cur.fetchone(), "count", 0) or 0
-
-    cur.execute("""
-        SELECT COUNT(*) AS count
-        FROM incidents
-    """)
-    incidents = row_value(cur.fetchone(), "count", 0) or 0
-
-    cur.execute("""
-        SELECT COUNT(*) AS count
+        SELECT COUNT(*)
         FROM incidents
         WHERE status = 'OPEN'
     """)
-    open_incidents = row_value(cur.fetchone(), "count", 0) or 0
+    open_incidents = cur.fetchone()[0] or 0
 
     # -------------------------
     # RISK ENGINE
     # -------------------------
-    cur.execute("""
-        SELECT AVG(risk_score) AS avg_risk
-        FROM scans
-    """)
-    avg_risk = row_value(cur.fetchone(), "avg_risk", 0)
+    cur.execute("SELECT AVG(risk_score) FROM scans")
+    avg_risk = cur.fetchone()[0]
 
     try:
         avg_risk = float(avg_risk or 0)
-    except (TypeError, ValueError):
+    except:
         avg_risk = 0
 
     avg_risk = round(avg_risk, 2)
@@ -1492,15 +1445,11 @@ def soc_metrics():
     # CRITICAL THREATS
     # -------------------------
     cur.execute("""
-        SELECT COUNT(*) AS count
+        SELECT COUNT(*)
         FROM scans
         WHERE risk_score >= 80
     """)
-    critical_threats = row_value(
-        cur.fetchone(),
-        "count",
-        0
-    ) or 0
+    critical_threats = cur.fetchone()[0] or 0
 
     conn.close()
 
@@ -1542,17 +1491,21 @@ def soc_metrics():
         status = "CRITICAL"
 
     return {
-        "total_scans": scans,
-        "total_alerts": alerts,
-        "total_incidents": incidents,
-        "open_incidents": open_incidents,
-        "avg_risk": avg_risk,
-        "critical_threats": critical_threats,
-        "security_score": round(soc_health, 2),
-        "soc_health": round(soc_health, 2),
-        "status": status
-    }
+    "total_scans": scans,
+    "total_alerts": alerts,
+    "total_incidents": incidents,
+    "open_incidents": open_incidents,
+    "avg_risk": avg_risk,
+    "critical_threats": critical_threats,
 
+    # Frontend expects this
+    "security_score": round(soc_health, 2),
+
+    # Keep this too
+    "soc_health": round(soc_health, 2),
+
+    "status": status
+}
 def train_threat_model():
     conn = get_conn()
     cur = conn.cursor()
@@ -1721,32 +1674,30 @@ def build_executive_payload():
 
     # Active threats
     cursor.execute("""
-        SELECT COUNT(*) AS count
+        SELECT COUNT(*)
         FROM incidents
-        WHERE status = 'OPEN'
+        WHERE status='OPEN'
     """)
-    row = cursor.fetchone()
-    active_threats = row["count"] if row is not None else 0
+    active_threats = cursor.fetchone()[0]
 
     # Critical alerts
     cursor.execute("""
-        SELECT COUNT(*) AS count
+        SELECT COUNT(*)
         FROM scans
         WHERE risk_score >= 90
     """)
-    row = cursor.fetchone()
-    critical_alerts = row["count"] if row is not None else 0
+    critical_alerts = cursor.fetchone()[0]
 
     # Blocked attacks
     cursor.execute("""
-        SELECT COUNT(*) AS count
+        SELECT COUNT(*)
         FROM incidents
-        WHERE status = 'BLOCKED'
+        WHERE status='BLOCKED'
     """)
-    row = cursor.fetchone()
-    blocked_attacks = row["count"] if row is not None else 0
+    blocked_attacks = cursor.fetchone()[0]
 
     conn.close()
+
     return {
         "type": "executive_dashboard",
         "timestamp": datetime.utcnow().isoformat(),
@@ -1973,51 +1924,6 @@ def verify_token(token: str):
 
     except JWTError:
         return None
-
-def _require_roles(user, allowed_roles):
-    role = str(user.get("role", "")).lower()
-
-    if role not in allowed_roles:
-        raise HTTPException(
-            status_code=403,
-            detail="Insufficient permissions for this resource."
-        )
-
-    return user
-
-
-def require_customer_access(
-    user=Depends(get_current_user)
-):
-    return _require_roles(
-        user,
-        {"admin", "customer"}
-    )
-
-
-def get_customer_tenant(
-    user=Depends(require_customer_access)
-):
-    tenant_id = user.get("tenant_id")
-
-    if not tenant_id:
-        raise HTTPException(
-            status_code=403,
-            detail="No tenant is assigned to this account."
-        )
-
-    return str(tenant_id)
-
-
-def require_executive_access(
-    user=Depends(get_current_user)
-):
-    return _require_roles(
-        user,
-        {"admin", "executive"}
-    )
-
-
 def background_siem_processor():
 
     while True:
@@ -2099,11 +2005,11 @@ def auto_tune_risk_model():
 
     avg_recent_risk = sum(x["score"] for x in recent[-10:]) / 10
 
-    # ⚠️ too many threats ⚠️ increase sensitivity
+    # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â´ too many threats ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ increase sensitivity
     if avg_recent_risk > 80:
         SOC_REASONING_STATE["risk_bias"] += 0.05
 
-    # 🟢 too safe → reduce sensitivity
+    # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚Â¢ too safe ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ reduce sensitivity
     elif avg_recent_risk < 30:
         SOC_REASONING_STATE["risk_bias"] -= 0.03
 
@@ -2215,7 +2121,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
 
     elif category == "Harassment":
         add_graph_edge("User Report", "Harassment")
-    print("✅ GRAPH NODE ADDED")
+    print("ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ GRAPH NODE ADDED")
     print(ATTACK_GRAPH)
 
     build_attack_clusters()
@@ -2229,7 +2135,7 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
             add_graph_edge(
                 existing_id,
                 corr_id,
-                f"{node['stage']} → {stage}"
+                f"{node['stage']} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ {stage}"
             )
 
         elif abs(node.get("max_score", node.get("score", 0)) - score) <= 15:
@@ -2261,163 +2167,6 @@ def build_attack_clusters():
 class AnalyzeRequest(BaseModel):
     text: str
 
-
-
-GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-GMAIL_TOKEN_FILE = Path("gmail_token.json")
-
-
-def get_gmail_service():
-    if not GMAIL_TOKEN_FILE.exists():
-        raise HTTPException(
-            status_code=503,
-            detail="Gmail is not connected. Run connect_gmail.py first."
-        )
-
-    creds = Credentials.from_authorized_user_file(
-        str(GMAIL_TOKEN_FILE),
-        GMAIL_SCOPES
-    )
-
-    if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        GMAIL_TOKEN_FILE.write_text(
-            creds.to_json(),
-            encoding="utf-8"
-        )
-
-    if not creds.valid:
-        raise HTTPException(
-            status_code=503,
-            detail="Gmail authorization is invalid or expired."
-        )
-
-    return gmail_build(
-        "gmail",
-        "v1",
-        credentials=creds
-    )
-
-
-
-@app.get("/gmail/analyze")
-def gmail_analyze(
-    max_results: int = 10,
-    q: str | None = None,
-    user=Depends(get_current_user)
-):
-    max_results = max(1, min(max_results, 50))
-
-    service = get_gmail_service()
-
-    request = service.users().messages().list(
-        userId="me",
-        maxResults=max_results,
-        q=q
-    )
-
-    message_list = request.execute().get("messages", [])
-
-    results = []
-
-    for item in message_list:
-        message = service.users().messages().get(
-            userId="me",
-            id=item["id"],
-            format="metadata",
-            metadataHeaders=["From", "To", "Subject", "Date"]
-        ).execute()
-
-        headers = {
-            h["name"].lower(): h["value"]
-            for h in message.get("payload", {}).get("headers", [])
-        }
-
-        sender = headers.get("from")
-        recipient = headers.get("to")
-        subject = headers.get("subject")
-        date = headers.get("date")
-        snippet = message.get("snippet", "")
-
-        analysis_text = "\n".join(
-            part for part in [
-                subject,
-                sender,
-                snippet
-            ] if part
-        )
-
-        category, score, stage, mitre, confidence, matches = classify_threat(
-            analysis_text
-        )
-
-        try:
-            ml_result = predict(analysis_text)
-        except Exception as exc:
-            ml_result = {
-                "status": "Unavailable",
-                "score": 0,
-                "category": "Unknown",
-                "explanation": str(exc)
-            }
-
-        results.append({
-            "message_id": item["id"],
-            "thread_id": message.get("threadId"),
-            "date": date,
-            "sender": sender,
-            "recipient": recipient,
-            "subject": subject,
-            "snippet": snippet,
-            "category": category,
-            "score": score,
-            "status": calculate_status(score),
-            "stage": stage,
-            "mitre": mitre,
-            "confidence": confidence,
-            "matches": matches,
-            "ml": ml_result
-        })
-
-    return {
-        "success": True,
-        "source": "gmail",
-        "count": len(results),
-        "results": results
-    }
-
-
-@app.get("/gmail/status")
-def gmail_status():
-    service = get_gmail_service()
-    profile = service.users().getProfile(userId="me").execute()
-
-    return {
-        "success": True,
-        "connected": True,
-        "email": profile.get("emailAddress"),
-        "messages_total": profile.get("messagesTotal", 0),
-    }
-
-
-class EmailWebhookRequest(BaseModel):
-    text: str
-    sender: str | None = None
-    recipient: str | None = None
-    subject: str | None = None
-    tenant_id: str | None = "demo"
-
-class EmailAnalyzeRequest(BaseModel):
-    text: str
-    sender: str | None = None
-    recipient: str | None = None
-    subject: str | None = None
-    tenant_id: str | None = "demo"
-
-class WhatsAppAnalyzeRequest(BaseModel):
-    text: str
-    sender: str | None = None
-    tenant_id: str | None = "demo"
 
 class ThreatHuntRequest(BaseModel):
     category: str | None = None
@@ -2452,210 +2201,30 @@ FAKE_USERS = {
 from fastapi import Header
 
 
-class SignupRequest(BaseModel):
-    username: str
-    password: str
-    full_name: str | None = None
-    email: str | None = None
-
-
-@app.post("/signup")
-def signup(request: SignupRequest):
-    username = request.username.strip()
-    password = request.password
-
-    if not username or not password:
-        raise HTTPException(
-            status_code=400,
-            detail="Username and password are required."
-        )
-
-    if len(password) < 6:
-        raise HTTPException(
-            status_code=400,
-            detail="Password must be at least 6 characters."
-        )
-
-    conn = get_conn()
-
-    try:
-        cursor = conn.cursor()
-
-        cursor.execute(
-            db_sql("""
-                SELECT id
-                FROM users
-                WHERE username = ?
-                LIMIT 1
-            """),
-            (username,)
-        )
-
-        if cursor.fetchone():
-            raise HTTPException(
-                status_code=409,
-                detail="Username already exists."
-            )
-
-        if request.email:
-            cursor.execute(
-                db_sql("""
-                    SELECT id
-                    FROM users
-                    WHERE email = ?
-                    LIMIT 1
-                """),
-                (request.email.strip(),)
-            )
-
-            if cursor.fetchone():
-                raise HTTPException(
-                    status_code=409,
-                    detail="Email already exists."
-                )
-
-        password_hash = hash_password(password)
-
-        cursor.execute(
-            db_sql("""
-                INSERT INTO users (
-                    username,
-                    full_name,
-                    email,
-                    password_hash,
-                    role,
-                    tenant_id,
-                    status,
-                    is_active,
-                    session_version
-                )
-                VALUES (?, ?, ?, ?, 'customer', 'demo', 'active', 1, 1)
-            """),
-            (
-                username,
-                request.full_name,
-                request.email.strip() if request.email else None,
-                password_hash
-            )
-        )
-
-        conn.commit()
-
-        user_id = cursor.lastrowid
-
-        token = create_access_token(
-            {
-                "sub": username,
-                "user_id": user_id,
-                "role": "customer",
-                "tenant_id": "demo",
-                "session_version": 1
-            }
-        )
-
-        return {
-            "success": True,
-            "message": "Signup successful",
-            "token": token,
-            "role": "customer",
-            "tenant_id": "demo",
-            "user_id": user_id
-        }
-
-    finally:
-        conn.close()
-
-
 @app.post("/login")
 def login(request: LoginRequest):
 
-    # Preserve the existing built-in authentication flow.
     user = FAKE_USERS.get(request.username)
 
     print("LOGIN USER:", request.username, flush=True)
+    print("LOGIN PASSWORD:", repr(request.password), flush=True)
     print("USER FOUND:", user is not None, flush=True)
 
-    if user:
-        verified = verify_password(
-            request.password,
-            user["password"]
-        )
-
-        print("VERIFY RESULT:", verified, flush=True)
-
-        if not verified:
-            return {
-                "success": False,
-                "message": "Invalid password"
-            }
-
-        token = create_access_token(
-            {
-                "sub": request.username,
-                "role": user["role"],
-                "tenant_id": "demo",
-                "session_version": 1
-            }
-        )
-
+    if not user:
         return {
-            "success": True,
-            "message": "Login successful",
-            "token": token,
-            "role": user["role"],
-            "tenant_id": "demo"
-        }
+        "success": False,
+        "message": "Invalid username"
+    }
 
-    # DB-backed users created through /signup.
-    conn = get_conn()
-
-    try:
-        cursor = conn.cursor()
-
-        cursor.execute(
-            db_sql("""
-                SELECT
-                    id,
-                    username,
-                    password_hash,
-                    role,
-                    tenant_id,
-                    status,
-                    is_active,
-                    session_version
-                FROM users
-                WHERE username = ?
-                LIMIT 1
-            """),
-            (request.username,)
-        )
-
-        db_user = cursor.fetchone()
-
-    finally:
-        conn.close()
-
-    if not db_user:
-        return {
-            "success": False,
-            "message": "Invalid username"
-        }
-
-    db_user = dict(db_user)
-
-    status = str(
-        db_user.get("status") or "active"
-    ).lower()
-
-    if status in ("blocked", "suspended") or not db_user.get("is_active", 1):
-        return {
-            "success": False,
-            "message": "User account is suspended or blocked."
-        }
+    print(
+    "ENDPOINT VERIFY:",
+    verify_password(request.password, user["password"]),
+    flush=True
+)
 
     verified = verify_password(
         request.password,
-        db_user["password_hash"]
+        user["password"]
     )
 
     print("VERIFY RESULT:", verified, flush=True)
@@ -2666,31 +2235,19 @@ def login(request: LoginRequest):
             "message": "Invalid password"
         }
 
-    role = db_user.get("role") or "customer"
-    tenant_id = db_user.get("tenant_id")
-    session_version = int(
-        db_user.get("session_version") or 0
-    )
-
     token = create_access_token(
         {
-            "sub": db_user["username"],
-            "user_id": db_user["id"],
-            "role": role,
-            "tenant_id": tenant_id,
-            "session_version": session_version
+            "sub": request.username,
+            "role": user["role"]
         }
     )
 
     return {
-        "success": True,
-        "message": "Login successful",
-        "token": token,
-        "role": role,
-        "tenant_id": tenant_id
-    }
-
-
+    "success": True,
+    "message": "Login successful",
+    "token": token,
+    "role": user["role"]
+}
 def block_source(incident_id):
     print(f"[SOC] Blocking source for incident {incident_id}")
 
@@ -2821,296 +2378,17 @@ def autonomous_soc_response(incident_id, category, score):
         username: str
         password: str
 
-@app.post("/email/webhook")
-def email_webhook(payload: EmailWebhookRequest):
-    text = payload.text.strip()
-
-    if not text:
-        raise HTTPException(
-            status_code=400,
-            detail="Inbound email text is required."
-        )
-
-    analysis_text = "\n".join(
-        part for part in [
-            payload.subject,
-            payload.sender,
-            text
-        ] if part
-    )
-
-    category, score, stage, mitre, confidence, matches = classify_threat(
-        analysis_text
-    )
-
-    try:
-        ml_result = predict(analysis_text)
-    except Exception as exc:
-        ml_result = {
-            "status": "Unavailable",
-            "score": 0,
-            "category": "Unknown",
-            "explanation": str(exc)
-        }
-
-    return {
-        "success": True,
-        "source": "email_webhook",
-        "sender": payload.sender,
-        "recipient": payload.recipient,
-        "subject": payload.subject,
-        "tenant_id": payload.tenant_id or "demo",
-        "category": category,
-        "score": score,
-        "status": calculate_status(score),
-        "stage": stage,
-        "mitre": mitre,
-        "confidence": confidence,
-        "matches": matches,
-        "ml": ml_result
-    }
-
-@app.post("/email/analyze")
-def email_analyze(
-    payload: EmailAnalyzeRequest,
-    user=Depends(get_current_user)
-):
-    text = payload.text.strip()
-
-    if not text:
-        raise HTTPException(
-            status_code=400,
-            detail="Email message text is required."
-        )
-
-    analysis_text = "\n".join(
-        part for part in [
-            payload.subject,
-            payload.sender,
-            text
-        ] if part
-    )
-
-    category, score, stage, mitre, confidence, matches = classify_threat(
-        analysis_text
-    )
-
-    try:
-        ml_result = predict(analysis_text)
-    except Exception as exc:
-        ml_result = {
-            "status": "Unavailable",
-            "score": 0,
-            "category": "Unknown",
-            "explanation": str(exc)
-        }
-
-    return {
-        "success": True,
-        "source": "email",
-        "sender": payload.sender,
-        "recipient": payload.recipient,
-        "subject": payload.subject,
-        "tenant_id": payload.tenant_id or "demo",
-        "category": category,
-        "score": score,
-        "status": calculate_status(score),
-        "stage": stage,
-        "mitre": mitre,
-        "confidence": confidence,
-        "matches": matches,
-        "ml": ml_result
-    }
-
-@app.post("/whatsapp/analyze")
-def whatsapp_analyze(payload: WhatsAppAnalyzeRequest):
-    text = payload.text.strip()
-
-    if not text:
-        raise HTTPException(
-            status_code=400,
-            detail="WhatsApp message text is required."
-        )
-
-    category, score, stage, mitre, confidence, matches = classify_threat(text)
-
-    try:
-        ml_result = predict(text)
-    except Exception as exc:
-        ml_result = {
-            "status": "Unavailable",
-            "score": 0,
-            "category": "Unknown",
-            "explanation": str(exc)
-        }
-
-    return {
-        "source": "whatsapp",
-        "sender": payload.sender,
-        "tenant_id": payload.tenant_id or "demo",
-        "category": category,
-        "score": score,
-        "status": calculate_status(score),
-        "stage": stage,
-        "mitre": mitre,
-        "confidence": confidence,
-        "matches": matches,
-        "ml": ml_result
-    }
-
-
-# ============================================================
-# META WHATSAPP CLOUD API WEBHOOK
-# ============================================================
-
-@app.get("/whatsapp/webhook")
-def whatsapp_webhook_verify(
-    hub_mode: str | None = Query(None, alias="hub.mode"),
-    hub_verify_token: str | None = Query(None, alias="hub.verify_token"),
-    hub_challenge: str | None = Query(None, alias="hub.challenge")
-):
-    """
-    Meta webhook verification endpoint.
-
-    Meta sends:
-      hub.mode
-      hub.verify_token
-      hub.challenge
-
-    FastAPI converts the underscore parameters from the query string.
-    """
-
-    if hub_mode == "subscribe" and hub_verify_token == WHATSAPP_VERIFY_TOKEN:
-        return int(hub_challenge or "0")
-
-    raise HTTPException(
-        status_code=403,
-        detail="WhatsApp webhook verification failed."
-    )
-
-
-@app.post("/whatsapp/webhook")
-async def whatsapp_webhook(request: Request):
-    """
-    Receives inbound WhatsApp Cloud API messages from Meta,
-    extracts text messages, and sends them through the existing
-    SafeChat AI threat-classification + ML pipeline.
-    """
-
-    body = await request.body()
-
-    signature = request.headers.get("X-Hub-Signature-256", "")
-
-    if WHATSAPP_APP_SECRET:
-        expected = "sha256=" + hmac.new(
-            WHATSAPP_APP_SECRET.encode("utf-8"),
-            body,
-            hashlib.sha256
-        ).hexdigest()
-
-        if not hmac.compare_digest(signature, expected):
-            raise HTTPException(
-                status_code=403,
-                detail="Invalid WhatsApp webhook signature."
-            )
-
-    payload = await request.json()
-
-    results = []
-
-    for entry in payload.get("entry", []):
-        for change in entry.get("changes", []):
-            value = change.get("value", {})
-
-            for message in value.get("messages", []):
-
-                message_type = message.get("type")
-
-                # SafeChat currently analyzes text messages.
-                if message_type != "text":
-                    results.append({
-                        "message_id": message.get("id"),
-                        "status": "ignored",
-                        "reason": f"Unsupported message type: {message_type}"
-                    })
-                    continue
-
-                text_body = (
-                    message.get("text", {})
-                    .get("body", "")
-                    .strip()
-                )
-
-                if not text_body:
-                    continue
-
-                sender = message.get("from")
-                message_id = message.get("id")
-                timestamp = message.get("timestamp")
-
-                category, score, stage, mitre, confidence, matches = (
-                    classify_threat(text_body)
-                )
-
-                try:
-                    ml_result = predict(text_body)
-                except Exception as exc:
-                    ml_result = {
-                        "status": "Unavailable",
-                        "score": 0,
-                        "category": "Unknown",
-                        "explanation": str(exc)
-                    }
-
-                result = {
-                    "source": "whatsapp_cloud",
-                    "message_id": message_id,
-                    "sender": sender,
-                    "timestamp": timestamp,
-                    "tenant_id": "demo",
-                    "text": text_body,
-                    "category": category,
-                    "score": score,
-                    "status": calculate_status(score),
-                    "stage": stage,
-                    "mitre": mitre,
-                    "confidence": confidence,
-                    "matches": matches,
-                    "ml": ml_result
-                }
-
-                results.append(result)
-
-    return {
-        "success": True,
-        "source": "whatsapp_cloud",
-        "messages_received": len(results),
-        "results": results
-    }
-
-
 @app.post("/analyze")
 async def analyze(payload: AnalyzeRequest):
     global LAST_CORRELATION_ID
 
-    print("🔎 ANALYZE ENDPOINT HIT")
+    print("ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ ANALYZE ENDPOINT HIT")
 
     user = {
         "username": "developer",
         "role": "admin"
     }
     category, score, stage, mitre, confidence, matches = classify_threat(payload.text)
-
-    # Phase 12 ML secondary signal
-    try:
-        ml_result = predict(payload.text)
-    except Exception as exc:
-        ml_result = {
-            "status": "Unavailable",
-            "score": 0,
-            "category": "Unknown",
-            "explanation": str(exc)
-        }
 
     event = {
     "category": category,
@@ -3452,7 +2730,6 @@ async def analyze(payload: AnalyzeRequest):
     # RESPONSE
     # ---------------------------------------
     return {
-        "ml": ml_result,
     "success": True,
     "data": {
         "category": category,
@@ -3481,8 +2758,7 @@ async def analyze(payload: AnalyzeRequest):
         "campaign_events": campaign["events"],
 
         "kill_chain": kill_chain,
-        "prediction_engine": prediction_engine,
-        "ml": ml_result
+        "prediction_engine": prediction_engine
     }
 }
 # =========================
@@ -3490,24 +2766,10 @@ async def analyze(payload: AnalyzeRequest):
 # =========================
 
 @app.get("/incidents")
-def incidents(user=Depends(get_current_user)):
-    tenant_id = user.get("tenant_id")
-
-    if not tenant_id:
-        raise HTTPException(
-            status_code=403,
-            detail="No tenant is assigned to this account."
-        )
-
+def incidents(tenant_id: str = "demo"):
     return get_incidents(tenant_id)
 @app.put("/incidents/{incident_id}/resolve")
-def resolve_incident(incident_id: int, user=Depends(get_current_user)):
-    tenant_id = user.get("tenant_id")
-    if not tenant_id:
-        raise HTTPException(
-            status_code=403,
-            detail="No tenant is assigned to this account."
-        )
+def resolve_incident(incident_id: int):
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3515,21 +2777,15 @@ def resolve_incident(incident_id: int, user=Depends(get_current_user)):
     cur.execute("""
         UPDATE incidents
         SET status='RESOLVED'
-        WHERE id=? AND tenant_id=?
-    """, (incident_id, tenant_id))
+        WHERE id=?
+    """, (incident_id,))
 
     conn.commit()
     conn.close()
 
     return {"success": True}
 @app.put("/incidents/{incident_id}/investigate")
-def investigate_incident(incident_id: int, user=Depends(get_current_user)):
-    tenant_id = user.get("tenant_id")
-    if not tenant_id:
-        raise HTTPException(
-            status_code=403,
-            detail="No tenant is assigned to this account."
-        )
+def investigate_incident(incident_id: int):
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3537,8 +2793,8 @@ def investigate_incident(incident_id: int, user=Depends(get_current_user)):
     cur.execute("""
         UPDATE incidents
         SET status='INVESTIGATING'
-        WHERE id=? AND tenant_id=?
-    """, (incident_id, tenant_id))
+        WHERE id=?
+    """, (incident_id,))
 
     conn.commit()
     conn.close()
@@ -3549,17 +2805,7 @@ class AssignRequest(BaseModel):
 
 
 @app.put("/incidents/{incident_id}/assign")
-def assign_incident(
-    incident_id: int,
-    request: AssignRequest,
-    user=Depends(get_current_user)
-):
-    tenant_id = user.get("tenant_id")
-    if not tenant_id:
-        raise HTTPException(
-            status_code=403,
-            detail="No tenant is assigned to this account."
-        )
+def assign_incident(incident_id: int, request: AssignRequest):
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3567,8 +2813,8 @@ def assign_incident(
     cur.execute("""
         UPDATE incidents
         SET assigned_to = ?
-        WHERE id = ? AND tenant_id = ?
-    """, (request.assigned_to, incident_id, tenant_id))
+        WHERE id = ?
+    """, (request.assigned_to, incident_id))
 
     conn.commit()
     conn.close()
@@ -3580,7 +2826,7 @@ def assign_incident(
 
 
 @app.get("/incidents/open")
-def open_incidents(user=Depends(get_current_user)):
+def open_incidents():
     conn = get_conn()
     cur = conn.cursor()
 
@@ -3801,7 +3047,7 @@ async def startup():
     add_threat_intel_column()
     train_threat_model()
 
-    # 🧪 ADD THIS TEST NODE
+    # ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ ADD THIS TEST NODE
     await manager.broadcast({
         "type": "new_threat",
         "node": {
@@ -3812,31 +3058,10 @@ async def startup():
     })
 
     asyncio.create_task(soc_live_loop())
-    print("🚀 SOC SYSTEM STARTED")
+    print("ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¡ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ SOC SYSTEM STARTED")
 # =========================
 # DASHBOARD UI (MINIMAL)
 # =========================
-
-@app.post("/soar/respond")
-def soar_respond(
-    incident_id: str,
-    category: str,
-    score: float,
-    user=Depends(get_current_user)
-):
-    result = autonomous_soc_response(
-        incident_id,
-        category,
-        score
-    )
-
-    return {
-        "success": True,
-        "incident_id": incident_id,
-        "category": category,
-        "score": score,
-        "response": result
-    }
 
 @app.get("/ui", response_class=HTMLResponse)
 def ui():
@@ -3849,7 +3074,7 @@ def ui():
 
     <body style="background:#0b1220;color:white;font-family:Arial;">
 
-        <h1>🛡️ ENTERPRISE SOC SIEM</h1>
+        <h1>ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ ENTERPRISE SOC SIEM</h1>
 
         <pre id="feed">Connecting...</pre>
 
@@ -3871,10 +3096,10 @@ def ui():
     </html>
     """
 @app.get("/debug-executive")
-def debug_executive(user=Depends(get_current_user)):
+def debug_executive():
     return build_executive_payload()
 @app.get("/fix-incidents")
-def fix_incidents(user=Depends(get_current_user)):
+def fix_incidents():
 
     conn = get_conn()
     cur = conn.cursor()
@@ -3922,15 +3147,15 @@ async def enrich_intelligence(payload: dict):
 
     iocs = payload.get("iocs", [])
 
-    results = enrich_iocs(iocs)
+    results = analyze_iocs(iocs)
 
     for item in results:
         save_threat_ioc(item)
 
     return {
-        "count": len(results),
-        "results": results
-    }
+    "count": len(results),
+    "results": results
+}
 @app.get("/events/{event_type}")
 def get_events(event_type: str):
 
@@ -4643,7 +3868,7 @@ async def soc_chat(payload: dict):
     return result
 @app.post("/soc-ai-stream")
 async def soc_ai_stream(payload: dict):
-    print("🤖 SOC-AI-STREAM ENDPOINT HIT")
+    print("ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ SOC-AI-STREAM ENDPOINT HIT")
 
     request = AnalyzeRequest(
         text=payload.get("text", "")
@@ -5028,17 +4253,17 @@ async def ioc_intelligence():
         "hashes": IOC_DATABASE["hashes"]
     }
 @app.get("/incidents/live")
-def live_incidents(user=Depends(get_current_user)):
+def live_incidents():
 
     incidents = get_incidents()
 
     return incidents[:20]
 @app.get("/graph-test")
-def graph_test(user=Depends(get_current_user)):
+def graph_test():
     soc_autonomous_orchestrator("Test", 90, "debug123")
     return ATTACK_GRAPH
 @app.get("/debug-threat-graph")
-def debug_threat_graph(user=Depends(get_current_user)):
+def debug_threat_graph():
     return ATTACK_GRAPH
 @app.get("/ui/dashboard")
 def ui_dashboard():
@@ -5137,7 +4362,7 @@ def ui_incident_timeline(corr_id: str):
 @app.websocket("/ws/soc")
 async def soc_stream(websocket: WebSocket):
 
-    print("🔌 /ws/soc CONNECTED")
+    print("ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€šÃ‚Â¥ /ws/soc CONNECTED")
 
     await manager.connect(websocket)
 
@@ -5153,18 +4378,7 @@ async def soc_stream(websocket: WebSocket):
 
 
 @app.get("/security-events")
-def security_events(
-    limit: int = 100,
-    user=Depends(get_current_user)
-):
-    tenant_id = user.get("tenant_id")
-
-    if not tenant_id:
-        raise HTTPException(
-            status_code=403,
-            detail="No tenant is assigned to this account."
-        )
-
+def security_events(limit: int = 100, tenant_id: str | None = None):
     return {
         "events": get_security_events(
             limit=limit,
@@ -5174,7 +4388,7 @@ def security_events(
 
 
 @app.get("/security-events/event/{event_id}")
-def security_event(event_id: str, user=Depends(get_current_user)):
+def security_event(event_id: str):
     event = get_security_event(event_id)
 
     if not event:
@@ -5192,16 +4406,8 @@ def security_event(event_id: str, user=Depends(get_current_user)):
 @app.get("/attack-campaigns")
 def attack_campaigns(
     limit: int = 50,
-    user=Depends(get_current_user)
+    tenant_id: str | None = None,
 ):
-    tenant_id = user.get("tenant_id")
-
-    if not tenant_id:
-        raise HTTPException(
-            status_code=403,
-            detail="No tenant is assigned to this account."
-        )
-
     return {
         "campaigns": get_attack_campaigns(
             tenant_id=tenant_id,
@@ -5211,7 +4417,7 @@ def attack_campaigns(
 
 
 @app.get("/attack-campaigns/{campaign_id}")
-def attack_campaign(campaign_id: str, user=Depends(get_current_user)):
+def attack_campaign(campaign_id: str):
     campaign = get_attack_campaign(campaign_id)
 
     if not campaign:
@@ -5228,7 +4434,7 @@ def attack_campaign(campaign_id: str, user=Depends(get_current_user)):
 
 
 @app.get("/attack-campaigns/{campaign_id}/investigation")
-def attack_campaign_investigation(campaign_id: str, user=Depends(get_current_user)):
+def attack_campaign_investigation(campaign_id: str):
     campaign = get_attack_campaign(campaign_id)
 
     if not campaign:
@@ -5585,8 +4791,8 @@ def analytics():
             for s in statuses
         ]
     }
-@app.get("/customer/dashboard", dependencies=[Depends(require_customer_access)])
-def customer_dashboard(tenant_id: str = Depends(get_customer_tenant)):
+@app.get("/customer/dashboard")
+def customer_dashboard(tenant_id: str = "demo"):
     conn = get_conn()
     cursor = conn.cursor()
 
@@ -5646,7 +4852,7 @@ def customer_dashboard(tenant_id: str = Depends(get_customer_tenant)):
         "alerts": alerts,
         "recent_alerts": alerts
     }
-@app.get("/executive/dashboard", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/dashboard")
 def executive_dashboard():
 
     conn = get_conn()
@@ -5687,7 +4893,7 @@ def executive_dashboard():
         "open_incidents": open_incidents
     }
 
-@app.get("/executive/risk-trend", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/risk-trend")
 def executive_risk_trend():
 
     conn = get_conn()
@@ -5718,7 +4924,7 @@ def executive_risk_trend():
 
     return data
 
-@app.get("/executive/threat-distribution", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/threat-distribution")
 def executive_threat_distribution():
 
     conn = get_conn()
@@ -5738,7 +4944,7 @@ def executive_threat_distribution():
     conn.close()
 
     return data
-@app.get("/executive/incidents", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/incidents")
 def executive_incidents():
 
     conn = get_conn()
@@ -5761,7 +4967,7 @@ def executive_incidents():
     conn.close()
 
     return rows
-@app.get("/executive/briefing", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/briefing")
 def executive_briefing():
 
     kpi = executive_kpis()
@@ -5802,14 +5008,14 @@ def executive_briefing():
         "summary": summary,
         "recommendation": recommendation
     }
-@app.get("/customer/attack-trend", dependencies=[Depends(require_customer_access)])
-def customer_attack_trend(tenant_id: str = Depends(get_customer_tenant)):
+@app.get("/customer/attack-trend")
+def customer_attack_trend(tenant_id: str):
     conn = get_conn()
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT
-            strftime('%H:00', incidents.created_at) AS hour,
+            TO_CHAR(incidents.created_at, 'HH24:00') AS hour,
             COUNT(*) AS attacks,
             AVG(scans.risk_score) AS avg_score
         FROM incidents
@@ -5834,8 +5040,8 @@ def customer_attack_trend(tenant_id: str = Depends(get_customer_tenant)):
         })
 
     return trend
-@app.get("/customer/incidents", dependencies=[Depends(require_customer_access)])
-def customer_incidents(tenant_id: str = Depends(get_customer_tenant)):
+@app.get("/customer/incidents")
+def customer_incidents(tenant_id: str):
     return get_incidents(tenant_id)
 class CustomerIncidentUpdate(BaseModel):
     status: str
@@ -5844,43 +5050,30 @@ class CustomerIncidentUpdate(BaseModel):
 @app.put("/customer/incidents/{incident_id}")
 def update_customer_incident(
     incident_id: int,
-    payload: CustomerIncidentUpdate,
-    tenant_id: str = Depends(get_customer_tenant)
+    payload: CustomerIncidentUpdate
 ):
     conn = get_conn()
     cursor = conn.cursor()
 
-    try:
-        cursor.execute("""
-            UPDATE incidents
-            SET status = ?
-            WHERE id = ?
-              AND tenant_id = ?
-        """, (
-            payload.status,
-            incident_id,
-            tenant_id
-        ))
+    cursor.execute("""
+        UPDATE incidents
+        SET status = ?
+        WHERE id = ?
+    """, (
+        payload.status,
+        incident_id
+    ))
 
-        updated = cursor.rowcount
-        conn.commit()
-
-    finally:
-        conn.close()
-
-    if updated == 0:
-        raise HTTPException(
-            status_code=404,
-            detail="Incident not found for this tenant."
-        )
+    conn.commit()
+    conn.close()
 
     return {
         "success": True,
         "incident_id": incident_id,
         "status": payload.status
     }
-@app.get("/customer/trends", dependencies=[Depends(require_customer_access)])
-def customer_trends(tenant_id: str = Depends(get_customer_tenant)):
+@app.get("/customer/trends")
+def customer_trends(tenant_id: str = "demo"):
 
     conn = get_conn()
     cur = conn.cursor()
@@ -5899,8 +5092,8 @@ def customer_trends(tenant_id: str = Depends(get_customer_tenant)):
     conn.close()
 
     return [dict(r) for r in rows]
-@app.get("/customer/categories", dependencies=[Depends(require_customer_access)])
-def customer_categories(tenant_id: str = Depends(get_customer_tenant)):
+@app.get("/customer/categories")
+def customer_categories(tenant_id: str = "demo"):
 
     conn = get_conn()
     cur = conn.cursor()
@@ -5919,8 +5112,8 @@ def customer_categories(tenant_id: str = Depends(get_customer_tenant)):
     conn.close()
 
     return [dict(r) for r in rows]
-@app.get("/customer/status", dependencies=[Depends(require_customer_access)])
-def customer_status(tenant_id: str = Depends(get_customer_tenant)):
+@app.get("/customer/status")
+def customer_status(tenant_id: str = "demo"):
 
     conn = get_conn()
     cur = conn.cursor()
@@ -5938,8 +5131,8 @@ def customer_status(tenant_id: str = Depends(get_customer_tenant)):
     conn.close()
 
     return [dict(r) for r in rows]
-@app.get("/customer/alerts", dependencies=[Depends(require_customer_access)])
-def customer_alerts(tenant_id: str = Depends(get_customer_tenant)):
+@app.get("/customer/alerts")
+def customer_alerts(tenant_id: str):
     conn = get_conn()
     cur = conn.cursor()
 
@@ -5957,15 +5150,7 @@ def customer_alerts(tenant_id: str = Depends(get_customer_tenant)):
 
     return [dict(r) for r in rows]
 @app.get("/debug/customer/{tenant_id}")
-def debug_customer(
-    tenant_id: str,
-    user=Depends(get_current_user)
-):
-    if str(user.get("role", "")).lower() != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Administrator access required."
-        )
+def debug_customer(tenant_id: str):
     conn = get_conn()
     cur = conn.cursor()
 
@@ -5987,12 +5172,7 @@ def debug_customer(
         "incidents": incidents
     }
 @app.get("/debug/tenants")
-def debug_tenants(user=Depends(get_current_user)):
-    if str(user.get("role", "")).lower() != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Administrator access required."
-        )
+def debug_tenants():
     conn = get_conn()
     cur = conn.cursor()
 
@@ -6024,10 +5204,10 @@ def debug_tenants(user=Depends(get_current_user)):
         "alerts": alerts,
         "incidents": incidents
     }
-@app.get("/executive/kpis", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/kpis")
 def executive_kpis():
     return get_executive_kpis()
-@app.get("/executive/live-feed", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/live-feed")
 def executive_live_feed():
     conn = get_conn()
     cursor = conn.cursor()
@@ -6049,7 +5229,7 @@ def executive_live_feed():
     conn.close()
 
     return rows
-@app.post("/executive/copilot", dependencies=[Depends(require_executive_access)])
+@app.post("/executive/copilot")
 def executive_copilot(data: dict):
 
     question = data.get("question", "")
@@ -6081,7 +5261,7 @@ Review high-risk incidents and prioritize remediation.
     return {
         "answer": answer
     }
-@app.get("/executive/decision", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/decision")
 def executive_decision():
 
     kpi = get_executive_kpis()
@@ -6117,7 +5297,7 @@ def executive_decision():
         "recommendation": recommendation,
         "enterprise_risk": risk
     }
-@app.get("/executive/priority-queue", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/priority-queue")
 def executive_priority_queue():
 
     conn = get_conn()
@@ -6166,7 +5346,7 @@ def executive_priority_queue():
         })
 
     return priority
-@app.get("/executive/actions", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/actions")
 def executive_actions():
 
     conn = get_conn()
@@ -6215,7 +5395,7 @@ def executive_actions():
             })
 
     return actions
-@app.get("/executive/escalation-matrix", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/escalation-matrix")
 def executive_escalation_matrix():
 
     conn = get_conn()
@@ -6272,7 +5452,7 @@ def executive_escalation_matrix():
         "sla": sla,
         "total": len(rows)
     }
-@app.get("/executive/summary", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/summary")
 def executive_summary():
 
     kpi = get_executive_kpis()
@@ -6317,7 +5497,7 @@ def executive_summary():
         "critical_threats": critical,
         "action": action
     }
-@app.get("/executive/threat-intelligence", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/threat-intelligence")
 def executive_threat_intelligence():
 
     conn = get_conn()
@@ -6366,15 +5546,14 @@ def executive_threat_intelligence():
         "trend": trend,
         "warning": warning
     }
-@app.get("/executive/prediction", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/prediction")
 def executive_prediction():
 
     conn = get_conn()
     cursor = conn.cursor()
 
-    # Highest-risk active threat category
     cursor.execute("""
-        SELECT category, COUNT(*) AS total
+        SELECT category, COUNT(*) as total
         FROM incidents
         WHERE risk_score >= 70
         GROUP BY category
@@ -6382,57 +5561,45 @@ def executive_prediction():
         LIMIT 1
     """)
 
-    threat_row = cursor.fetchone()
+    row = cursor.fetchone()
 
-    # Average incident risk
+
     cursor.execute("""
-        SELECT AVG(risk_score) AS avg_risk
+        SELECT AVG(risk_score)
         FROM incidents
     """)
 
-    avg_row = cursor.fetchone()
-
-    if avg_row is not None:
-        try:
-            avg = float(avg_row["avg_risk"] or 0)
-        except (KeyError, IndexError, TypeError):
-            try:
-                avg = float(avg_row[0] or 0)
-            except (KeyError, IndexError, TypeError):
-                avg = 0
-    else:
-        avg = 0
+    avg = cursor.fetchone()[0] or 0
 
     conn.close()
 
-    # Predicted threat
-    if threat_row is not None:
-        try:
-            predicted = threat_row["category"]
-        except (KeyError, IndexError, TypeError):
-            predicted = "No active threat"
+
+    if row:
+        predicted = row["category"]
     else:
         predicted = "No active threat"
 
-    # Probability / forecast
+
     if avg >= 80:
         probability = 90
         forecast = "High probability of continued malicious activity."
+
     elif avg >= 50:
         probability = 65
         forecast = "Moderate threat activity expected."
+
     else:
         probability = 30
         forecast = "Low threat activity expected."
+
 
     return {
         "predicted_threat": predicted,
         "probability": probability,
         "forecast": forecast,
-        "average_risk": round(avg, 2)
+        "average_risk": round(avg,2)
     }
-
-@app.get("/executive/remediation", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/remediation")
 def executive_remediation():
 
     conn = get_conn()
@@ -6478,7 +5645,7 @@ def executive_remediation():
 
 
     return actions
-@app.get("/executive/incident/{incident_id}", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/incident/{incident_id}")
 def executive_incident_detail(incident_id: int):
 
     conn = get_conn()
@@ -6533,7 +5700,7 @@ def executive_incident_detail(incident_id: int):
         "created_at": incident["created_at"],
         "ai_recommendation": recommendation
     }
-@app.get("/executive/compliance", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/compliance")
 def executive_compliance():
 
     conn = get_conn()
@@ -6587,7 +5754,7 @@ def executive_compliance():
         "recommendation": recommendation
     }
 
-@app.get("/executive/scorecard", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/scorecard")
 def executive_scorecard():
 
     kpi = get_executive_kpis()
@@ -6664,7 +5831,7 @@ def executive_scorecard():
         "high_risk_events": high_risk
 
     }
-@app.get("/executive/strategy", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/strategy")
 def executive_strategy():
 
     conn = get_conn()
@@ -6683,12 +5850,11 @@ def executive_strategy():
 
 
     cursor.execute("""
-        SELECT AVG(risk_score) AS avg_risk
+        SELECT AVG(risk_score)
         FROM incidents
     """)
 
-    row = cursor.fetchone()
-    avg_risk = row["avg_risk"] if row is not None else 0
+    avg_risk = cursor.fetchone()[0] or 0
 
 
     conn.close()
@@ -6756,7 +5922,7 @@ def executive_strategy():
             recommendations
 
     }
-@app.get("/executive/board-report", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/board-report")
 def executive_board_report():
 
     dashboard = executive_dashboard()
@@ -6789,7 +5955,7 @@ def executive_board_report():
         "recommended_actions": actions
 
     }
-@app.get("/executive/report/pdf", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/report/pdf")
 def executive_pdf_report():
 
     dashboard = executive_dashboard()
@@ -6951,7 +6117,7 @@ def executive_pdf_report():
             "attachment; filename=Executive_Security_Report.pdf"
         }
     )
-@app.get("/executive/threat-map", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/threat-map")
 def executive_threat_map():
     return get_executive_threat_map()
 def get_executive_risk_forecast():
@@ -7007,7 +6173,7 @@ def get_executive_risk_forecast():
         })
 
     return future
-@app.post("/executive/simulate", dependencies=[Depends(require_executive_access)])
+@app.post("/executive/simulate")
 def executive_simulation(data: dict):
 
     attack = data.get("attack", "Unknown")
@@ -7045,7 +6211,7 @@ def executive_simulation(data: dict):
         "level": level,
         "recommendation": f"Increase monitoring and containment for {attack}."
     }
-@app.post("/executive/approve-action/{incident_id}", dependencies=[Depends(require_executive_access)])
+@app.post("/executive/approve-action/{incident_id}")
 def approve_action(incident_id: int):
 
     conn = get_conn()
@@ -7069,7 +6235,7 @@ def approve_action(incident_id: int):
         "status": "Contained",
         "message": "SOC AI has automatically contained this threat."
     }
-@app.get("/executive/kpi-history", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/kpi-history")
 def executive_kpi_history():
 
     return [
@@ -7099,7 +6265,7 @@ def executive_kpi_history():
             "enterprise_risk": 14
         }
     ]
-@app.get("/executive/live-metrics", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/live-metrics")
 def executive_live_metrics():
 
     incidents = get_incidents()
@@ -7261,13 +6427,13 @@ def get_ai_executive_decision():
         "priority": "MEDIUM",
         "confidence": 92
     }
-@app.get("/executive/ai-decision", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/ai-decision")
 def executive_ai_decision():
     return get_ai_executive_decision()
-@app.get("/executive/risk-forecast", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/risk-forecast")
 def executive_risk_forecast():
     return get_executive_risk_forecast()
-@app.get("/executive/attack-replay", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/attack-replay")
 def executive_attack_replay():
     return get_replay()
 @app.websocket("/ws/incidents")
@@ -7327,7 +6493,7 @@ def seed_incidents():
     conn.close()
 
     return {"status": "seeded"}
-@app.get("/customer/iocs", dependencies=[Depends(require_customer_access)])
+@app.get("/customer/iocs")
 def customer_iocs():
 
     conn = get_conn()
@@ -7354,7 +6520,7 @@ def customer_iocs():
 
     return [dict(r) for r in rows]
 @app.get("/debug/incidents-schema")
-def debug_incidents_schema(user=Depends(get_current_user)):
+def debug_incidents_schema():
 
     conn = get_conn()
     cursor = conn.cursor()
@@ -7367,40 +6533,34 @@ def debug_incidents_schema(user=Depends(get_current_user)):
 
     return [dict(r) for r in rows]
 @app.get("/customer/incidents/{incident_id}/intel")
-def incident_intel(
-    incident_id: int,
-    tenant_id: str = Depends(get_customer_tenant)
-):
+def incident_intel(incident_id:int):
 
     conn = get_conn()
     cursor = conn.cursor()
 
-    try:
-        cursor.execute(
-            """
-            SELECT threat_intel
-            FROM incidents
-            WHERE id=?
-              AND tenant_id=?
-            """,
-            (incident_id, tenant_id)
-        )
+    cursor.execute(
+        """
+        SELECT threat_intel
+        FROM incidents
+        WHERE id=?
+        """,
+        (incident_id,)
+    )
 
-        row = cursor.fetchone()
+    row = cursor.fetchone()
 
-    finally:
-        conn.close()
+    conn.close()
 
     if not row:
         return {
-            "error": "Incident not found"
+            "error":"Incident not found"
         }
 
     return {
-        "incident_id": incident_id,
-        "intel": json.loads(row["threat_intel"] or "[]")
+        "incident_id":incident_id,
+        "intel":json.loads(row["threat_intel"] or "[]")
     }
-@app.get("/executive/users", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/users")
 def executive_users():
 
     conn = get_conn()
@@ -7546,7 +6706,11 @@ def admin_change_user_status(
 ):
     status = status.strip().lower()
 
-    allowed = {"active", "suspended", "blocked"}
+    allowed = {
+        "active",
+        "suspended",
+        "blocked"
+    }
 
     if status not in allowed:
         raise HTTPException(
@@ -7692,12 +6856,12 @@ def admin_force_logout(
 
         return {
             "success": True,
-            "user_id": user_id,
-            "message": "All active sessions have been revoked."
+            "message": "All user sessions have been revoked."
         }
 
     finally:
         conn.close()
+
 
 @app.patch("/admin/users/{user_id}/role")
 def admin_change_user_role(
@@ -7804,86 +6968,6 @@ def admin_change_user_tenant(
     finally:
         conn.close()
 
-
-@app.get("/admin/tenants")
-def admin_list_tenants(user=Depends(require_admin)):
-    conn = get_conn()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute(db_sql("""
-            SELECT
-                tenant_id,
-                COUNT(*) AS user_count
-            FROM users
-            WHERE tenant_id IS NOT NULL
-              AND TRIM(tenant_id) <> ''
-            GROUP BY tenant_id
-            ORDER BY tenant_id
-        """))
-
-        tenants = [
-            {
-                "tenant_id": row[0],
-                "user_count": row[1]
-            }
-            for row in cursor.fetchall()
-        ]
-
-        return {
-            "success": True,
-            "tenant_count": len(tenants),
-            "tenants": tenants
-        }
-
-    finally:
-        conn.close()
-
-
-@app.get("/admin/tenants/{tenant_id}/users")
-def admin_tenant_users(
-    tenant_id: str,
-    user=Depends(require_admin)
-):
-    tenant_id = tenant_id.strip()
-
-    if not tenant_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Tenant ID is required."
-        )
-
-    conn = get_conn()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute(db_sql("""
-            SELECT id, username, email, role, tenant_id
-            FROM users
-            WHERE tenant_id = ?
-            ORDER BY id
-        """), (tenant_id,))
-
-        users = [
-            {
-                "id": row[0],
-                "username": row[1],
-                "email": row[2],
-                "role": row[3],
-                "tenant_id": row[4]
-            }
-            for row in cursor.fetchall()
-        ]
-
-        return {
-            "success": True,
-            "tenant_id": tenant_id,
-            "user_count": len(users),
-            "users": users
-        }
-
-    finally:
-        conn.close()
 
 @app.post("/admin/users/{user_id}/password-reset")
 def admin_password_reset(
@@ -8174,17 +7258,17 @@ def executive_ai():
         "top_threats": ai.get("top_threats", []),
         "confidence": ai.get("confidence", 0)
     }
-@app.get("/executive/incident-commander", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/incident-commander")
 def executive_incident_commander():
     return {
         "total_active": len(ACTIVE_INCIDENTS),
         "incidents": list(ACTIVE_INCIDENTS.values())
     }
-@app.post("/executive/close-incident/{incident_id}", dependencies=[Depends(require_executive_access)])
+@app.post("/executive/close-incident/{incident_id}")
 def executive_close_incident(incident_id: int):
 
     return close_incident(incident_id)
-@app.get("/executive/active-count", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/active-count")
 def active_count():
 
     return {
@@ -8260,7 +7344,7 @@ def attack_path_analysis():
         ]
     }
 
-@app.get("/executive/recommendations", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/recommendations")
 def executive_recommendations():
 
     recommendations = [
@@ -8367,7 +7451,7 @@ def add_executive_event(event_type, message, severity="INFO"):
 
     return event
 
-@app.post("/executive/declare-incident", dependencies=[Depends(require_executive_access)])
+@app.post("/executive/declare-incident")
 async def declare_incident():
 
     update_executive_posture(
@@ -8379,7 +7463,7 @@ async def declare_incident():
 
     event = add_executive_event(
         "INCIDENT",
-        "🚨 Incident declared by Executive Commander",
+        "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â¨ Incident declared by Executive Commander",
         "CRITICAL"
     )
 
@@ -8393,7 +7477,7 @@ async def declare_incident():
         "posture": EXECUTIVE_STATUS
     }
 
-@app.post("/executive/crisis-mode", dependencies=[Depends(require_executive_access)])
+@app.post("/executive/crisis-mode")
 async def crisis_mode():
 
     global CRISIS_MODE
@@ -8410,7 +7494,7 @@ async def crisis_mode():
 
     event = add_executive_event(
         "CRISIS",
-        "⚠ Enterprise crisis mode activated",
+        "ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â  Enterprise crisis mode activated",
         "CRITICAL"
     )
 
@@ -8420,16 +7504,16 @@ async def crisis_mode():
 
     return {
         "success":True,
-        "message":"⚠ Executive Crisis Mode Activated",
+        "message":"ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â  Executive Crisis Mode Activated",
         "posture": EXECUTIVE_STATUS
     }
 
-@app.post("/executive/notify-board", dependencies=[Depends(require_executive_access)])
+@app.post("/executive/notify-board")
 async def notify_board():
 
     event = add_executive_event(
         "BOARD",
-        "📢 Board members notified",
+        "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¢ Board members notified",
         "HIGH"
     )
 
@@ -8438,11 +7522,11 @@ async def notify_board():
 
     return {
         "success": True,
-        "message": "📢 Board Members Notified",
+        "message": "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¢ Board Members Notified",
         "timestamp": datetime.utcnow().isoformat()
     }
 
-@app.post("/executive/generate-report", dependencies=[Depends(require_executive_access)])
+@app.post("/executive/generate-report")
 async def generate_report():
 
     summary = executive_summary()
@@ -8470,7 +7554,7 @@ async def generate_report():
 
     event = add_executive_event(
         "REPORT",
-        "📄 Executive security report generated",
+        "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Executive security report generated",
         "INFO"
     )
 
@@ -8479,17 +7563,17 @@ async def generate_report():
 
     return {
         "success": True,
-        "message": "📄 Executive Report Generated",
+        "message": "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ Executive Report Generated",
         "report": report
     }
 
-@app.get("/executive/live-events", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/live-events")
 async def executive_live_events():
 
     return {
         "events": EXECUTIVE_EVENTS
     }
-@app.get("/executive/posture", dependencies=[Depends(require_executive_access)])
+@app.get("/executive/posture")
 async def executive_posture():
 
     return EXECUTIVE_STATUS
@@ -8497,18 +7581,6 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 
 
 THREAT_INTEL_DB = {
@@ -11,19 +11,21 @@ def enrich_iocs(iocs):
     results = []
 
     for ioc in iocs:
+        now = datetime.utcnow().isoformat()
 
         results.append({
             "ioc": ioc,
             "type": "unknown",
             "reputation": "unknown",
             "risk_score": 50,
-            "checked_at": datetime.utcnow().isoformat()
+            "sources": "SafeChat AI",
+            "first_seen": now,
+            "checked_at": now
         })
 
     THREAT_INTEL_DB["iocs"].extend(results)
 
     return results
-
 
 def analyze_iocs(iocs):
 
@@ -67,3 +69,4 @@ def detect_campaign(category=None, message=None, risk_score=0, *args, **kwargs):
         return "High Risk Unknown Campaign"
 
     return "Unknown Campaign"
+

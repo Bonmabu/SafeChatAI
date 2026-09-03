@@ -1,0 +1,12 @@
+﻿import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+
+import "./index.css";`r`nimport axios from "axios";`r`n`r`naxios.interceptors.request.use((config) => {`r`n  const token = localStorage.getItem("token");`r`n  if (token) {`r`n    config.headers = config.headers || {};`r`n    config.headers.Authorization = `Bearer ${token}`;`r`n  }`r`n  return config;`r`n});
+
+import Router from "./router";
+
+createRoot(document.getElementById("root")).render(
+  <BrowserRouter>
+    <Router />
+  </BrowserRouter>
+);

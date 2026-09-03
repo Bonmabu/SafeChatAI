@@ -1,34 +1,43 @@
 ﻿from pathlib import Path
 
-path = Path("main.py")
-text = path.read_text(encoding="utf-8")
-lines = text.splitlines()
+p = Path(r".\main.py")
+t = p.read_text(encoding="utf-8")
 
 replacements = {
-    278: '# 🔐 PHASE 9 AUTH SYSTEM',
-    351: '                print("❌ SEND FAILED:", e)',
-    1337: '    # 🔴 CRITICAL THREAT',
-    2020: '    # 🔴 too many threats → increase sensitivity',
-    2397: '    print("🔥 ANALYZE ENDPOINT HIT")',
-    3055: '    # 🔥 ADD THIS TEST NODE',
-    3082: '        <h1>🔥 ENTERPRISE SOC SIEM</h1>',
-    3876: '    print("🔥 SOC-AI-STREAM ENDPOINT HIT")',
-    4370: '    print("🔥 /ws/soc CONNECTED")',
+    279: "🔐 PHASE 9 AUTH SYSTEM",
+    354: "❌ SEND FAILED:",
+    1345: "🔴 CRITICAL THREAT",
+    2102: "⚠️ too many threats ⚠️ increase sensitivity",
+    3096: "🔎 ANALYZE ENDPOINT HIT",
+    3804: "🧪 ADD THIS TEST NODE",
+    3852: "🛡️ ENTERPRISE SOC SIEM",
+    4646: "🤖 SOC-AI-STREAM ENDPOINT HIT",
+    5140: "🔌 /ws/soc CONNECTED",
 }
 
-for line_number, replacement in replacements.items():
-    index = line_number - 1
+lines = t.splitlines()
 
-    if index >= len(lines):
-        raise RuntimeError(f"Line {line_number} does not exist")
+for line_no, replacement in replacements.items():
+    old = lines[line_no - 1]
 
-    print(f"Fixing line {line_number}")
-    lines[index] = replacement
+    if line_no == 279:
+        lines[line_no - 1] = "# " + replacement
+    elif line_no == 354:
+        lines[line_no - 1] = '                print("' + replacement + '", e)'
+    elif line_no == 1345:
+        lines[line_no - 1] = "    # " + replacement
+    elif line_no == 2102:
+        lines[line_no - 1] = "    # " + replacement
+    elif line_no == 3096:
+        lines[line_no - 1] = '    print("' + replacement + '")'
+    elif line_no == 3804:
+        lines[line_no - 1] = "    # " + replacement
+    elif line_no == 3852:
+        lines[line_no - 1] = "        <h1>" + replacement + "</h1>"
+    elif line_no == 4646:
+        lines[line_no - 1] = '    print("' + replacement + '")'
+    elif line_no == 5140:
+        lines[line_no - 1] = '    print("' + replacement + '")'
 
-path.write_text(
-    "\n".join(lines) + "\n",
-    encoding="utf-8",
-    newline="\n"
-)
-
-print(f"Fixed {len(replacements)} specific mojibake lines.")
+p.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+print("FIXED 9 CONFIRMED MOJIBAKE LINES")

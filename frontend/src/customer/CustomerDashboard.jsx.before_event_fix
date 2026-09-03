@@ -586,10 +586,7 @@ break;
 
             break;
 
-        case "executive_dashboard":
-            break;
-
-        case "threat_intelligence":
+        case "executive_dashboard":`r`n            break;`r`n`r`n        case "threat_intelligence":
             console.log("[THREAT INTELLIGENCE]", msg.data || msg);
             break;
 
@@ -636,7 +633,7 @@ break;
           textShadow: "0 0 15px rgba(0,255,255,0.5)"
         }}
       >
-        🛡️ Customer Security Dashboard
+        ðŸ›¡ Customer Security Dashboard
       </h1>
 {alerts.length > 0 && (
   <div
@@ -651,7 +648,7 @@ break;
     }}
   >
     <h3 style={{ color: "#ef4444", marginBottom: 10 }}>
-      🚨 LIVE ALERTS
+      ðŸš¨ LIVE ALERTS
     </h3>
 
     {alerts.map((a) => (
@@ -700,7 +697,7 @@ break;
   }}
 >
   <h2 style={{ color: "#fff" }}>
-    📈 Live Attack Trend
+    ðŸ“ˆ Live Attack Trend
   </h2>
 
   <div
@@ -819,7 +816,7 @@ break;
     </div>
   </div>
 </div>
-        <h2 style={{ color: "#fff" }}>🛡️ Security Status</h2>
+        <h2 style={{ color: "#fff" }}>ðŸ›¡ Security Status</h2>
 <div
   style={{
     marginBottom: 20,
@@ -911,7 +908,7 @@ break;
 
     {aiSummary.soc_brain.recommended_action.actions.map(
       (action, i) => (
-        <div key={i}>✅ {action}</div>
+        <div key={i}>âœ… {action}</div>
       )
     )}
   </>
@@ -919,7 +916,7 @@ break;
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h3 style={{ color: "#00ffc8" }}>
-  🔥 Threat Heat Map
+  ðŸ”¥ Threat Heat Map
 </h3>
 
 <div
@@ -1019,7 +1016,7 @@ break;
       fontWeight: "bold"
     }}
   >
-    ▶️ Replay Attack Timeline
+    â–¶ Replay Attack Timeline
   </button>
 </div>
 
@@ -1063,7 +1060,7 @@ break;
     }}
   />
 
-{/* 🔥 ADD STREAM OUTPUT RIGHT HERE */}
+{/* ðŸ”¥ ADD STREAM OUTPUT RIGHT HERE */}
 <div style={{
   marginTop: 10,
   padding: 10,
@@ -1185,7 +1182,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    🤖 Autonomous Response Timeline
+    ðŸ¤– Autonomous Response Timeline
   </h2>
 
   {responseTimeline.length === 0 ? (
@@ -1217,7 +1214,7 @@ onClick={async () => {
 
     <div style={{ marginTop: 8 }}>
       {item.actions?.map((action, i) => (
-        <div key={i}>✅ {action}</div>
+        <div key={i}>âœ… {action}</div>
       ))}
     </div>
 
@@ -1229,7 +1226,7 @@ onClick={async () => {
           fontWeight: "bold"
         }}
       >
-        🚨 Escalated to SOC
+        ðŸš¨ Escalated to SOC
       </div>
     )}
   </div>
@@ -1246,7 +1243,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    🚨 Live Incident Queue
+    ðŸš¨ Live Incident Queue
   </h2>
 
   <table
@@ -1313,7 +1310,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    🌐 Global Attack Map
+    ðŸŒ Global Attack Map
   </h2>
 
   <AttackMap nodes={graphData.nodes} />
@@ -1328,7 +1325,7 @@ onClick={async () => {
   }}
 >
   <h2 style={{ color: "#fff", marginBottom: 15 }}>
-    🧬 Threat Intelligence (IOCs)
+    ðŸ§¬ Threat Intelligence (IOCs)
   </h2>
 
   <table
@@ -1372,10 +1369,10 @@ onClick={async () => {
         }}
       >
 <div style={{ marginBottom: 10, color: "#9ca3af" }}>
-  🧬 Kill Chain Tracking Enabled
+  ðŸ§¬ Kill Chain Tracking Enabled
 </div>
         <h2 style={{ color: "#fff", marginBottom: 10 }}>
-          🌐 Live Attack Graph
+          ðŸŒ Live Attack Graph
         </h2>
 <div
   style={{
@@ -1426,7 +1423,7 @@ onClick={async () => {
       fontWeight: "bold"
     }}
   >
-    🔍 Locate
+    ðŸ” Locate
   </button>
 </div>
 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
@@ -1485,7 +1482,7 @@ setReplayProgress(0);
       cursor: "pointer"
     }}
   >
-    ▶️ Start Replay
+    â–¶ Start Replay
   </button>
 
   <button
@@ -1536,7 +1533,7 @@ setReplayProgress(0);
     <h4 style={{ color: "#00ffc8" }}>ðŸ§  AI Incident Summary</h4>
 {aiSummary?.campaign && (
   <div className="ai-card">
-    <h3>🎯 Attack Campaign Intelligence</h3>
+    <h3>ðŸŽ¯ Attack Campaign Intelligence</h3>
 
     <p>
       <b>Campaign:</b> {aiSummary.campaign}
@@ -1554,7 +1551,7 @@ setReplayProgress(0);
 <SOCAssistant />
 {aiSummary?.attack_story && (
   <div className="ai-card">
-    <h3>📖 Attack Narrative</h3>
+    <h3>ðŸ“– Attack Narrative</h3>
     <p>{aiSummary.attack_story}</p>
   </div>
 )}
@@ -1585,7 +1582,7 @@ setReplayProgress(0);
 
     <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
-    <h4 style={{ color: "#22c55e" }}>🌐± Root Cause Analysis</h4>
+    <h4 style={{ color: "#22c55e" }}>ðŸŒ± Root Cause Analysis</h4>
 
     <p><b>Patient Zero:</b> {aiSummary.root_cause?.id}</p>
 
@@ -1599,7 +1596,7 @@ setReplayProgress(0);
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h4 style={{ color: "#60a5fa" }}>
-  📖 AI Attack Narrative
+  ðŸ“– AI Attack Narrative
 </h4>
 
 <div
@@ -1617,7 +1614,7 @@ setReplayProgress(0);
 <hr style={{ margin: "15px 0", borderColor: "#334155" }} />
 
 <h4 style={{ color: "#facc15" }}>
-  🛡️ MITRE ATT&CK Timeline
+  ðŸ›¡ MITRE ATT&CK Timeline
 </h4>
 
 <div
@@ -1653,7 +1650,7 @@ setReplayProgress(0);
   ))}
 </div>
 <h4 style={{ color: "#38bdf8", marginTop: 20 }}>
-    🛡️ MITRE ATT&CK Timeline
+    ðŸ›¡ MITRE ATT&CK Timeline
 </h4>
 
 <div
@@ -1716,7 +1713,7 @@ setReplayProgress(0);
     <hr style={{ margin: "20px 0", borderColor: "#334155" }} />
 
     <h4 style={{ color: "#38bdf8" }}>
-      🎯 Attack Campaign
+      ðŸŽ¯ Attack Campaign
     </h4>
 
     <div
@@ -1788,7 +1785,7 @@ setReplayProgress(0);
   }}
 >
   <h3 style={{color:"#00ffff"}}>
-    ▶️ Replay Event {playbackIndex + 1}
+    â–¶ Replay Event {playbackIndex + 1}
   </h3>
 
   <p>
@@ -1899,7 +1896,7 @@ MITRE: ${node.mitre || "Unknown"}`
   return Math.max(4, (node.score || 10) / 5);
 }}
 
-  // 🔥 NEW: professional glow + labels
+  // ðŸ”¥ NEW: professional glow + labels
   nodeCanvasObject={(node, ctx, globalScale) => {
     const size = Math.max(4, (node.score || 10) / 4);
 
@@ -2009,7 +2006,7 @@ MITRE: ${node.mitre || "Unknown"}`
                 {selectedNode.attackPath.map((a, i) => (
   <div key={i}>
     {typeof a.source === "object" ? a.source.id : a.source}
-    {" → "}
+    {" â†’ "}
     {typeof a.target === "object" ? a.target.id : a.target}
   </div>
 ))}
@@ -2021,4 +2018,3 @@ MITRE: ${node.mitre || "Unknown"}`
     </div>
   );
 }
-
