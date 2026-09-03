@@ -16,6 +16,7 @@ from fastapi import (
     Depends
 )
 from event_correlation import (
+    build_threat_dna,
     init_event_correlation,
     correlate_event,
     get_event_correlations,
@@ -5665,6 +5666,7 @@ def attack_campaign_investigation(campaign_id: str, user=Depends(get_current_use
         "attack_graph": None,
         "digital_twin": None,
         "replay": None,
+        "threat_dna": build_threat_dna(campaign_id),
         "links": {
             "campaign_id": campaign_id,
             "cluster_id": cluster_id,

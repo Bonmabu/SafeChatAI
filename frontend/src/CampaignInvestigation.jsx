@@ -1178,30 +1178,55 @@ useEffect(() => {
                 <div className="campaign-evidence-grid">
 
                   <div className="campaign-evidence-card">
-                    <div className="campaign-evidence-label">
+                    <div
+                      className="campaign-evidence-label"
+                    >
                       THREAT DNA
                     </div>
 
                     <strong>
-                      {investigation?.threat_dna?.fingerprint ||
-                        investigation?.threat_dna?.dna_id ||
-                        "Not available"}
+                      {investigation?.threat_dna?.status === "ready"
+                        ? "READY"
+                        : "NOT AVAILABLE"}
                     </strong>
 
-                    <span>
-                      {investigation?.threat_dna?.risk_band ||
-                        investigation?.threat_dna?.risk_level ||
-                        "UNKNOWN"}
-                    </span>
+                    {investigation?.threat_dna && (
+                      <>
+                        <span>
+                          {investigation.threat_dna.categories?.join(", ") ||
+                            "No categories"}
+                        </span>
 
-                    {investigation?.threat_dna?.occurrences != null && (
-                      <small>
-                        {investigation.threat_dna.occurrences} occurrences
-                      </small>
+                        <small>
+                          Frequency:{" "}
+                          {investigation.threat_dna.frequency ?? 0} ·
+                          Recurrence:{" "}
+                          {investigation.threat_dna.recurrence ?? 0}
+                        </small>
+
+                        <small>
+                          MITRE:{" "}
+                          {investigation.threat_dna.mitre_techniques?.join(
+                            ", "
+                          ) || "None"}
+                        </small>
+
+                        <small>
+                          IOCs:{" "}
+                          {Object.values(
+                            investigation.threat_dna.ioc_profile || {}
+                          ).reduce(
+                            (total, values) =>
+                              total +
+                              (Array.isArray(values) ? values.length : 0),
+                            0
+                          )}
+                        </small>
+                      </>
                     )}
                   </div>
 
-                  <div className="campaign-evidence-card">
+<div className="campaign-evidence-card">
                     <div className="campaign-evidence-label">
                       ATTACK GRAPH
                     </div>

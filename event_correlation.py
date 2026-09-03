@@ -150,12 +150,21 @@ def init_event_correlation():
             affected_devices TEXT,
             affected_ips TEXT,
             mitre_techniques TEXT,
+            threat_dna TEXT,
             investigation_priority TEXT DEFAULT 'LOW',
             recommendation TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """))
+
+    try:
+        cur.execute(db_sql("""
+            ALTER TABLE attack_campaigns
+            ADD COLUMN threat_dna TEXT
+        """))
+    except Exception:
+        pass
 
     cur.execute(db_sql("""
         CREATE TABLE IF NOT EXISTS attack_campaign_edges (
@@ -1091,10 +1100,11 @@ def build_attack_campaign(cluster_id):
                 affected_devices,
                 affected_ips,
                 mitre_techniques,
+                threat_dna,
                 investigation_priority,
                 recommendation
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (campaign_id)
             DO UPDATE SET
                 name = EXCLUDED.name,
@@ -1442,6 +1452,125 @@ def build_campaign_timeline(campaign_id):
     }
 
 
+
+def build_threat_dna(campaign_id):
+    """Build a behavioral Threat DNA profile for an attack campaign."""
+
+    campaign = get_attack_campaign(campaign_id)
+
+    if not campaign:
+        return {
+            "campaign_id": campaign_id,
+            "behavioral_signature": [],
+            "ioc_profile": {},
+            "mitre_techniques": [],
+            "attack_stages": [],
+            "categories": [],
+            "recurrence": 0,
+            "frequency": 0,
+            "status": "not_found"
+        }
+
+    timeline_data = get_campaign_timeline(campaign_id) or []
+
+    if isinstance(timeline_data, dict):
+        timeline = (
+            timeline_data.get("events")
+            or timeline_data.get("timeline")
+            or []
+        )
+    else:
+        timeline = timeline_data
+
+    if isinstance(timeline, dict):
+        timeline = [timeline]
+
+    categories = []
+    stages = []
+    event_types = []
+    mitre = list(campaign.get("mitre_techniques") or [])
+
+    ioc_profile = {
+        "ips": [],
+        "users": [],
+        "devices": [],
+        "event_ids": []
+    }
+
+    for event in timeline:
+        if not isinstance(event, dict):
+            continue
+
+        category = event.get("category")
+        phase = event.get("phase")
+        event_type = event.get("event_type")
+
+        if category and category not in categories:
+            categories.append(category)
+
+        if phase and phase not in stages:
+            stages.append(phase)
+
+        if event_type and event_type not in event_types:
+            event_types.append(event_type)
+
+        if event.get("ip") and event["ip"] not in ioc_profile["ips"]:
+            ioc_profile["ips"].append(event["ip"])
+
+        if event.get("user") and event["user"] not in ioc_profile["users"]:
+            ioc_profile["users"].append(event["user"])
+
+        if event.get("device") and event["device"] not in ioc_profile["devices"]:
+            ioc_profile["devices"].append(event["device"])
+
+        if event.get("event_id"):
+            ioc_profile["event_ids"].append(event["event_id"])
+
+    behavioral_signature = []
+
+    behavioral_signature.extend(
+        f"Category:{category}"
+        for category in categories
+    )
+
+    behavioral_signature.extend(
+        f"Phase:{phase}"
+        for phase in stages
+    )
+
+    behavioral_signature.extend(
+        f"EventType:{event_type}"
+        for event_type in event_types
+    )
+
+    behavioral_signature.extend(
+        f"MITRE:{technique}"
+        for technique in mitre
+        if technique
+    )
+
+    ioc_profile = {
+        key: values
+        for key, values in ioc_profile.items()
+        if values
+    }
+
+    frequency = len(timeline)
+
+    return {
+        "campaign_id": campaign_id,
+        "behavioral_signature": behavioral_signature,
+        "ioc_profile": ioc_profile,
+        "mitre_techniques": mitre,
+        "attack_stages": stages,
+        "categories": categories,
+        "recurrence": max(frequency - 1, 0),
+        "frequency": frequency,
+        "status": "ready"
+    }
+
+
+
 def get_campaign_timeline(campaign_id):
     return build_campaign_timeline(campaign_id)
 
@@ -1474,6 +1603,7 @@ def get_attack_campaign(campaign_id):
         "affected_devices",
         "affected_ips",
         "mitre_techniques",
+        "threat_dna",
     ):
         value = campaign.get(field)
 
@@ -1545,6 +1675,7 @@ def get_attack_campaigns(
             "affected_devices",
             "affected_ips",
             "mitre_techniques",
+            "threat_dna",
         ):
             value = item.get(field)
 
