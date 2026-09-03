@@ -2628,14 +2628,13 @@ GMAIL_TOKEN_FILE = Path("gmail_token.json")
 
 
 def get_gmail_service():
-    gmail_token_b64 = os.getenv("GMAIL_TOKEN_B64")
+    gmail_token_hex = os.getenv("GMAIL_TOKEN_HEX")
 
-    if gmail_token_b64:
+    if gmail_token_hex:
         try:
-            import base64
-            gmail_token_b64 = "".join(gmail_token_b64.split())
-            gmail_token_b64 += "=" * (-len(gmail_token_b64) % 4)
-            token_json = base64.b64decode(gmail_token_b64).decode("utf-8")
+            token_json = bytes.fromhex(
+                "".join(gmail_token_hex.split())
+            ).decode("utf-8")
             creds = Credentials.from_authorized_user_info(
                 json.loads(token_json),
                 GMAIL_SCOPES
