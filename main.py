@@ -2633,6 +2633,8 @@ def get_gmail_service():
     if gmail_token_b64:
         try:
             import base64
+            gmail_token_b64 = "".join(gmail_token_b64.split())
+            gmail_token_b64 += "=" * (-len(gmail_token_b64) % 4)
             token_json = base64.b64decode(gmail_token_b64).decode("utf-8")
             creds = Credentials.from_authorized_user_info(
                 json.loads(token_json),
