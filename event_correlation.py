@@ -1134,6 +1134,7 @@ def build_attack_campaign(cluster_id):
             json.dumps(campaign["affected_devices"]),
             json.dumps(campaign["affected_ips"]),
             json.dumps(campaign["mitre_techniques"]),
+            json.dumps(campaign.get("threat_dna")) if campaign.get("threat_dna") is not None else None,
             campaign["investigation_priority"],
             campaign["recommendation"],
         )
@@ -2061,4 +2062,5 @@ def get_correlation_clusters(
     conn.close()
 
     return [dict(row) for row in rows]
+
 
