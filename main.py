@@ -4,7 +4,7 @@ from db import save_forensic_evidence, get_forensic_evidence, verify_forensic_ev
 from pathlib import Path
 from googleapiclient.discovery import build as gmail_build
 from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import Request as GoogleAuthRequest
 
 from fastapi import (
     Query,
@@ -2656,7 +2656,7 @@ def get_gmail_service():
         )
 
     if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
+        creds.refresh(GoogleAuthRequest())
 
         if not gmail_token_b64:
             GMAIL_TOKEN_FILE.write_text(
