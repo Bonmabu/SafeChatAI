@@ -2658,7 +2658,7 @@ def get_gmail_service():
     if creds.expired and creds.refresh_token:
         creds.refresh(GoogleAuthRequest())
 
-        if not gmail_token_b64:
+        if not gmail_token_hex:
             GMAIL_TOKEN_FILE.write_text(
                 creds.to_json(),
                 encoding="utf-8"
@@ -9483,6 +9483,7 @@ def attack_replay(
         tenant_id=tenant_id,
         limit=limit
     )
+
 
 
 
