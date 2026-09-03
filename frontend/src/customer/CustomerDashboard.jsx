@@ -408,8 +408,12 @@ function getAttackStage(node) {
   return "UNKNOWN";
 }
 function startLiveStream() {
-const WS_URL =
-  `${import.meta.env.VITE_WS_BASE || "ws://127.0.0.1:8000"}/ws/soc`;
+const WS_BASE =
+  import.meta.env.VITE_WS_BASE ||
+  import.meta.env.VITE_WS_URL?.replace(/\/ws\/soc\/?$/, "") ||
+  "ws://127.0.0.1:8000";
+
+const WS_URL = `${WS_BASE}/ws/soc`;
   const ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
@@ -2024,5 +2028,6 @@ MITRE: ${node.mitre || "Unknown"}`
     </div>
   );
 }
+
 
 
