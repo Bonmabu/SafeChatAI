@@ -2765,6 +2765,175 @@ def gmail_analyze(
     }
 
 
+
+# =========================
+# GMAIL AUTOMATIC MONITOR
+# =========================
+
+GMAIL_MONITOR_HISTORY_ID = None
+
+
+def gmail_poll_new_messages():
+    global GMAIL_MONITOR_HISTORY_ID
+
+    service = get_gmail_service()
+
+    profile = service.users().getProfile(
+        userId="me"
+    ).execute()
+
+    current_history_id = profile.get("historyId")
+
+    if not current_history_id:
+        return []
+
+    if GMAIL_MONITOR_HISTORY_ID is None:
+        GMAIL_MONITOR_HISTORY_ID = current_history_id
+        print(f"[GMAIL MONITOR] Initialized at historyId={current_history_id}")
+        return []
+
+    if GMAIL_MONITOR_HISTORY_ID == current_history_id:
+        return []
+
+    history = service.users().history().list(
+        userId="me",
+        startHistoryId=GMAIL_MONITOR_HISTORY_ID,
+        historyTypes=["messageAdded"],
+        maxResults=100
+    ).execute()
+
+    new_messages = []
+
+    for record in history.get("history", []):
+        for added in record.get("messagesAdded", []):
+            message = added.get("message", {})
+            message_id = message.get("id")
+
+            if message_id:
+                new_messages.append(message_id)
+
+    GMAIL_MONITOR_HISTORY_ID = history.get(
+        "historyId",
+        current_history_id
+    )
+
+    return list(dict.fromkeys(new_messages))
+
+
+async def gmail_monitor_loop():
+
+    poll_seconds = max(
+        15,
+        int(os.getenv("GMAIL_POLL_SECONDS", "30"))
+    )
+
+    print(
+        f"[GMAIL MONITOR] Started. "
+        f"Polling every {poll_seconds}s."
+    )
+
+    while True:
+        try:
+            message_ids = await asyncio.to_thread(
+                gmail_poll_new_messages
+            )
+
+            for message_id in message_ids:
+
+                service = await asyncio.to_thread(
+                    get_gmail_service
+                )
+
+                message = await asyncio.to_thread(
+                    lambda: service.users().messages().get(
+                        userId="me",
+                        id=message_id,
+                        format="metadata",
+                        metadataHeaders=[
+                            "From",
+                            "To",
+                            "Subject",
+                            "Date"
+                        ]
+                    ).execute()
+                )
+
+                headers = {
+                    h["name"].lower(): h["value"]
+                    for h in message.get(
+                        "payload", {}
+                    ).get("headers", [])
+                }
+
+                sender = headers.get("from")
+                recipient = headers.get("to")
+                subject = headers.get("subject")
+                date = headers.get("date")
+                snippet = message.get("snippet", "")
+
+                analysis_text = "\n".join(
+                    part for part in [
+                        subject,
+                        sender,
+                        snippet
+                    ] if part
+                )
+
+                category, score, stage, mitre, confidence, matches = (
+                    classify_threat(analysis_text)
+                )
+
+                try:
+                    ml_result = await asyncio.to_thread(
+                        predict,
+                        analysis_text
+                    )
+                except Exception as exc:
+                    ml_result = {
+                        "status": "Unavailable",
+                        "score": 0,
+                        "category": "Unknown",
+                        "explanation": str(exc)
+                    }
+
+                await push_event(
+                    "scan_event",
+                    {
+                        "source": "gmail",
+                        "message_id": message_id,
+                        "thread_id": message.get("threadId"),
+                        "date": date,
+                        "sender": sender,
+                        "recipient": recipient,
+                        "subject": subject,
+                        "snippet": snippet,
+                        "category": category,
+                        "score": score,
+                        "status": calculate_status(score),
+                        "stage": stage,
+                        "mitre": mitre,
+                        "confidence": confidence,
+                        "matches": matches,
+                        "ml": ml_result
+                    }
+                )
+
+                print(
+                    f"[GMAIL MONITOR] Analyzed "
+                    f"{message_id} | "
+                    f"{category} | score={score}"
+                )
+
+        except Exception as exc:
+            print(
+                "[GMAIL MONITOR ERROR]",
+                type(exc).__name__,
+                str(exc)
+            )
+
+        await asyncio.sleep(poll_seconds)
+
+
 @app.get("/gmail/status")
 def gmail_status():
     service = get_gmail_service()
@@ -4262,6 +4431,10 @@ async def startup():
     })
 
     asyncio.create_task(soc_live_loop())
+
+    if os.getenv("GMAIL_MONITOR_ENABLED", "false").lower() == "true":
+        asyncio.create_task(gmail_monitor_loop())
+        print("📧 GMAIL AUTOMATIC MONITOR ENABLED")
     print("🚀 SOC SYSTEM STARTED")
 # =========================
 # DASHBOARD UI (MINIMAL)
