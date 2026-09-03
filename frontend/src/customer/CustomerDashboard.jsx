@@ -408,12 +408,12 @@ function getAttackStage(node) {
   return "UNKNOWN";
 }
 function startLiveStream() {
-const WS_BASE =
-  import.meta.env.VITE_WS_BASE ||
-  import.meta.env.VITE_WS_URL?.replace(/\/ws\/soc\/?$/, "") ||
-  "ws://127.0.0.1:8000";
+  const WS_BASE =
+    import.meta.env.VITE_WS_BASE ||
+    import.meta.env.VITE_WS_URL?.replace(/\/ws\/soc\/?$/, "") ||
+    "ws://127.0.0.1:8000";
 
-const WS_URL = `${WS_BASE}/ws/soc`;
+  const WS_URL = `${WS_BASE}/ws/soc`;
   const ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
@@ -424,193 +424,187 @@ const WS_URL = `${WS_BASE}/ws/soc`;
     const msg = JSON.parse(event.data);
 
     if (!msg.type && msg.event_type) {
-        msg.type = msg.event_type;
+      msg.type = msg.event_type;
     }
 
     console.log(msg);
 
     switch (msg.type) {
+      case "ioc_update":
+        setIocs(prev => {
+          const existing = prev.find(x => x.id === msg.data.id);
 
-        case "ioc_update":
-            setIocs(prev => {
-                const existing = prev.find(x => x.id === msg.data.id);
+          if (existing) {
+            return prev.map(x =>
+              x.id === msg.data.id ? msg.data : x
+            );
+          }
 
-                if (existing) {
-                    return prev.map(x =>
-                        x.id === msg.data.id ? msg.data : x
-                    );
-                }
+          return [msg.data, ...prev].slice(0, 50);
+        });
+        break;
 
-                return [msg.data, ...prev].slice(0, 50);
-            });
-            break;
+      case "alert":
+        setAlerts(prev => [msg, ...prev].slice(0, 20));
+        break;
 
-        case "alert":
-            setAlerts(prev => [msg, ...prev].slice(0, 20));
-            break;
+      case "attack_graph": {
+        const nodes = msg.nodes || [];
+        const links = (msg.links || []).filter(link => {
+          if (!link) return false;
 
-        case "attack_graph":
-
-{
-    const nodes = msg.nodes || [];
-    const links = (msg.links || []).filter(link => {
-
-    if (!link) return false;
-
-        const source =
+          const source =
             typeof link.source === "object"
-            ? link.source.id
-            : link.source;
+              ? link.source.id
+              : link.source;
 
-        const target =
+          const target =
             typeof link.target === "object"
-            ? link.target.id
-            : link.target;
+              ? link.target.id
+              : link.target;
 
-        return (
+          return (
             nodes.some(n => n.id === source) &&
             nodes.some(n => n.id === target)
-        );
+          );
+        });
 
-    });
+        setGraphData({
+          nodes,
+          links
+        });
+        break;
+      }
 
+      case "dashboard_update":
+        loadDashboard();
 
-    setGraphData({
-        nodes,
-        links
-    });
-}
+        setThreatStats(prev => {
+          const stats = { ...prev };
 
-break;
-
-        case "dashboard_update":
-
-    loadDashboard();
-
-    setThreatStats(prev => {
-        const stats = { ...prev };
-
-        if (msg.data.score >= 90)
+          if (msg.data.score >= 90) {
             stats.Critical++;
-
-        else if (msg.data.score >= 75)
+          } else if (msg.data.score >= 75) {
             stats.High++;
-
-        else if (msg.data.score >= 50)
+          } else if (msg.data.score >= 50) {
             stats.Medium++;
-
-        else
+          } else {
             stats.Low++;
+          }
 
-        return stats;
-    });
+          return stats;
+        });
+        break;
 
-    break;
+      case "response_timeline":
+      case "auto_response_event":
+        setResponseTimeline(prev => [
+          {
+            time: msg.timestamp || new Date().toLocaleTimeString(),
+            level: msg.data?.level || "UNKNOWN",
+            actions: msg.data?.actions || [],
+            escalation: msg.data?.escalation || false
+          },
+          ...prev
+        ].slice(0, 20));
+        break;
 
-        case "response_timeline":
-        case "auto_response_event":
+      case "new_threat":
+        if (msg.node) {
+          setTimelineData(prev => [...prev, msg.node]);
+        }
+        break;
 
-            setResponseTimeline(prev => [
-                {
-                    time: msg.timestamp || new Date().toLocaleTimeString(),
-                    level: msg.data?.level || "UNKNOWN",
-                    actions: msg.data?.actions || [],
-                    escalation: msg.data?.escalation || false
-                },
-                ...prev
-            ].slice(0,20));
+      case "alert_event":
+        setAttackTrend(prev => [
+          ...prev.slice(-49),
+          {
+            time: new Date().toLocaleTimeString(),
+            score: msg.score
+          }
+        ]);
+        break;
 
-            break;
+      case "attack_graph_live":
+        setGraphData(prev => {
+          const liveGraph = msg.graph || {};
+          const incomingNodes = Array.isArray(liveGraph.nodes)
+            ? liveGraph.nodes
+            : [];
 
-        case "new_threat":
+          const nodes = [
+            ...prev.nodes.filter(
+              existing =>
+                !incomingNodes.some(
+                  incoming => incoming?.id === existing?.id
+                )
+            ),
+            ...incomingNodes
+          ].filter(Boolean);
 
-            setTimelineData(prev => [...prev,msg.node]);
-            break;
+          const links = (
+            Array.isArray(liveGraph.links)
+              ? liveGraph.links
+              : []
+          ).filter(link => {
+            if (!link) return false;
 
-        case "alert_event":
+            const source =
+              typeof link.source === "object"
+                ? link.source?.id
+                : link.source;
 
-            setAttackTrend(prev=>[
-                ...prev.slice(-49),
-                {
-                    time:new Date().toLocaleTimeString(),
-                    score:msg.score
-                }
-            ]);
+            const target =
+              typeof link.target === "object"
+                ? link.target?.id
+                : link.target;
 
-            break;
+            if (!source || !target) {
+              return false;
+            }
 
-        case "attack_graph_live":
+            return (
+              nodes.some(n => n.id === source) &&
+              nodes.some(n => n.id === target)
+            );
+          });
 
-            setGraphData(prev => {
+          return {
+            nodes,
+            links
+          };
+        });
+        break;
 
-                const liveGraph = msg.graph || {};
-                const incomingNodes = Array.isArray(liveGraph.nodes)
-                    ? liveGraph.nodes
-                    : [];
+      case "executive_dashboard":
+        break;
 
-                const nodes = [
-                    ...prev.nodes.filter(
-                        existing =>
-                            !incomingNodes.some(
-                                incoming => incoming?.id === existing?.id
-                            )
-                    ),
-                    ...incomingNodes
-                ].filter(Boolean);
+      case "threat_intelligence":
+        console.log("[THREAT INTELLIGENCE]", msg.data || msg);
+        break;
 
-                const links = (Array.isArray(liveGraph.links)
-                    ? liveGraph.links
-                    : []
-                ).filter(link => {
-
-                    if (!link) return false;
-
-                    const source =
-                        typeof link.source === "object"
-                            ? link.source?.id
-                            : link.source;
-
-                    const target =
-                        typeof link.target === "object"
-                            ? link.target?.id
-                            : link.target;
-
-                    if (!source || !target) {
-                        return false;
-                    }
-
-                    return (
-                        nodes.some(n => n.id === source) &&
-                        nodes.some(n => n.id === target)
-                    );
-                });
-
-                return {
-                    nodes,
-                    links
-                };
-            });
-
-            break;
-
-        case "executive_dashboard":
-            break;
-
-        case "threat_intelligence":
-            console.log("[THREAT INTELLIGENCE]", msg.data || msg);
-            break;
-
-        default:
-            console.log("Unknown websocket event",msg);
+      default:
+        console.log("Unknown websocket event", msg);
     }
-};
- ws.onerror = (err) => {
-  console.error("WebSocket error:", err);
-};
+  };
+
+  ws.onerror = (err) => {
+    console.error("WebSocket error:", err);
+  };
+
+  ws.onclose = (event) => {
+    console.warn(
+      "LIVE STREAM CLOSED:",
+      event.code,
+      event.reason || "no reason"
+    );
+  };
+
   setSocket(ws);
 
   return ws;
 }
+
 
   if (loading) {
     return (
@@ -2028,6 +2022,7 @@ MITRE: ${node.mitre || "Unknown"}`
     </div>
   );
 }
+
 
 
 
