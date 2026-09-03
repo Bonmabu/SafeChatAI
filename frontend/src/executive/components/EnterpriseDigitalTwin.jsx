@@ -3,7 +3,8 @@ import "./EnterpriseDigitalTwin.css";
 
 export default function EnterpriseDigitalTwin({
     attackGraph = {},
-    securityPosture = {}
+    securityPosture = {},
+    digitalTwin = {}
 }) {
 
 
@@ -160,7 +161,9 @@ Real-time enterprise attack surface visualization
 {
 assets.map(asset=>{
 
-const threats=getThreatCount(asset);
+const threats =
+    Number(digitalTwin?.[asset.name]) ||
+    getThreatCount(asset);
 
 
 return (
@@ -250,3 +253,5 @@ width:`${Math.min(threats*10,100)}%`
 );
 
 }
+
+
