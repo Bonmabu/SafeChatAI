@@ -229,8 +229,11 @@ async function loadAttackTrend() {
     );
 
     const res = await axios.get(`${API}/customer/attack-trend`, {
-      params:{
+      params: {
         tenant_id: tenantId
+      },
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`
       }
     });
 
@@ -2021,4 +2024,5 @@ MITRE: ${node.mitre || "Unknown"}`
     </div>
   );
 }
+
 
