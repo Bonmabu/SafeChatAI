@@ -2628,23 +2628,41 @@ GMAIL_TOKEN_FILE = Path("gmail_token.json")
 
 
 def get_gmail_service():
-    if not GMAIL_TOKEN_FILE.exists():
-        raise HTTPException(
-            status_code=503,
-            detail="Gmail is not connected. Run connect_gmail.py first."
-        )
+    gmail_token_b64 = os.getenv("GMAIL_TOKEN_B64")
 
-    creds = Credentials.from_authorized_user_file(
-        str(GMAIL_TOKEN_FILE),
-        GMAIL_SCOPES
-    )
+    if gmail_token_b64:
+        try:
+            import base64
+            token_json = base64.b64decode(gmail_token_b64).decode("utf-8")
+            creds = Credentials.from_authorized_user_info(
+                json.loads(token_json),
+                GMAIL_SCOPES
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Gmail token configuration is invalid: {exc}"
+            )
+    else:
+        if not GMAIL_TOKEN_FILE.exists():
+            raise HTTPException(
+                status_code=503,
+                detail="Gmail is not connected."
+            )
+
+        creds = Credentials.from_authorized_user_file(
+            str(GMAIL_TOKEN_FILE),
+            GMAIL_SCOPES
+        )
 
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        GMAIL_TOKEN_FILE.write_text(
-            creds.to_json(),
-            encoding="utf-8"
-        )
+
+        if not gmail_token_b64:
+            GMAIL_TOKEN_FILE.write_text(
+                creds.to_json(),
+                encoding="utf-8"
+            )
 
     if not creds.valid:
         raise HTTPException(
