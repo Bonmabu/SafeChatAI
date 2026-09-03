@@ -5809,18 +5809,35 @@ def customer_attack_trend(tenant_id: str = Depends(get_customer_tenant)):
 
     cursor.execute("""
         SELECT
-            strftime('%H:00', incidents.created_at) AS hour,
-            COUNT(*) AS attacks,
-            AVG(scans.risk_score) AS avg_score
+            incidents.created_at,
+            scans.risk_score
         FROM incidents
         JOIN scans
             ON incidents.scan_id = scans.id
-        WHERE incidents.tenant_id = ?
-        GROUP BY hour
-        ORDER BY hour ASC
+        WHERE incidents.tenant_id = %s
+        ORDER BY incidents.created_at ASC
     """, (tenant_id,))
 
     rows = cursor.fetchall()
+
+    from collections import defaultdict
+    hourly = defaultdict(lambda: {"attacks": 0, "scores": []})
+
+    for row in rows:
+        created_at = row["created_at"]
+        hour = created_at.strftime("%H:00") if hasattr(created_at, "strftime") else str(created_at)[11:13] + ":00"
+        hourly[hour]["attacks"] += 1
+        if row["risk_score"] is not None:
+            hourly[hour]["scores"].append(float(row["risk_score"]))
+
+    rows = [
+        {
+            "hour": hour,
+            "attacks": data["attacks"],
+            "avg_score": sum(data["scores"]) / len(data["scores"]) if data["scores"] else 0
+        }
+        for hour, data in sorted(hourly.items())
+    ]
 
     conn.close()
 
@@ -8497,6 +8514,7 @@ async def executive_posture():
 def attack_replay():
 
     return get_replay()
+
 
 
 
