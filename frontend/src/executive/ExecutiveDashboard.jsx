@@ -246,6 +246,7 @@ const [warRoomMessage, setWarRoomMessage] = useState("");
 const [warRoomLoading, setWarRoomLoading] = useState(false);
 const [threatIntel, setThreatIntel] = useState(null);
 const [prediction, setPrediction] = useState(null);
+const [predictiveIntelligence, setPredictiveIntelligence] = useState(null);
 const [liveExecutiveAlerts, setLiveExecutiveAlerts] = useState([]);
 const [remediation, setRemediation] = useState([]);
 const [selectedIncident, setSelectedIncident] = useState(null);
@@ -797,6 +798,13 @@ setAttackReplay(replayRes.data);
    `${API}/executive/prediction`
   );
   setPrediction(predictionRes.data);
+
+  const predictiveRes = await axios.get(
+   `${API}/predictive-threat-intelligence`
+  );
+  setPredictiveIntelligence(
+   predictiveRes.data?.prediction || predictiveRes.data
+  );
 
   const summaryRes = await axios.get(
    `${API}/executive/summary`
@@ -1911,7 +1919,7 @@ Waiting for live security events...
 
 
 </div>
-{prediction && (
+{predictiveIntelligence && (
 <div
 style={{
 marginTop:25,
@@ -1923,9 +1931,8 @@ border:"1px solid #334155"
 >
 
 <h2 style={{color:"#00ffc8"}}>
-AI Attack Forecast
+AI Predictive Threat Intelligence
 </h2>
-
 
 <div
 style={{
@@ -1937,23 +1944,30 @@ gap:15
 
 <Card
 title="Predicted Threat"
-value={prediction.predicted_threat}
+value={predictiveIntelligence.predicted_threat || "UNKNOWN"}
 />
 
-
 <Card
-title="Probability"
-value={`${prediction.probability}%`}
+title="Confidence"
+value={`${predictiveIntelligence.confidence ?? 0}%`}
 />
 
+<Card
+title="Expected Risk"
+value={predictiveIntelligence.expected_score ?? 0}
+/>
 
 <Card
-title="Average Risk"
-value={prediction.average_risk}
+title="Threat Direction"
+value={predictiveIntelligence.threat_direction || "STABLE"}
+/>
+
+<Card
+title="Prediction Window"
+value={predictiveIntelligence.prediction_window || "UNKNOWN"}
 />
 
 </div>
-
 
 <h3
 style={{
@@ -1961,13 +1975,54 @@ marginTop:20,
 color:"#facc15"
 }}
 >
-Forecast
+Breach Forecast
 </h3>
 
 <p>
-{prediction.forecast}
+Probability:{" "}
+{predictiveIntelligence.breach_forecast?.breach_probability || "UNKNOWN"}
+{" · "}
+Window:{" "}
+{predictiveIntelligence.breach_forecast?.time_window || "UNKNOWN"}
+{" · "}
+Score:{" "}
+{predictiveIntelligence.breach_forecast?.forecast_score ?? 0}
 </p>
 
+{predictiveIntelligence.candidate_threats?.length > 0 && (
+<>
+<h3
+style={{
+marginTop:20,
+color:"#facc15"
+}}
+>
+Top Predicted Threats
+</h3>
+
+<div>
+{predictiveIntelligence.candidate_threats.map(
+(candidate, index) => (
+<div
+key={`${candidate.category}-${index}`}
+style={{
+padding:"10px 0",
+borderBottom:"1px solid #334155"
+}}
+>
+<strong>
+{candidate.category}
+</strong>
+{" — "}
+{candidate.confidence}% confidence
+{" · "}
+Expected risk {candidate.expected_score}
+</div>
+)
+)}
+</div>
+</>
+)}
 
 </div>
 )}

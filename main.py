@@ -5728,6 +5728,106 @@ def predict_next_attack():
 @app.get("/prediction")
 def get_prediction():
     return predict_next_attack()
+
+# =========================
+# PHASE 33 - PREDICTIVE THREAT INTELLIGENCE
+# =========================
+def predictive_threat_intelligence():
+
+    data = soc_metrics()
+
+    risk = float(data.get("avg_risk") or 0)
+    incidents = int(data.get("open_incidents") or 0)
+    alerts = int(data.get("total_alerts") or 0)
+    critical = int(data.get("critical_threats") or 0)
+
+    breach = predict_breach_risk()
+
+    patterns = SOC_MEMORY.get("threat_patterns") or {}
+
+    candidates = []
+
+    for category, pattern in patterns.items():
+        count = int(pattern.get("count") or 0)
+        avg_score = float(pattern.get("avg_score") or 0)
+
+        if count <= 0:
+            continue
+
+        confidence = min(99, round(count * 10, 2))
+
+        prediction_score = (
+            (avg_score * 0.55) +
+            (min(count, 10) * 3.0) +
+            (risk * 0.25)
+        )
+
+        candidates.append({
+            "category": category,
+            "confidence": confidence,
+            "expected_score": round(min(100, prediction_score), 2),
+            "historical_count": count,
+            "historical_avg_score": round(avg_score, 2)
+        })
+
+    candidates.sort(
+        key=lambda item: (
+            item["confidence"],
+            item["expected_score"]
+        ),
+        reverse=True
+    )
+
+    if candidates:
+        primary = candidates[0]
+        predicted_threat = primary["category"]
+        confidence = primary["confidence"]
+        expected_score = primary["expected_score"]
+    else:
+        predicted_threat = "UNKNOWN"
+        confidence = 0
+        expected_score = round(risk, 2)
+
+    if risk >= 75 or critical >= 3:
+        threat_direction = "ESCALATING"
+        prediction_window = "0-24 HOURS"
+    elif risk >= 50 or incidents >= 3:
+        threat_direction = "ELEVATED"
+        prediction_window = "1-3 DAYS"
+    elif risk >= 25 or alerts >= 5:
+        threat_direction = "WATCH"
+        prediction_window = "3-7 DAYS"
+    else:
+        threat_direction = "STABLE"
+        prediction_window = "7+ DAYS"
+
+    return {
+        "predicted_threat": predicted_threat,
+        "confidence": confidence,
+        "expected_score": expected_score,
+        "current_risk": round(risk, 2),
+        "threat_direction": threat_direction,
+        "prediction_window": prediction_window,
+        "breach_forecast": breach,
+        "candidate_threats": candidates[:10],
+        "signals": {
+            "open_incidents": incidents,
+            "total_alerts": alerts,
+            "critical_threats": critical
+        },
+        "generated": now_ts()
+    }
+
+
+@app.get("/predictive-threat-intelligence")
+def predictive_threat_intelligence_endpoint(
+    user=Depends(get_current_user)
+):
+    return {
+        "success": True,
+        "prediction": predictive_threat_intelligence()
+    }
+
 @app.get("/reports")
 def get_reports():
 
