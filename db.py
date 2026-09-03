@@ -1009,7 +1009,8 @@ def get_soc_intelligence_core():
         SELECT COUNT(*) FROM scans
         WHERE status IN ('High Risk', 'Critical')
     """)
-    critical = cur.fetchone()[0]
+    critical_row = cur.fetchone()
+    critical = critical_row[0] if not hasattr(critical_row, "keys") else next(iter(critical_row.values()))
 
     # --------------------------
     # 3. Velocity (last 1 hour)
@@ -1022,7 +1023,8 @@ def get_soc_intelligence_core():
         FROM scans
         WHERE {last_hour_expression}
     """)
-    velocity = cur.fetchone()[0]
+    velocity_row = cur.fetchone()
+    velocity = velocity_row[0] if not hasattr(velocity_row, "keys") else next(iter(velocity_row.values()))
 
     # --------------------------
     # 4. Anomaly baseline
@@ -1032,7 +1034,8 @@ def get_soc_intelligence_core():
         FROM scans
         WHERE {last_24h_expression}
     """)
-    last_24h = cur.fetchone()[0]
+    last_24h_row = cur.fetchone()
+    last_24h = last_24h_row[0] if not hasattr(last_24h_row, "keys") else next(iter(last_24h_row.values()))
 
     conn.close()
 
