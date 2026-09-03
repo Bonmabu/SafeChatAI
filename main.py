@@ -83,7 +83,7 @@ import time
 import csv
 from reportlab.platypus import SimpleDocTemplate, Table
 from threading import Thread
-from prediction_engine import learn, predict
+from prediction_engine import learn, predict as predict_threat
 from kill_chain import analyze_kill_chain
 from ml_model import predict
 from sklearn.linear_model import LinearRegression
@@ -738,6 +738,21 @@ THREAT_PREDICTION = {
 }
 
 def update_soc_memory(category: str, score: float, corr_id: str):
+
+    # -------------------------
+    # PHASE 34 — THREAT PREDICTION LEARNING
+    # -------------------------
+    try:
+        learn(
+            category=category,
+            score=score,
+            corr_id=corr_id
+        )
+    except Exception as prediction_error:
+        print(
+            "PHASE 34 PREDICTION LEARNING ERROR =",
+            repr(prediction_error)
+        )
 
     # -------------------------
     # TRACK INCIDENT PATTERNS
@@ -2480,6 +2495,21 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
     # 1. Memory learning
     update_soc_memory(category, score, corr_id)
 
+    # 1B. PHASE 34 — THREAT PREDICTION
+    try:
+        prediction_engine = predict_threat()
+    except Exception as prediction_error:
+        prediction_engine = {
+            "prediction": "UNKNOWN",
+            "predicted_threat": "UNKNOWN",
+            "confidence": 0,
+            "expected_score": 0,
+            "threat_direction": "STABLE",
+            "prediction_window": "7+ DAYS",
+            "supporting_signals": [],
+            "error": str(prediction_error)
+        }
+
     # 2. Risk tuning
     auto_tune_risk_model()
 
@@ -2562,6 +2592,12 @@ def soc_autonomous_orchestrator(category: str, score: float, corr_id: str):
                 corr_id,
                 "related_attack"
             )
+
+    # ---------------------------------------
+    # PHASE 34 — ATTACH THREAT PREDICTION
+    # ---------------------------------------
+    if isinstance(decision, dict):
+        decision["prediction_engine"] = prediction_engine
 
     return decision
 def build_attack_clusters():
@@ -3172,7 +3208,7 @@ def autonomous_soc_response(incident_id, category, score):
         password: str
 
 @app.post("/email/webhook")
-def email_webhook(payload: EmailWebhookRequest):
+async def email_webhook(payload: EmailWebhookRequest):
     text = payload.text.strip()
 
     if not text:
@@ -3203,6 +3239,11 @@ def email_webhook(payload: EmailWebhookRequest):
             "explanation": str(exc)
         }
 
+    # PHASE 18 — SEND AUTOMATED EMAIL INTO THE FULL SOC PIPELINE
+    pipeline_response = await analyze(
+        AnalyzeRequest(text=analysis_text)
+    )
+
     return {
         "success": True,
         "source": "email_webhook",
@@ -3210,14 +3251,7 @@ def email_webhook(payload: EmailWebhookRequest):
         "recipient": payload.recipient,
         "subject": payload.subject,
         "tenant_id": payload.tenant_id or "demo",
-        "category": category,
-        "score": score,
-        "status": calculate_status(score),
-        "stage": stage,
-        "mitre": mitre,
-        "confidence": confidence,
-        "matches": matches,
-        "ml": ml_result
+        "pipeline": pipeline_response
     }
 
 @app.post("/email/analyze")
@@ -3398,19 +3432,11 @@ async def whatsapp_webhook(request: Request):
                 message_id = message.get("id")
                 timestamp = message.get("timestamp")
 
-                category, score, stage, mitre, confidence, matches = (
-                    classify_threat(text_body)
+                # PHASE 18 — SEND AUTOMATED WHATSAPP MESSAGE
+                # INTO THE FULL SAFECHAT SOC PIPELINE
+                pipeline_response = await analyze(
+                    AnalyzeRequest(text=text_body)
                 )
-
-                try:
-                    ml_result = predict(text_body)
-                except Exception as exc:
-                    ml_result = {
-                        "status": "Unavailable",
-                        "score": 0,
-                        "category": "Unknown",
-                        "explanation": str(exc)
-                    }
 
                 result = {
                     "source": "whatsapp_cloud",
@@ -3419,14 +3445,7 @@ async def whatsapp_webhook(request: Request):
                     "timestamp": timestamp,
                     "tenant_id": "demo",
                     "text": text_body,
-                    "category": category,
-                    "score": score,
-                    "status": calculate_status(score),
-                    "stage": stage,
-                    "mitre": mitre,
-                    "confidence": confidence,
-                    "matches": matches,
-                    "ml": ml_result
+                    "pipeline": pipeline_response
                 }
 
                 results.append(result)
@@ -3693,6 +3712,17 @@ async def analyze(payload: AnalyzeRequest):
         score,
         corr_id
     )
+
+    # ---------------------------------------
+    # PHASE 34 — EXPOSE LIVE THREAT PREDICTION
+    # ---------------------------------------
+    prediction_engine = (
+        decision.get("prediction_engine")
+        if isinstance(decision, dict)
+        else None
+    )
+
+    prediction = prediction_engine
 
     kill_chain = analyze_kill_chain(category)
 
@@ -9435,6 +9465,12 @@ def attack_replay(
         tenant_id=tenant_id,
         limit=limit
     )
+
+
+
+
+
+
 
 
 
