@@ -49,6 +49,7 @@ from reportlab.platypus import (
 from dotenv import load_dotenv
 import os
 import logging
+import httpx
 
 load_dotenv()
 
@@ -164,6 +165,7 @@ WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
 WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
 WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+WHATSAPP_GRAPH_API_VERSION = os.getenv("WHATSAPP_GRAPH_API_VERSION", "")
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
@@ -3616,6 +3618,103 @@ def whatsapp_analyze(payload: WhatsAppAnalyzeRequest):
 
 
 # ============================================================
+# META WHATSAPP CLOUD API
+# ============================================================
+
+async def send_whatsapp_message(
+    recipient: str,
+    message_text: str
+):
+    """
+    Send a text message through the Meta WhatsApp Cloud API.
+
+    Provider configuration is supplied through environment variables.
+    Returns a structured result without exposing credentials.
+    """
+
+    if not WHATSAPP_ACCESS_TOKEN:
+        return {
+            "success": False,
+            "status": "provider_not_configured",
+            "reason": "WHATSAPP_ACCESS_TOKEN is not configured"
+        }
+
+    if not WHATSAPP_PHONE_NUMBER_ID:
+        return {
+            "success": False,
+            "status": "provider_not_configured",
+            "reason": "WHATSAPP_PHONE_NUMBER_ID is not configured"
+        }
+
+    if not WHATSAPP_GRAPH_API_VERSION:
+        return {
+            "success": False,
+            "status": "provider_not_configured",
+            "reason": "WHATSAPP_GRAPH_API_VERSION is not configured"
+        }
+
+    url = (
+        f"https://graph.facebook.com/"
+        f"{WHATSAPP_GRAPH_API_VERSION}/"
+        f"{WHATSAPP_PHONE_NUMBER_ID}/messages"
+    )
+
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": recipient,
+        "type": "text",
+        "text": {
+            "body": message_text
+        }
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                url,
+                headers=headers,
+                json=payload
+            )
+
+        if response.is_success:
+            data = response.json()
+            return {
+                "success": True,
+                "status": "sent",
+                "message_id": (
+                    data.get("messages", [{}])[0].get("id")
+                    if data.get("messages")
+                    else None
+                )
+            }
+
+        logger.error(
+            "WhatsApp Cloud API error: status=%s body=%s",
+            response.status_code,
+            response.text[:500]
+        )
+
+        return {
+            "success": False,
+            "status": "provider_error",
+            "http_status": response.status_code
+        }
+
+    except Exception:
+        logger.exception("WhatsApp Cloud API request failed")
+        return {
+            "success": False,
+            "status": "provider_request_failed",
+            "reason": "WhatsApp Cloud API request failed"
+        }
+
+
+# ============================================================
 # META WHATSAPP CLOUD API WEBHOOK
 # ============================================================
 
@@ -3710,6 +3809,28 @@ async def whatsapp_webhook(request: Request):
                     AnalyzeRequest(text=text_body)
                 )
 
+                outbound_response = None
+
+                pipeline_data = (
+                    pipeline_response.get("data", {})
+                    if isinstance(pipeline_response, dict)
+                    else {}
+                )
+
+                score = pipeline_data.get("score", 0)
+                status = pipeline_data.get("status", "")
+
+                if sender and (
+                    status == "High Risk"
+                    or (isinstance(score, (int, float)) and score >= 80)
+                ):
+                    outbound_response = await send_whatsapp_message(
+                        sender,
+                        "SafeChat AI detected a high-risk message. "
+                        "Please do not share passwords, OTPs, PINs, "
+                        "or financial information."
+                    )
+
                 result = {
                     "source": "whatsapp_cloud",
                     "message_id": message_id,
@@ -3717,7 +3838,8 @@ async def whatsapp_webhook(request: Request):
                     "timestamp": timestamp,
                     "tenant_id": "demo",
                     "text": text_body,
-                    "pipeline": pipeline_response
+                    "pipeline": pipeline_response,
+                    "outbound_response": outbound_response
                 }
 
                 results.append(result)
