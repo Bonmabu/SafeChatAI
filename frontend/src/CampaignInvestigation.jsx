@@ -645,7 +645,7 @@ useEffect(() => {
 
               <section className="campaign-kpis">
                 <div className="campaign-kpi">
-                  <span>Severity</span>
+                  <span>Campaign Severity</span>
                   <strong>
                     {selectedCampaign.severity || "LOW"}
                   </strong>
@@ -1229,7 +1229,7 @@ useEffect(() => {
 
 <div className="campaign-evidence-card">
                     <div className="campaign-evidence-label">
-                      ATTACK GRAPH
+                      LINKED ATTACK GRAPH
                     </div>
 
                     <strong>
@@ -1238,7 +1238,7 @@ useEffect(() => {
                         0}
                     </strong>
 
-                    <span>graph relationships</span>
+                    <span>linked relationships</span>
 
                     <small>
                       {investigation?.attack_graph?.nodes?.length ??
@@ -1260,7 +1260,7 @@ useEffect(() => {
                         0}
                     </strong>
 
-                    <span>tracked assets</span>
+                    <span>linked assets</span>
 
                     <small>
                       Live asset intelligence
@@ -1273,14 +1273,22 @@ useEffect(() => {
                     </div>
 
                     <strong>
-                      {Array.isArray(investigation?.replay)
-                        ? (investigation.replay ?? threatReplay?.timeline).length
-                        : investigation?.replay?.events?.length ??
-                          investigation?.replay?.timeline?.length ??
-                          0}
+                      {(() => {
+                        const replayCount = Array.isArray(
+                          investigation?.replay
+                        )
+                          ? investigation.replay.length
+                          : investigation?.replay?.events?.length ??
+                            investigation?.replay?.timeline?.length ??
+                            0;
+
+                        return replayCount > 0
+                          ? replayCount
+                          : "NOT LINKED";
+                      })()}
                     </strong>
 
-                    <span>replay events</span>
+                    <span>linked replay events</span>
 
                     <small>
                       {investigation?.replay
@@ -1598,7 +1606,7 @@ useEffect(() => {
                         </div>
 
                         <div>
-                          <span>Risk</span>
+                          <span>Event Risk</span>
                           <strong>
                             {Number(
                               selectedEvent.risk_score || 0
