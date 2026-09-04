@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import CustomerNav from "./CustomerNav";
 import ForceGraph2D from "react-force-graph-2d";
@@ -357,9 +357,23 @@ if (nodes.length > 0 && !rootNode) {
 console.log("NODES:", nodes);
 console.log("LINKS:", links);
 
-    setGraphData({
-  nodes,
-  links
+    setGraphData(prev => {
+  const liveGmailNodes = prev.nodes.filter(
+    node => node?.source === "gmail"
+  );
+
+  const mergedNodes = [
+    ...nodes,
+    ...liveGmailNodes.filter(
+      gmailNode =>
+        !nodes.some(existing => existing.id === gmailNode.id)
+    )
+  ];
+
+  return {
+    nodes: mergedNodes,
+    links
+  };
 });
 
     if (nodes.length) {
