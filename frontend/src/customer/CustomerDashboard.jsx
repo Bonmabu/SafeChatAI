@@ -58,6 +58,10 @@ const replayIntervalRef = useRef(null);
 const [replayProgress, setReplayProgress] = useState(0);
 const [highestRiskNode, setHighestRiskNode] = useState(null);
 const [currentThreatLevel, setCurrentThreatLevel] = useState("LOW");
+const [emailAnalyses, setEmailAnalyses] = useState([]);
+const [emailSearch, setEmailSearch] = useState("");
+const [emailFilter, setEmailFilter] = useState("ALL");
+const [expandedEmail, setExpandedEmail] = useState(null);
 const [threatStats, setThreatStats] = useState({
   Critical: 0,
   High: 0,
@@ -210,6 +214,53 @@ incidents.data.forEach(i => {
 });
 
 setThreatStats(stats);
+
+      const persistedEmailAnalyses = incidents.data
+        .map((incident) => {
+          if (!incident?.message) return null;
+
+          try {
+            const parsed =
+              typeof incident.message === "string"
+                ? JSON.parse(incident.message)
+                : incident.message;
+
+            if (!parsed || parsed.source !== "gmail") {
+              return null;
+            }
+
+            return {
+              ...parsed,
+              incident_id: incident.id,
+              scan_id: incident.scan_id,
+              correlation_id: incident.correlation_id,
+              severity: incident.severity || parsed.status,
+              persisted_at:
+                incident.created_at ||
+                incident.timestamp ||
+                null
+            };
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+
+      setEmailAnalyses((prev) => {
+        const merged = [...persistedEmailAnalyses, ...prev];
+        const seen = new Set();
+
+        return merged.filter((item) => {
+          const key =
+            item.message_id ||
+            `${item.incident_id}-${item.subject || ""}`;
+
+          if (seen.has(key)) return false;
+
+          seen.add(key);
+          return true;
+        });
+      });
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
       console.error(err);
@@ -486,6 +537,36 @@ function startLiveStream() {
             nodes: [...prev.nodes, node]
           };
         });
+
+        if (event.source === "gmail") {
+          setEmailAnalyses((prev) => {
+            const messageId = event.message_id;
+
+            if (
+              messageId &&
+              prev.some(
+                (item) => item.message_id === messageId
+              )
+            ) {
+              return prev;
+            }
+
+            return [
+              {
+                ...event,
+                source: "gmail",
+                status:
+                  event.status ||
+                  (Number(event.score ?? 0) >= 80
+                    ? "High Risk"
+                    : Number(event.score ?? 0) >= 50
+                    ? "Suspicious"
+                    : "Low Risk")
+              },
+              ...prev
+            ];
+          });
+        }
 
         break;
       }
@@ -1029,6 +1110,516 @@ function startLiveStream() {
 <p style={{ color: "#9ca3af" }}>
   Last Updated: {lastUpdated}
 </p>
+
+
+      {/* EMAIL & AUTOMATED MESSAGE INTELLIGENCE */}
+      <section
+        style={{
+          margin: "28px 0",
+          padding: "24px",
+          borderRadius: "20px",
+          background:
+            "linear-gradient(145deg, rgba(15,23,42,.96), rgba(17,24,39,.92))",
+          border: "1px solid rgba(148,163,184,.16)",
+          boxShadow: "0 18px 50px rgba(0,0,0,.22)"
+        }}
+      >
+        {(() => {
+          const highRiskCount = emailAnalyses.filter(
+            email => Number(email.score ?? 0) >= 80
+          ).length;
+
+          const phishingCount = emailAnalyses.filter(
+            email =>
+              String(email.category || "")
+                .toLowerCase()
+                .includes("phishing")
+          ).length;
+
+          const filteredEmails = emailAnalyses
+            .filter(email => {
+              const search = emailSearch.trim().toLowerCase();
+              const category = String(email.category || "").toLowerCase();
+              const score = Number(email.score ?? 0);
+
+              const matchesSearch =
+                !search ||
+                String(email.subject || "").toLowerCase().includes(search) ||
+                String(email.sender || "").toLowerCase().includes(search) ||
+                String(email.message_id || "").toLowerCase().includes(search) ||
+                category.includes(search);
+
+              const matchesFilter =
+                emailFilter === "ALL" ||
+                (emailFilter === "HIGH RISK" && score >= 80) ||
+                category.includes(emailFilter.toLowerCase());
+
+              return matchesSearch && matchesFilter;
+            })
+            .slice(0, 20);
+
+          const riskColor = score =>
+            score >= 80 ? "#ef4444" :
+            score >= 50 ? "#f59e0b" :
+            "#22c55e";
+
+          return (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: "18px",
+                  flexWrap: "wrap"
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      letterSpacing: "1.8px",
+                      fontWeight: 800,
+                      color: "#38bdf8",
+                      textTransform: "uppercase"
+                    }}
+                  >
+                    Security Intelligence
+                  </div>
+
+                  <h2
+                    style={{
+                      margin: "6px 0 4px",
+                      fontSize: "22px",
+                      color: "#f8fafc"
+                    }}
+                  >
+                    Email & Automated Message Analysis
+                  </h2>
+
+                  <div style={{ color: "#94a3b8", fontSize: "13px" }}>
+                    Continuous analysis of Gmail and automated security messages
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    flexWrap: "wrap"
+                  }}
+                >
+                  {[
+                    ["ANALYZED", emailAnalyses.length],
+                    ["HIGH RISK", highRiskCount],
+                    ["PHISHING", phishingCount]
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        minWidth: "92px",
+                        padding: "10px 14px",
+                        borderRadius: "12px",
+                        background: "rgba(15,23,42,.75)",
+                        border: "1px solid rgba(148,163,184,.12)"
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color: "#64748b",
+                          letterSpacing: "1px"
+                        }}
+                      >
+                        {label}
+                      </div>
+
+                      <strong
+                        style={{
+                          display: "block",
+                          marginTop: "3px",
+                          color: "#f8fafc",
+                          fontSize: "18px"
+                        }}
+                      >
+                        {value}
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  margin: "20px 0 16px",
+                  flexWrap: "wrap"
+                }}
+              >
+                <input
+                  value={emailSearch}
+                  onChange={e => setEmailSearch(e.target.value)}
+                  placeholder="Search sender, subject, category or message ID..."
+                  style={{
+                    flex: "1 1 300px",
+                    minWidth: "240px",
+                    padding: "12px 14px",
+                    borderRadius: "11px",
+                    border: "1px solid rgba(148,163,184,.16)",
+                    background: "rgba(2,6,23,.72)",
+                    color: "#e2e8f0",
+                    outline: "none"
+                  }}
+                />
+
+                {["ALL", "HIGH RISK", "PHISHING", "MALWARE", "FRAUD"].map(
+                  filter => (
+                    <button
+                      key={filter}
+                      onClick={() => setEmailFilter(filter)}
+                      style={{
+                        padding: "10px 13px",
+                        borderRadius: "10px",
+                        border:
+                          emailFilter === filter
+                            ? "1px solid rgba(56,189,248,.65)"
+                            : "1px solid rgba(148,163,184,.14)",
+                        background:
+                          emailFilter === filter
+                            ? "rgba(14,116,144,.25)"
+                            : "rgba(15,23,42,.65)",
+                        color:
+                          emailFilter === filter
+                            ? "#7dd3fc"
+                            : "#94a3b8",
+                        cursor: "pointer",
+                        fontSize: "11px",
+                        fontWeight: 800
+                      }}
+                    >
+                      {filter}
+                    </button>
+                  )
+                )}
+              </div>
+
+              {filteredEmails.length === 0 ? (
+                <div
+                  style={{
+                    padding: "30px",
+                    textAlign: "center",
+                    borderRadius: "14px",
+                    background: "rgba(2,6,23,.45)",
+                    color: "#64748b"
+                  }}
+                >
+                  No Gmail or automated message analyses match the current filter.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: "10px" }}>
+                  {filteredEmails.map(email => {
+                    const score = Number(email.score ?? 0);
+                    const emailKey =
+                      email.message_id ||
+                      email.incident_id ||
+                      email.subject ||
+                      "email";
+                    const expanded = expandedEmail === emailKey;
+
+                    return (
+                      <div
+                        key={emailKey}
+                        onClick={() =>
+                          setExpandedEmail(expanded ? null : emailKey)
+                        }
+                        style={{
+                          padding: "15px",
+                          borderRadius: "14px",
+                          background: "rgba(2,6,23,.52)",
+                          border: "1px solid rgba(148,163,184,.12)",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "70px minmax(0,1fr) auto",
+                            gap: "14px",
+                            alignItems: "center"
+                          }}
+                        >
+                          <div
+                            style={{
+                              textAlign: "center",
+                              padding: "9px 5px",
+                              borderRadius: "10px",
+                              background: `${riskColor(score)}18`,
+                              border: `1px solid ${riskColor(score)}55`
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "19px",
+                                fontWeight: 900,
+                                color: riskColor(score)
+                              }}
+                            >
+                              {score}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "9px",
+                                color: "#64748b"
+                              }}
+                            >
+                              RISK
+                            </div>
+                          </div>
+
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                color: "#f8fafc",
+                                fontWeight: 800,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis"
+                              }}
+                            >
+                              {email.subject || "Untitled message"}
+                            </div>
+
+                            <div
+                              style={{
+                                marginTop: "4px",
+                                color: "#94a3b8",
+                                fontSize: "12px",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis"
+                              }}
+                            >
+                              {email.sender || "Unknown sender"}
+                            </div>
+
+                            <div
+                              style={{
+                                marginTop: "7px",
+                                display: "flex",
+                                gap: "7px",
+                                flexWrap: "wrap"
+                              }}
+                            >
+                              {[email.category, email.stage, email.status]
+                                .filter(Boolean)
+                                .map(value => (
+                                  <span
+                                    key={value}
+                                    style={{
+                                      padding: "4px 7px",
+                                      borderRadius: "7px",
+                                      background: "rgba(30,41,59,.72)",
+                                      color: "#cbd5e1",
+                                      fontSize: "10px"
+                                    }}
+                                  >
+                                    {value}
+                                  </span>
+                                ))}
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              color: "#64748b",
+                              fontSize: "11px"
+                            }}
+                          >
+                            {expanded ? "▲" : "▼"}
+                          </div>
+                        </div>
+
+                        {expanded && (
+                          <div
+                            style={{
+                              marginTop: "15px",
+                              paddingTop: "15px",
+                              borderTop: "1px solid rgba(148,163,184,.1)"
+                            }}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns:
+                                  "repeat(auto-fit,minmax(150px,1fr))",
+                                gap: "9px"
+                              }}
+                            >
+                              {[
+                                ["Risk Score", email.score],
+                                ["Confidence", email.confidence],
+                                ["Category", email.category],
+                                ["Status", email.status],
+                                ["Attack Stage", email.stage],
+                                ["MITRE", email.mitre]
+                              ].map(([label, value]) => (
+                                <div
+                                  key={label}
+                                  style={{
+                                    padding: "10px",
+                                    borderRadius: "9px",
+                                    background: "rgba(15,23,42,.7)"
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      color: "#64748b",
+                                      fontSize: "9px",
+                                      textTransform: "uppercase"
+                                    }}
+                                  >
+                                    {label}
+                                  </div>
+
+                                  <div
+                                    style={{
+                                      marginTop: "4px",
+                                      color: "#e2e8f0",
+                                      fontSize: "12px",
+                                      fontWeight: 700
+                                    }}
+                                  >
+                                    {String(value ?? "N/A")}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div
+                              style={{
+                                marginTop: "12px",
+                                display: "grid",
+                                gap: "10px"
+                              }}
+                            >
+                              <div>
+                                <div
+                                  style={{
+                                    color: "#38bdf8",
+                                    fontSize: "10px",
+                                    fontWeight: 800
+                                  }}
+                                >
+                                  MATCHED INDICATORS
+                                </div>
+
+                                <div
+                                  style={{
+                                    color: "#cbd5e1",
+                                    fontSize: "12px",
+                                    marginTop: "4px"
+                                  }}
+                                >
+                                  {Array.isArray(email.matches)
+                                    ? email.matches.join(", ") || "None"
+                                    : String(email.matches || "None")}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div
+                                  style={{
+                                    color: "#38bdf8",
+                                    fontSize: "10px",
+                                    fontWeight: 800
+                                  }}
+                                >
+                                  MESSAGE EVIDENCE
+                                </div>
+
+                                <div
+                                  style={{
+                                    color: "#cbd5e1",
+                                    fontSize: "12px",
+                                    marginTop: "4px",
+                                    lineHeight: 1.5
+                                  }}
+                                >
+                                  {email.snippet ||
+                                    email.message ||
+                                    "No evidence available."}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div
+                                  style={{
+                                    color: "#38bdf8",
+                                    fontSize: "10px",
+                                    fontWeight: 800
+                                  }}
+                                >
+                                  ML ANALYSIS
+                                </div>
+
+                                <pre
+                                  style={{
+                                    margin: "5px 0 0",
+                                    padding: "10px",
+                                    borderRadius: "9px",
+                                    background: "rgba(2,6,23,.7)",
+                                    color: "#94a3b8",
+                                    fontSize: "10px",
+                                    overflowX: "auto"
+                                  }}
+                                >
+                                  {JSON.stringify(email.ml || {}, null, 2)}
+                                </pre>
+                              </div>
+
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gap: "4px",
+                                  color: "#64748b",
+                                  fontSize: "10px"
+                                }}
+                              >
+                                <div>Message ID: {email.message_id || "N/A"}</div>
+                                <div>Scan ID: {email.scan_id || "N/A"}</div>
+                                <div>Incident ID: {email.incident_id || "N/A"}</div>
+                                <div>
+                                  Correlation ID: {email.correlation_id || "N/A"}
+                                </div>
+                                <div>Sender: {email.sender || "N/A"}</div>
+                                <div>
+                                  Date: {email.date || email.persisted_at || "N/A"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div
+                style={{
+                  marginTop: "14px",
+                  color: "#64748b",
+                  fontSize: "10px"
+                }}
+              >
+                Live Gmail detections are added automatically through the SOC event stream.
+              </div>
+            </>
+          );
+        })()}
+      </section>
 
 {isReplaying && (
   <div style={{ marginBottom: 10 }}>
