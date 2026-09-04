@@ -5367,6 +5367,8 @@ async def soc_ai_stream(payload: dict):
     else "UNKNOWN"
 )
 
+    live_investigation = None
+
     if ai["category"] == "Safe":
 
         reply = f"""
