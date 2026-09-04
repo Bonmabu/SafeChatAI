@@ -448,6 +448,34 @@ function startLiveStream() {
         setAlerts(prev => [msg, ...prev].slice(0, 20));
         break;
 
+      case "scan_event": {
+        const event = msg.data || {};
+
+        const node = {
+          id: event.message_id || `gmail-${Date.now()}`,
+          category: event.category || "Unknown",
+          score: Number(event.score ?? 0),
+          stage: event.stage || "UNKNOWN",
+          source: event.source || "gmail",
+          sender: event.sender || "",
+          subject: event.subject || "",
+          date: event.date || msg.timestamp
+        };
+
+        setGraphData(prev => {
+          if (prev.nodes.some(existing => existing.id === node.id)) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            nodes: [...prev.nodes, node]
+          };
+        });
+
+        break;
+      }
+
       case "attack_graph": {
         const nodes = msg.nodes || [];
         const links = (msg.links || []).filter(link => {
