@@ -1318,27 +1318,33 @@ useEffect(() => {
                   <div>
                     <span>Attack Graph</span>
                     <strong>
-                      {investigation?.attack_graph
+                      {investigation?.attack_graph?.edges?.length ||
+                      investigation?.attack_graph?.links?.length ||
+                      investigation?.attack_graph?.nodes?.length
                         ? "CONNECTED"
-                        : "AVAILABLE"}
+                        : "NOT LINKED"}
                     </strong>
                   </div>
 
                   <div>
                     <span>Digital Twin</span>
                     <strong>
-                      {investigation?.digital_twin
+                      {investigation?.digital_twin?.assets?.length
                         ? "CONNECTED"
-                        : "AVAILABLE"}
+                        : "NOT LINKED"}
                     </strong>
                   </div>
 
                   <div>
                     <span>Threat Replay</span>
                     <strong>
-                      {investigation?.replay
+                      {investigation?.replay &&
+                      (Array.isArray(investigation.replay)
+                        ? investigation.replay.length
+                        : investigation.replay?.events?.length ||
+                          investigation.replay?.timeline?.length)
                         ? "CONNECTED"
-                        : "AVAILABLE"}
+                        : "NOT LINKED"}
                     </strong>
                   </div>
                 </div>
