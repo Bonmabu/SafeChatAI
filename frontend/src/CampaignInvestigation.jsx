@@ -638,7 +638,7 @@ useEffect(() => {
                     selectedRisk
                   )}`}
                 >
-                  <span>RISK</span>
+                  <span>CAMPAIGN RISK</span>
                   <strong>{selectedRisk.toFixed(1)}</strong>
                 </div>
               </section>
@@ -1122,7 +1122,7 @@ useEffect(() => {
                                     fontWeight: 800,
                                   }}
                                 >
-                                  ? {action}
+                                  → {action}
                                 </span>
                               ))
                             ) : (
@@ -1337,30 +1337,30 @@ useEffect(() => {
 
                 <div className="campaign-tags" style={{ marginTop: 16 }}>
                   <span>
-                    Campaign ? Cluster
+                    Campaign · Cluster
                   </span>
 
                   {investigation?.cluster && (
                     <span>
-                      Cluster ? Events
+                      Cluster · Events
                     </span>
                   )}
 
                   {investigation?.attack_graph && (
                     <span>
-                      Campaign ? Attack Graph
+                      Campaign → Attack Graph
                     </span>
                   )}
 
                   {investigation?.digital_twin && (
                     <span>
-                      Campaign ? Digital Twin
+                      Campaign → Digital Twin
                     </span>
                   )}
 
                   {investigation?.replay && (
                     <span>
-                      Campaign ? Replay
+                      Campaign → Replay
 
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "8px" }}>
                       <button
@@ -1402,7 +1402,7 @@ useEffect(() => {
               <section className="campaign-card campaign-card-wide">
                 <div className="campaign-card-header-row">
                   <div className="campaign-card-title">
-                    ?? Digital Forensics & Evidence Integrity
+                    Digital Forensics & Evidence Integrity
                   </div>
                 </div>
 
@@ -1436,7 +1436,7 @@ useEffect(() => {
                     <div className="campaign-intel-item">
                       <span>Evidence Integrity</span>
                       <strong>
-                        {forensicInvestigation.evidence_integrity || "unknown"}
+                        {String(forensicInvestigation.evidence_integrity || "unknown").toUpperCase() === "UNKNOWN" ? "NOT VERIFIED" : String(forensicInvestigation.evidence_integrity).toUpperCase()}
                       </strong>
                     </div>
                   </div>
