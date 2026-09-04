@@ -1,4 +1,4 @@
-﻿from db import get_forensic_evidence, get_forensic_custody, verify_forensic_evidence, verify_forensic_custody
+from db import get_forensic_evidence, get_forensic_custody, verify_forensic_evidence, verify_forensic_custody
 from db import add_forensic_custody_event, get_forensic_custody, verify_forensic_custody
 from db import save_forensic_evidence, get_forensic_evidence, verify_forensic_evidence
 from pathlib import Path
@@ -2821,48 +2821,28 @@ def gmail_poll_new_messages():
 
 
 async def gmail_monitor_loop():
-
-    poll_seconds = max(
-        15,
-        int(os.getenv("GMAIL_POLL_SECONDS", "30"))
-    )
-
-    print(
-        f"[GMAIL MONITOR] Started. "
-        f"Polling every {poll_seconds}s."
-    )
+    poll_seconds = max(15, int(os.getenv("GMAIL_POLL_SECONDS", "30")))
+    print(f"[GMAIL MONITOR] Started. Polling every {poll_seconds}s.")
 
     while True:
         try:
-            message_ids = await asyncio.to_thread(
-                gmail_poll_new_messages
-            )
+            message_ids = await asyncio.to_thread(gmail_poll_new_messages)
 
             for message_id in message_ids:
-
-                service = await asyncio.to_thread(
-                    get_gmail_service
-                )
+                service = await asyncio.to_thread(get_gmail_service)
 
                 message = await asyncio.to_thread(
                     lambda: service.users().messages().get(
                         userId="me",
                         id=message_id,
                         format="metadata",
-                        metadataHeaders=[
-                            "From",
-                            "To",
-                            "Subject",
-                            "Date"
-                        ]
+                        metadataHeaders=["From", "To", "Subject", "Date"]
                     ).execute()
                 )
 
                 headers = {
                     h["name"].lower(): h["value"]
-                    for h in message.get(
-                        "payload", {}
-                    ).get("headers", [])
+                    for h in message.get("payload", {}).get("headers", [])
                 }
 
                 sender = headers.get("from")
@@ -2872,16 +2852,14 @@ async def gmail_monitor_loop():
                 snippet = message.get("snippet", "")
 
                 analysis_text = "\n".join(
-                    part for part in [
-                        subject,
-                        sender,
-                        snippet
-                    ] if part
+                    part for part in [subject, sender, snippet] if part
                 )
 
                 category, score, stage, mitre, confidence, matches = (
                     classify_threat(analysis_text)
                 )
+
+                status = calculate_status(score)
 
                 try:
                     ml_result = await asyncio.to_thread(
@@ -2896,31 +2874,138 @@ async def gmail_monitor_loop():
                         "explanation": str(exc)
                     }
 
+                # Full Gmail evidence retained in the SOC record.
+                gmail_record = {
+                    "source": "gmail",
+                    "message_id": message_id,
+                    "thread_id": message.get("threadId"),
+                    "date": date,
+                    "sender": sender,
+                    "recipient": recipient,
+                    "subject": subject,
+                    "snippet": snippet,
+                    "category": category,
+                    "score": score,
+                    "status": status,
+                    "stage": stage,
+                    "mitre": mitre,
+                    "confidence": confidence,
+                    "matches": matches,
+                    "ml": ml_result
+                }
+
+                evidence = json.dumps(
+                    gmail_record,
+                    default=str
+                )
+
+                corr_id = generate_correlation_key(
+                    category,
+                    evidence
+                )
+
+                # 1. Persist scan so dashboard Total Scans increases.
+                scan_id = create_scan(
+                    message=evidence,
+                    category=category,
+                    risk_score=score,
+                    status=status,
+                    user="gmail-monitor",
+                    tenant_id="demo"
+                )
+
+                # 2. Persist alert so dashboard Alerts increases.
+                create_alert(
+                    evidence,
+                    status,
+                    "demo"
+                )
+
+                # 3. Persist threat intelligence.
+                threat_intel = upsert_threat_intelligence(
+                    indicator=category,
+                    category=category,
+                    score=score
+                )
+
+                # 4. Persist incident so it survives dashboard refresh.
+                incident_id = create_incident(
+                    scan_id=scan_id,
+                    message=evidence,
+                    category=category,
+                    threat_type=category,
+                    risk_score=score,
+                    severity=status,
+                    stage=stage,
+                    mitre=mitre,
+                    tenant_id="demo",
+                    threat_intel=json.dumps(
+                        threat_intel,
+                        default=str
+                    ),
+                    correlation_id=corr_id
+                )
+
+                # Existing attack/replay pipelines.
+                event = {
+                    "category": category,
+                    "score": score,
+                    "stage": stage,
+                    "mitre": mitre,
+                    "confidence": confidence,
+                    "matches": matches,
+                    "username": "gmail-monitor",
+                    "hostname": "gmail",
+                    "source_ip": ""
+                }
+
+                add_event(event)
+                add_replay_event(event)
+
+                # Populate the existing in-memory investigation timeline.
+                if corr_id not in ATTACK_TIMELINE:
+                    ATTACK_TIMELINE[corr_id] = []
+
+                ATTACK_TIMELINE[corr_id].append({
+                    "timestamp": date or now_ts(),
+                    "event": "gmail_message_analyzed",
+                    "source": "gmail",
+                    "incident_id": incident_id,
+                    "scan_id": scan_id,
+                    "category": category,
+                    "score": score,
+                    "status": status,
+                    "stage": stage,
+                    "mitre": mitre,
+                    "message_id": message_id,
+                    "sender": sender,
+                    "recipient": recipient,
+                    "subject": subject
+                })
+
+                # Existing live attack graph.
+                add_graph_node(
+                    corr_id,
+                    category,
+                    score,
+                    stage,
+                    mitre
+                )
+
+                # Existing live WebSocket pipeline.
                 await push_event(
                     "scan_event",
                     {
-                        "source": "gmail",
-                        "message_id": message_id,
-                        "thread_id": message.get("threadId"),
-                        "date": date,
-                        "sender": sender,
-                        "recipient": recipient,
-                        "subject": subject,
-                        "snippet": snippet,
-                        "category": category,
-                        "score": score,
-                        "status": calculate_status(score),
-                        "stage": stage,
-                        "mitre": mitre,
-                        "confidence": confidence,
-                        "matches": matches,
-                        "ml": ml_result
+                        **gmail_record,
+                        "scan_id": scan_id,
+                        "incident_id": incident_id,
+                        "correlation_id": corr_id
                     }
                 )
 
                 print(
-                    f"[GMAIL MONITOR] Analyzed "
-                    f"{message_id} | "
+                    f"[GMAIL MONITOR] Persisted {message_id} | "
+                    f"scan={scan_id} | incident={incident_id} | "
                     f"{category} | score={score}"
                 )
 
