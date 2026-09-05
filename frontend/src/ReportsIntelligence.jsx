@@ -167,7 +167,7 @@ export default function ReportsIntelligence() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") runQuery();
               }}
-              placeholder='Ask for a report, e.g. "Show phishing incidents this month"'
+              placeholder='Ask for a report, e.g. "Show phishing incidents for August"'
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -615,4 +615,5 @@ export default function ReportsIntelligence() {
     </div>
   );
 }
+
 
