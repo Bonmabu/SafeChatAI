@@ -71,10 +71,10 @@ export default function ReportsIntelligence() {
   };
 
   const quickReports = [
-    "Generate an executive report for August",
-    "Show phishing incidents for August",
+    "Generate an executive report",
+    "Show phishing incidents",
     "Show all high-risk incidents this month",
-    "Retrieve report 2348",
+    "Retrieve an incident report",
   ];
 
   return (
@@ -167,7 +167,7 @@ export default function ReportsIntelligence() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") runQuery();
               }}
-              placeholder='Ask for a report, e.g. "Show phishing incidents for August"'
+              placeholder='Ask for a report, e.g. "Show phishing incidents this month"'
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -615,3 +615,4 @@ export default function ReportsIntelligence() {
     </div>
   );
 }
+
