@@ -275,6 +275,20 @@ def init_db():
     )
     """)
 
+    # report history / archive
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS report_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tenant_id TEXT NOT NULL,
+        report_type TEXT NOT NULL,
+        query TEXT,
+        period_start TEXT,
+        period_end TEXT,
+        report_data TEXT NOT NULL,
+        generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     # threat hunts
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS threat_hunts (
@@ -291,6 +305,88 @@ def init_db():
 
     conn.commit()
     conn.close()
+def save_report_history(
+    tenant_id,
+    report_type,
+    report_data,
+    query=None,
+    period_start=None,
+    period_end=None
+):
+    import json
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO report_history (
+            tenant_id,
+            report_type,
+            query,
+            period_start,
+            period_end,
+            report_data
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        tenant_id,
+        report_type,
+        query,
+        period_start,
+        period_end,
+        json.dumps(report_data, default=str)
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def get_report_history(
+    tenant_id="demo",
+    limit=100
+):
+    import json
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            id,
+            tenant_id,
+            report_type,
+            query,
+            period_start,
+            period_end,
+            report_data,
+            generated_at
+        FROM report_history
+        WHERE tenant_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+    """, (
+        tenant_id,
+        limit
+    ))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    history = []
+
+    for row in rows:
+        item = dict(row)
+
+        try:
+            item["report_data"] = json.loads(item["report_data"])
+        except Exception:
+            pass
+
+        history.append(item)
+
+    return history
+
+
 def add_threat_intel_column():
     conn = get_conn()
     cursor = conn.cursor()

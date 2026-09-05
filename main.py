@@ -120,6 +120,7 @@ from ml_model import predict
 from sklearn.ensemble import IsolationForest
 MODEL = IsolationForest(contamination=0.05)
 from db import create_scan, save_digital_twin_snapshot, get_latest_digital_twin_snapshot, save_remediation_audit
+from db import save_report_history, get_report_history
 
 from db import (
     init_db,
@@ -6911,6 +6912,30 @@ def natural_language_report_query(
     )
 
     # ---------------------------------------------------------
+    # Report history / archive
+    # ---------------------------------------------------------
+    save_report_history(
+        tenant_id=tenant_id,
+        report_type="Natural Language Report",
+        query=original_query,
+        period_start=from_date,
+        period_end=to_date,
+        report_data={
+            "interpretation": {
+                "incident_id": incident_id,
+                "category": category,
+                "severity": severity,
+                "status": status,
+                "from_date": from_date,
+                "to_date": to_date,
+                "tenant_id": tenant_id
+            },
+            "result_count": len(results),
+            "reports": results
+        }
+    )
+
+    # ---------------------------------------------------------
     # Report response
     # ---------------------------------------------------------
     return {
@@ -6929,6 +6954,25 @@ def natural_language_report_query(
         "reports": results
     }
 
+
+
+@app.get("/reports/history")
+def report_history(
+    limit: int = 100,
+    user=Depends(get_current_user)
+):
+    tenant_id = user.get("tenant_id", "demo")
+
+    limit = max(1, min(limit, 500))
+
+    return {
+        "success": True,
+        "tenant_id": tenant_id,
+        "reports": get_report_history(
+            tenant_id=tenant_id,
+            limit=limit
+        )
+    }
 
 
 @app.get("/reports/{incident_id}/ai-investigation")
