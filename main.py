@@ -6681,6 +6681,240 @@ def reports_csv(user=Depends(get_current_user)):
         media_type="text/csv"
     )
 
+
+@app.get("/reports/query")
+def natural_language_report_query(
+    q: str,
+    user=Depends(get_current_user)
+):
+    """
+    Natural-language reporting interface.
+
+    Examples:
+      /reports/query?q=Retrieve report 2348
+      /reports/query?q=Show high risk phishing incidents
+      /reports/query?q=Show phishing incidents for August
+      /reports/query?q=Show all high-risk incidents this month
+
+    Tenant scope always comes from the authenticated user.
+    """
+
+    from datetime import datetime, timedelta
+    import calendar
+    import re
+
+    original_query = q.strip()
+    query = original_query.lower()
+
+    if not original_query:
+        raise HTTPException(
+            status_code=400,
+            detail="Report query is required"
+        )
+
+    tenant_id = user.get("tenant_id", "demo")
+
+    incident_id = None
+    category = None
+    severity = None
+    status = None
+    from_date = None
+    to_date = None
+
+    # ---------------------------------------------------------
+    # Incident ID
+    # ---------------------------------------------------------
+    id_match = re.search(
+        r'\b(?:inc(?:ident)?[-\s:]*)?(\d{2,})\b',
+        query
+    )
+
+    if id_match and any(
+        token in query
+        for token in (
+            "incident",
+            "report",
+            "retrieve",
+            "show",
+            "get"
+        )
+    ):
+        incident_id = id_match.group(1)
+
+    # ---------------------------------------------------------
+    # Category
+    # ---------------------------------------------------------
+    categories = [
+        "phishing",
+        "malware",
+        "fraud",
+        "harassment",
+        "ransomware",
+        "spyware",
+        "business email compromise",
+        "credential theft",
+        "account takeover",
+        "insider threat"
+    ]
+
+    for item in categories:
+        if item in query:
+            category = item
+            break
+
+    # ---------------------------------------------------------
+    # Severity
+    # ---------------------------------------------------------
+    if "high risk" in query or "high-risk" in query or "critical" in query:
+        severity = "High"
+    elif "suspicious" in query or "medium risk" in query or "medium-risk" in query:
+        severity = "Suspicious"
+    elif "low risk" in query or "low-risk" in query:
+        severity = "Low"
+
+    # ---------------------------------------------------------
+    # Status
+    # ---------------------------------------------------------
+    statuses = [
+        "open",
+        "closed",
+        "resolved",
+        "investigating",
+        "pending",
+        "contained"
+    ]
+
+    for item in statuses:
+        if re.search(rf'\b{re.escape(item)}\b', query):
+            status = item
+            break
+
+    # ---------------------------------------------------------
+    # Date / month parsing
+    # ---------------------------------------------------------
+    now = datetime.utcnow()
+
+    month_names = {
+        "january": 1,
+        "february": 2,
+        "march": 3,
+        "april": 4,
+        "may": 5,
+        "june": 6,
+        "july": 7,
+        "august": 8,
+        "september": 9,
+        "october": 10,
+        "november": 11,
+        "december": 12
+    }
+
+    requested_month = None
+
+    for month_name, month_number in month_names.items():
+        if month_name in query:
+            requested_month = month_number
+            break
+
+    if requested_month:
+        year = now.year
+
+        if requested_month > now.month:
+            year -= 1
+
+        month_start = datetime(year, requested_month, 1)
+        last_day = calendar.monthrange(year, requested_month)[1]
+        month_end = datetime(
+            year,
+            requested_month,
+            last_day,
+            23,
+            59,
+            59
+        )
+
+        from_date = month_start.isoformat()
+        to_date = month_end.isoformat()
+
+    elif "this month" in query:
+        month_start = datetime(now.year, now.month, 1)
+
+        from_date = month_start.isoformat()
+        to_date = now.isoformat()
+
+    elif "last month" in query:
+        if now.month == 1:
+            year = now.year - 1
+            month = 12
+        else:
+            year = now.year
+            month = now.month - 1
+
+        month_start = datetime(year, month, 1)
+        last_day = calendar.monthrange(year, month)[1]
+
+        month_end = datetime(
+            year,
+            month,
+            last_day,
+            23,
+            59,
+            59
+        )
+
+        from_date = month_start.isoformat()
+        to_date = month_end.isoformat()
+
+    elif "today" in query:
+        start = datetime(now.year, now.month, now.day)
+
+        from_date = start.isoformat()
+        to_date = now.isoformat()
+
+    elif "this week" in query:
+        start = now - timedelta(days=now.weekday())
+
+        from_date = datetime(
+            start.year,
+            start.month,
+            start.day
+        ).isoformat()
+
+        to_date = now.isoformat()
+
+    # ---------------------------------------------------------
+    # Execute through existing tenant-scoped search logic
+    # ---------------------------------------------------------
+    results = search_reports(
+        incident_id=incident_id,
+        category=category,
+        severity=severity,
+        status=status,
+        from_date=from_date,
+        to_date=to_date,
+        user=user
+    )
+
+    # ---------------------------------------------------------
+    # Report response
+    # ---------------------------------------------------------
+    return {
+        "success": True,
+        "query": original_query,
+        "interpretation": {
+            "incident_id": incident_id,
+            "category": category,
+            "severity": severity,
+            "status": status,
+            "from_date": from_date,
+            "to_date": to_date,
+            "tenant_id": tenant_id
+        },
+        "result_count": len(results),
+        "reports": results
+    }
+
+
 @app.get("/reports/{incident_id}")
 async def get_report(
     incident_id: str,
