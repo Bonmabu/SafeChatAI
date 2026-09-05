@@ -6509,6 +6509,79 @@ def get_reports(user=Depends(get_current_user)):
         })
 
     return reports
+
+
+@app.get("/reports/search")
+def search_reports(
+    incident_id: str | None = None,
+    category: str | None = None,
+    severity: str | None = None,
+    status: str | None = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    user=Depends(get_current_user)
+):
+    tenant_id = user.get("tenant_id", "demo")
+
+    query = """
+        SELECT
+            id,
+            created_at,
+            category,
+            severity,
+            status,
+            assigned_to
+        FROM incidents
+        WHERE tenant_id = ?
+    """
+
+    params = [tenant_id]
+
+    if incident_id:
+        query += " AND id = ?"
+        params.append(incident_id)
+
+    if category:
+        query += " AND LOWER(category) = LOWER(?)"
+        params.append(category)
+
+    if severity:
+        query += " AND LOWER(severity) = LOWER(?)"
+        params.append(severity)
+
+    if status:
+        query += " AND LOWER(status) = LOWER(?)"
+        params.append(status)
+
+    if from_date:
+        query += " AND created_at >= ?"
+        params.append(from_date)
+
+    if to_date:
+        query += " AND created_at <= ?"
+        params.append(to_date)
+
+    query += " ORDER BY id DESC"
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(query, tuple(params))
+    rows = cur.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": row[0],
+            "created_at": row[1],
+            "category": row[2],
+            "severity": row[3],
+            "status": row[4],
+            "assigned_to": row[5]
+        }
+        for row in rows
+    ]
+
+
 @app.get("/reports/pdf")
 def reports_pdf(user=Depends(get_current_user)):
 
@@ -6607,6 +6680,49 @@ def reports_csv(user=Depends(get_current_user)):
         filename="incident_report.csv",
         media_type="text/csv"
     )
+
+@app.get("/reports/{incident_id}")
+async def get_report(
+    incident_id: str,
+    user=Depends(get_current_user)
+):
+    tenant_id = user.get("tenant_id", "demo")
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT *
+        FROM incidents
+        WHERE id = ?
+          AND tenant_id = ?
+        LIMIT 1
+    """, (incident_id, tenant_id))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Report not found"
+        )
+
+    incident = dict(row)
+
+    forensic = await forensic_investigation(
+        incident_id=incident_id,
+        tenant_id=tenant_id
+    )
+
+    return {
+        "success": True,
+        "report_type": "incident",
+        "incident": incident,
+        "forensics": forensic,
+        "tenant_id": tenant_id
+    }
+
 @app.get("/hunt")
 async def hunt(query: str = ""):
     conn = get_conn()
