@@ -31,18 +31,26 @@ export default function OverviewDashboard() {
 
     const load = async () => {
       try {
-        const [summaryRes, healthRes, incidentsRes, graphRes] =
+        const [summaryRes, healthRes, incidentsRes, graphRes, executiveRes] =
           await Promise.allSettled([
             axios.get(`${API}/soc-summary`, auth()),
             axios.get(`${API}/health`, auth()),
             axios.get(`${API}/incidents`, auth()),
             axios.get(`${API}/attack-graph`, auth()),
+            axios.get(`${API}/executive/dashboard`, auth()),
           ]);
 
         if (!mounted) return;
 
         if (summaryRes.status === "fulfilled") {
           setSummary(summaryRes.value.data || {});
+        }
+
+        if (executiveRes.status === "fulfilled") {
+          setSummary((prev) => ({
+            ...prev,
+            ...executiveRes.value.data,
+          }));
         }
 
         if (healthRes.status === "fulfilled") {
