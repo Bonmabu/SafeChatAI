@@ -6739,7 +6739,14 @@ def natural_language_report_query(
             "get"
         )
     ):
-        incident_id = id_match.group(1)
+        candidate_id = id_match.group(1)
+
+        # Do not interpret a standalone four-digit year as an incident ID.
+        if not (
+            len(candidate_id) == 4
+            and 1900 <= int(candidate_id) <= 2100
+        ):
+            incident_id = candidate_id
 
     # ---------------------------------------------------------
     # Category
@@ -6817,10 +6824,18 @@ def natural_language_report_query(
             break
 
     if requested_month:
-        year = now.year
+        year_match = re.search(
+            r"\b(20\d{2}|19\d{2})\b",
+            query
+        )
 
-        if requested_month > now.month:
-            year -= 1
+        if year_match:
+            year = int(year_match.group(1))
+        else:
+            year = now.year
+
+            if requested_month > now.month:
+                year -= 1
 
         month_start = datetime(year, requested_month, 1)
         last_day = calendar.monthrange(year, requested_month)[1]
@@ -8588,10 +8603,18 @@ def natural_language_executive_report(q: str):
             break
 
     if requested_month:
-        year = now.year
+        year_match = re.search(
+            r"\b(20\d{2}|19\d{2})\b",
+            query
+        )
 
-        if requested_month > now.month:
-            year -= 1
+        if year_match:
+            year = int(year_match.group(1))
+        else:
+            year = now.year
+
+            if requested_month > now.month:
+                year -= 1
 
         period_start = datetime(year, requested_month, 1)
 
