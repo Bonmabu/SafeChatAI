@@ -35,7 +35,140 @@ import {
   ResponsiveContainer
 } from "recharts";
 
+function SharedReport() {
+  const [loading, setLoading] = useState(true);
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const token = window.location.pathname
+      .split("/shared-report/")[1]
+      ?.split("/")[0];
+
+    if (!token) {
+      setError("Invalid shared report link.");
+      setLoading(false);
+      return;
+    }
+
+    axios.get(`${import.meta.env.VITE_API_BASE}/reports/shared/${token}`)
+      .then((res) => {
+        setReport(res.data);
+      })
+      .catch((err) => {
+        setError(
+          err.response?.data?.detail ||
+          "This report link is invalid or expired."
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40, fontFamily: "Arial" }}>
+        <h2>Loading shared report...</h2>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: 40, fontFamily: "Arial" }}>
+        <h2>Shared Report</h2>
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  const incident = report?.incident || {};
+  const forensics = report?.forensics || {};
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      padding: 40,
+      background: "#0f172a",
+      color: "#ffffff",
+      fontFamily: "Arial, sans-serif"
+    }}>
+      <div style={{
+        maxWidth: 1100,
+        margin: "0 auto"
+      }}>
+        <h1>SafeChat AI — Shared Incident Report</h1>
+
+        <p style={{ color: "#94a3b8" }}>
+          This is a secure, time-limited shared incident report.
+        </p>
+
+        <div style={{
+          marginTop: 24,
+          padding: 24,
+          background: "#111827",
+          borderRadius: 12
+        }}>
+          <h2>Incident #{incident.id}</h2>
+
+          <p><strong>Category:</strong> {incident.category || "Unknown"}</p>
+          <p><strong>Severity:</strong> {incident.severity || "Unknown"}</p>
+          <p><strong>Status:</strong> {incident.status || "Unknown"}</p>
+          <p><strong>Created:</strong> {incident.created_at || "Unknown"}</p>
+          <p><strong>Assigned to:</strong> {incident.assigned_to || "Unassigned"}</p>
+
+          {incident.message && (
+            <div style={{ marginTop: 20 }}>
+              <h3>Message</h3>
+              <pre style={{
+                whiteSpace: "pre-wrap",
+                background: "#020617",
+                padding: 16,
+                borderRadius: 8
+              }}>
+                {incident.message}
+              </pre>
+            </div>
+          )}
+        </div>
+
+        <div style={{
+          marginTop: 24,
+          padding: 24,
+          background: "#111827",
+          borderRadius: 12
+        }}>
+          <h2>Forensic Investigation</h2>
+
+          <pre style={{
+            whiteSpace: "pre-wrap",
+            background: "#020617",
+            padding: 16,
+            borderRadius: 8,
+            overflowX: "auto"
+          }}>
+            {JSON.stringify(forensics, null, 2)}
+          </pre>
+        </div>
+
+        <p style={{
+          marginTop: 24,
+          color: "#94a3b8",
+          fontSize: 13
+        }}>
+          Share link expires at: {report?.expires_at || "Unknown"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function App() {
+  if (window.location.pathname.startsWith("/shared-report/")) {
+    return <SharedReport />;
+  }
+
   const [authenticated, setAuthenticated] = useState(
   !!localStorage.getItem("token")
 );

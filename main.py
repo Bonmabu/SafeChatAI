@@ -7120,6 +7120,140 @@ def ai_investigation_report(
     }
 
 
+@app.post("/reports/{incident_id}/share")
+def create_report_share(
+    incident_id: str,
+    expires_minutes: int = 60,
+    user=Depends(get_current_user)
+):
+    """
+    Create an expiring tenant-isolated share link for an incident report.
+    """
+
+    tenant_id = user.get("tenant_id", "demo")
+
+    expires_minutes = max(5, min(expires_minutes, 1440))
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id
+        FROM incidents
+        WHERE id = ?
+          AND tenant_id = ?
+    """, (incident_id, tenant_id))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Report not found"
+        )
+
+    expires_at = datetime.utcnow() + timedelta(
+        minutes=expires_minutes
+    )
+
+    token = jwt.encode(
+        {
+            "scope": "report_share",
+            "incident_id": str(incident_id),
+            "tenant_id": tenant_id,
+            "exp": expires_at
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
+
+    frontend_url = os.getenv(
+        "FRONTEND_URL",
+        "http://localhost:5173"
+    ).rstrip("/")
+
+    return {
+        "success": True,
+        "report_type": "incident",
+        "incident_id": str(incident_id),
+        "tenant_id": tenant_id,
+        "expires_at": expires_at.isoformat() + "Z",
+        "share_url": (
+            f"{frontend_url}/shared-report/{token}"
+        )
+    }
+
+
+@app.get("/reports/shared/{token}")
+async def get_shared_report(token: str):
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        if payload.get("scope") != "report_share":
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid report share token"
+            )
+
+        incident_id = str(payload.get("incident_id"))
+        tenant_id = payload.get("tenant_id")
+
+        if not incident_id or not tenant_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid report share token"
+            )
+
+    except JWTError:
+        raise HTTPException(
+            status_code=403,
+            detail="Report share link is invalid or expired"
+        )
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT *
+        FROM incidents
+        WHERE id = ?
+          AND tenant_id = ?
+    """, (incident_id, tenant_id))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Report not found"
+        )
+
+    incident = dict(row)
+
+    forensic = await forensic_investigation(
+        incident_id=incident_id,
+        tenant_id=tenant_id
+    )
+
+    return {
+        "success": True,
+        "report_type": "incident",
+        "shared": True,
+        "incident": incident,
+        "forensics": forensic,
+        "expires_at": datetime.fromtimestamp(
+            payload["exp"]
+        ).isoformat() + "Z"
+    }
+
+
 @app.get("/reports/{incident_id}")
 async def get_report(
     incident_id: str,
