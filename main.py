@@ -6683,6 +6683,56 @@ def reports_csv(user=Depends(get_current_user)):
     )
 
 
+@app.get("/reports/json")
+def reports_json(user=Depends(get_current_user)):
+
+    tenant_id = user.get("tenant_id", "demo")
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id,
+               created_at,
+               category,
+               severity,
+               status,
+               assigned_to
+        FROM incidents
+        WHERE tenant_id = ?
+        ORDER BY id DESC
+    """, (tenant_id,))
+
+    rows = cur.fetchall()
+    conn.close()
+
+    reports = []
+
+    for r in rows:
+        reports.append({
+            "id": r[0],
+            "date": str(r[1]),
+            "category": r[2],
+            "severity": r[3],
+            "status": r[4],
+            "assigned_to": r[5] or "Unassigned"
+        })
+
+    return JSONResponse(
+        content={
+            "success": True,
+            "tenant_id": tenant_id,
+            "report_type": "incident_report",
+            "count": len(reports),
+            "reports": reports
+        },
+        headers={
+            "Content-Disposition":
+            "attachment; filename=incident_report.json"
+        }
+    )
+
+
 @app.get("/reports/query")
 def natural_language_report_query(
     q: str,
