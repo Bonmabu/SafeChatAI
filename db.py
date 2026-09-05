@@ -52,6 +52,16 @@ class CompatibleCursor:
         sql = db_sql(sql)
         return self._cursor.executemany(sql, params_seq)
 
+    @property
+    def lastrowid(self):
+        value = getattr(self._cursor, "lastrowid", None)
+        if value is not None:
+            return value
+
+        # PostgreSQL/psycopg cursors do not expose SQLite's lastrowid.
+        # PostgreSQL inserts in this project use RETURNING id where needed.
+        return None
+
     def __getattr__(self, name):
         return getattr(self._cursor, name)
 
