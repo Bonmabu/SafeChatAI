@@ -8442,6 +8442,237 @@ def executive_strategy():
             recommendations
 
     }
+
+@app.get("/reports/executive/query", dependencies=[Depends(require_executive_access)])
+def natural_language_executive_report(q: str):
+    """
+    Natural-language executive reporting interface.
+
+    Examples:
+      /reports/executive/query?q=Generate an executive report for August
+      /reports/executive/query?q=Generate the executive report for this month
+      /reports/executive/query?q=Generate the executive report for last month
+    """
+
+    import calendar
+    import re
+    from datetime import datetime
+
+    original_query = q.strip()
+
+    if not original_query:
+        raise HTTPException(
+            status_code=400,
+            detail="Executive report query is required"
+        )
+
+    query = original_query.lower()
+    now = datetime.utcnow()
+
+    month_names = {
+        "january": 1,
+        "february": 2,
+        "march": 3,
+        "april": 4,
+        "may": 5,
+        "june": 6,
+        "july": 7,
+        "august": 8,
+        "september": 9,
+        "october": 10,
+        "november": 11,
+        "december": 12
+    }
+
+    requested_month = None
+
+    for month_name, month_number in month_names.items():
+        if month_name in query:
+            requested_month = month_number
+            break
+
+    if requested_month:
+        year = now.year
+
+        if requested_month > now.month:
+            year -= 1
+
+        period_start = datetime(year, requested_month, 1)
+
+        last_day = calendar.monthrange(
+            year,
+            requested_month
+        )[1]
+
+        period_end = datetime(
+            year,
+            requested_month,
+            last_day,
+            23,
+            59,
+            59
+        )
+
+    elif "last month" in query:
+
+        if now.month == 1:
+            year = now.year - 1
+            month = 12
+        else:
+            year = now.year
+            month = now.month - 1
+
+        period_start = datetime(year, month, 1)
+
+        last_day = calendar.monthrange(
+            year,
+            month
+        )[1]
+
+        period_end = datetime(
+            year,
+            month,
+            last_day,
+            23,
+            59,
+            59
+        )
+
+    elif "this month" in query:
+
+        period_start = datetime(
+            now.year,
+            now.month,
+            1
+        )
+
+        period_end = now
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Specify a reporting period such as "
+                "August, this month, or last month"
+            )
+        )
+
+    start_iso = period_start.isoformat()
+    end_iso = period_end.isoformat()
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            COUNT(*) AS total_incidents,
+            COALESCE(AVG(risk_score), 0) AS average_risk,
+            SUM(
+                CASE
+                    WHEN risk_score >= 80 THEN 1
+                    ELSE 0
+                END
+            ) AS high_risk_incidents,
+            SUM(
+                CASE
+                    WHEN status = 'OPEN' THEN 1
+                    ELSE 0
+                END
+            ) AS open_incidents,
+            SUM(
+                CASE
+                    WHEN status = 'BLOCKED' THEN 1
+                    ELSE 0
+                END
+            ) AS blocked_incidents
+        FROM incidents
+        WHERE created_at >= ?
+          AND created_at <= ?
+    """, (start_iso, end_iso))
+
+    metrics = cursor.fetchone()
+
+    cursor.execute("""
+        SELECT
+            category,
+            COUNT(*) AS total
+        FROM incidents
+        WHERE created_at >= ?
+          AND created_at <= ?
+        GROUP BY category
+        ORDER BY total DESC
+        LIMIT 5
+    """, (start_iso, end_iso))
+
+    threat_rows = cursor.fetchall()
+
+    conn.close()
+
+    total_incidents = metrics["total_incidents"] or 0
+    average_risk = round(
+        metrics["average_risk"] or 0,
+        2
+    )
+    high_risk_incidents = metrics["high_risk_incidents"] or 0
+    open_incidents = metrics["open_incidents"] or 0
+    blocked_incidents = metrics["blocked_incidents"] or 0
+
+    if average_risk >= 70:
+        risk_level = "CRITICAL"
+    elif average_risk >= 40:
+        risk_level = "ELEVATED"
+    elif average_risk >= 20:
+        risk_level = "GUARDED"
+    else:
+        risk_level = "LOW"
+
+    top_threats = [
+        {
+            "category": row["category"],
+            "count": row["total"]
+        }
+        for row in threat_rows
+    ]
+
+    if high_risk_incidents > 0:
+        executive_recommendation = (
+            "Prioritize high-risk incidents and strengthen "
+            "active threat monitoring."
+        )
+    elif total_incidents > 0:
+        executive_recommendation = (
+            "Maintain proactive monitoring and continue "
+            "incident response readiness."
+        )
+    else:
+        executive_recommendation = (
+            "No incidents were recorded during the requested period."
+        )
+
+    month_label = period_start.strftime("%B %Y")
+
+    return {
+        "success": True,
+        "report_type": "executive",
+        "query": original_query,
+        "report_period": {
+            "label": month_label,
+            "from_date": start_iso,
+            "to_date": end_iso
+        },
+        "executive_summary": {
+            "total_incidents": total_incidents,
+            "average_risk": average_risk,
+            "risk_level": risk_level,
+            "high_risk_incidents": high_risk_incidents,
+            "open_incidents": open_incidents,
+            "blocked_incidents": blocked_incidents,
+            "top_threats": top_threats
+        },
+        "strategic_recommendation": executive_recommendation,
+        "generated_at": datetime.utcnow().isoformat()
+    }
+
 @app.get("/executive/board-report", dependencies=[Depends(require_executive_access)])
 def executive_board_report():
 
