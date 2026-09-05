@@ -402,9 +402,13 @@ export default function OverviewDashboard() {
 
             <div>
               <h2>Security Operations</h2>
-              <p>Move directly into the SOC view you need</p>
+              <p>Unified access to the complete SafeChat intelligence workspace</p>
             </div>
           </div>
+
+          <span className="overview-live-text">
+            COMMAND CENTER
+          </span>
         </div>
 
         <div className="overview-modules">
@@ -414,9 +418,29 @@ export default function OverviewDashboard() {
               navigate("/dashboard/customer")
             }
           >
-            <span>&#x1F465;</span>
+            <span>&#x1F6E1;&#xFE0F;</span>
             <strong>Customer SOC</strong>
-            <small>Threat operations & analytics</small>
+            <small>Threat operations, incidents & analytics</small>
+          </button>
+
+          <button
+            onClick={() =>
+              navigate("/dashboard/campaigns")
+            }
+          >
+            <span>&#x1F3AF;</span>
+            <strong>Campaign Investigation</strong>
+            <small>Investigate coordinated threat activity</small>
+          </button>
+
+          <button
+            onClick={() =>
+              navigate("/dashboard/reports")
+            }
+          >
+            <span>&#x1F4CA;</span>
+            <strong>Reports & Intelligence</strong>
+            <small>AI investigations, reports & intelligence</small>
           </button>
 
           <button
@@ -426,7 +450,7 @@ export default function OverviewDashboard() {
           >
             <span>&#x1F9E0;</span>
             <strong>Executive / IT</strong>
-            <small>Risk, posture & strategy</small>
+            <small>Risk, posture & strategic security insight</small>
           </button>
 
           <button
@@ -436,7 +460,27 @@ export default function OverviewDashboard() {
           >
             <span>&#x2699;&#xFE0F;</span>
             <strong>Admin SOC</strong>
-            <small>Users & governance</small>
+            <small>Users, governance & platform administration</small>
+          </button>
+
+          <button
+            onClick={() =>
+              navigate("/dashboard/customer/timeline")
+            }
+          >
+            <span>&#x1F552;</span>
+            <strong>Security Timeline</strong>
+            <small>Trace incidents and activity over time</small>
+          </button>
+
+          <button
+            onClick={() =>
+              navigate("/dashboard/customer/analytics")
+            }
+          >
+            <span>&#x1F4C8;</span>
+            <strong>Security Analytics</strong>
+            <small>Deep threat trends and operational analytics</small>
           </button>
 
         </div>
