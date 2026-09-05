@@ -1244,6 +1244,37 @@ style={{
 
 
     </div>
+
+    <div style={{ marginTop: 30 }}>
+      <h3>Threat Trend — Last 30 Days</h3>
+
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={analytics.daily_trends || []}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" />
+          <YAxis yAxisId="left" />
+          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} />
+          <Tooltip />
+          <Legend />
+          <Line
+            yAxisId="left"
+            type="monotone"
+            dataKey="count"
+            name="Incidents"
+            strokeWidth={2}
+            dot={false}
+          />
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="average_risk"
+            name="Average Risk"
+            strokeWidth={2}
+            dot={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   </div>
 )}
 </div>

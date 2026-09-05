@@ -7335,7 +7335,9 @@ async def hunt(query: str = ""):
         for r in rows
     ]
 @app.get("/analytics")
-def analytics():
+def analytics(user=Depends(get_current_user)):
+
+    tenant_id = user.get("tenant_id", "demo")
 
     conn = get_conn()
     cur = conn.cursor()
@@ -7343,23 +7345,42 @@ def analytics():
     cur.execute("""
         SELECT category, COUNT(*)
         FROM incidents
+        WHERE tenant_id = ?
         GROUP BY category
-    """)
+        ORDER BY COUNT(*) DESC
+    """, (tenant_id,))
     categories = cur.fetchall()
 
     cur.execute("""
         SELECT severity, COUNT(*)
         FROM incidents
+        WHERE tenant_id = ?
         GROUP BY severity
-    """)
+        ORDER BY COUNT(*) DESC
+    """, (tenant_id,))
     severities = cur.fetchall()
 
     cur.execute("""
         SELECT status, COUNT(*)
         FROM incidents
+        WHERE tenant_id = ?
         GROUP BY status
-    """)
+        ORDER BY COUNT(*) DESC
+    """, (tenant_id,))
     statuses = cur.fetchall()
+
+    cur.execute("""
+        SELECT
+            DATE(created_at) AS day,
+            COUNT(*) AS count,
+            ROUND(AVG(risk_score), 1) AS average_risk
+        FROM incidents
+        WHERE tenant_id = ?
+          AND created_at >= DATE('now', '-29 days')
+        GROUP BY DATE(created_at)
+        ORDER BY day
+    """, (tenant_id,))
+    daily_trends = cur.fetchall()
 
     conn.close()
 
@@ -7375,6 +7396,14 @@ def analytics():
         "statuses": [
             {"name": s[0], "count": s[1]}
             for s in statuses
+        ],
+        "daily_trends": [
+            {
+                "date": t[0],
+                "count": t[1],
+                "average_risk": t[2] if t[2] is not None else 0
+            }
+            for t in daily_trends
         ]
     }
 @app.get("/customer/dashboard", dependencies=[Depends(require_customer_access)])
