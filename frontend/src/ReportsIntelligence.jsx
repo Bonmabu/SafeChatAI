@@ -11,6 +11,30 @@ export default function ReportsIntelligence() {
   const [aiReport, setAiReport] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
+  const now = new Date();
+
+  const monthOptions = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
+
+    return {
+      value: `${date.getFullYear()}-${date.getMonth()}`,
+      label: date.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      }),
+      month: date.toLocaleDateString("en-US", {
+        month: "long",
+      }),
+      year: date.getFullYear(),
+    };
+  });
+
+  const [selectedMonth, setSelectedMonth] = useState(
+    `${now.getFullYear()}-${now.getMonth()}`
+  );
+
+  const [reportType, setReportType] = useState("Executive Report");
+
   const runQuery = async (value = query) => {
     const text = value.trim();
 
@@ -141,6 +165,129 @@ export default function ReportsIntelligence() {
             marginBottom: 24,
           }}
         >
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 12,
+              marginBottom: 20,
+            }}
+          >
+            <div style={{ flex: "1 1 220px" }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "#94a3b8",
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  marginBottom: 7,
+                }}
+              >
+                Investigation Period
+              </div>
+
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "13px 14px",
+                  borderRadius: 12,
+                  border: "1px solid #334155",
+                  background: "#020617",
+                  color: "#f8fafc",
+                  outline: "none",
+                  fontSize: 14,
+                }}
+              >
+                {monthOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: "1 1 220px" }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "#94a3b8",
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  marginBottom: 7,
+                }}
+              >
+                Intelligence Type
+              </div>
+
+              <select
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "13px 14px",
+                  borderRadius: 12,
+                  border: "1px solid #334155",
+                  background: "#020617",
+                  color: "#f8fafc",
+                  outline: "none",
+                  fontSize: 14,
+                }}
+              >
+                <option>Executive Report</option>
+                <option>Phishing Incidents</option>
+                <option>High-Risk Incidents</option>
+                <option>All Incidents</option>
+              </select>
+            </div>
+
+            <div style={{ flex: "0 1 190px", alignSelf: "flex-end" }}>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  const selected = monthOptions.find(
+                    (option) => option.value === selectedMonth
+                  );
+
+                  if (!selected) return;
+
+                  const queries = {
+                    "Executive Report":
+                      `Generate an executive report for ${selected.month} ${selected.year}`,
+                    "Phishing Incidents":
+                      `Show phishing incidents for ${selected.month} ${selected.year}`,
+                    "High-Risk Incidents":
+                      `Show all high-risk incidents for ${selected.month} ${selected.year}`,
+                    "All Incidents":
+                      `Show all incidents for ${selected.month} ${selected.year}`,
+                  };
+
+                  const generatedQuery = queries[reportType];
+
+                  setQuery(generatedQuery);
+                  runQuery(generatedQuery);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "13px 16px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(0,255,200,0.35)",
+                  background: "rgba(0,255,200,0.12)",
+                  color: "#00ffc8",
+                  fontWeight: 800,
+                  cursor: loading ? "wait" : "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {loading ? "Generating..." : "Investigate Period"}
+              </button>
+            </div>
+          </div>
+
           <div
             style={{
               fontSize: 13,
