@@ -785,13 +785,41 @@ style={{
 </h2>
 
           <div>
-            <button onClick={() => window.open(`${API_BASE}/reports/pdf`)}>
+            <button onClick={async () => {
+                const response = await axios.get(
+                  `${API_BASE}/reports/pdf`,
+                  { responseType: "blob" }
+                );
+
+                const url = URL.createObjectURL(response.data);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "incident_report.pdf";
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+              }}>
               📄 PDF
             </button>
 
             <button
               style={{ marginLeft: 10 }}
-              onClick={() => window.open(`${API_BASE}/reports/csv`)}
+              onClick={async () => {
+                const response = await axios.get(
+                  `${API_BASE}/reports/csv`,
+                  { responseType: "blob" }
+                );
+
+                const url = URL.createObjectURL(response.data);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "incident_report.csv";
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+              }}
             >
               📊 CSV
             </button>

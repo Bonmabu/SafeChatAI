@@ -6473,7 +6473,9 @@ def predictive_threat_intelligence_endpoint(
     }
 
 @app.get("/reports")
-def get_reports():
+def get_reports(user=Depends(get_current_user)):
+
+    tenant_id = user.get("tenant_id", "demo")
 
     conn = get_conn()
     cur = conn.cursor()
@@ -6487,8 +6489,9 @@ def get_reports():
             status,
             assigned_to
         FROM incidents
+        WHERE tenant_id = ?
         ORDER BY id DESC
-    """)
+    """, (tenant_id,))
 
     rows = cur.fetchall()
     conn.close()
@@ -6507,7 +6510,9 @@ def get_reports():
 
     return reports
 @app.get("/reports/pdf")
-def reports_pdf():
+def reports_pdf(user=Depends(get_current_user)):
+
+    tenant_id = user.get("tenant_id", "demo")
 
     conn = get_conn()
     cur = conn.cursor()
@@ -6520,8 +6525,9 @@ def reports_pdf():
                status,
                assigned_to
         FROM incidents
+        WHERE tenant_id = ?
         ORDER BY id DESC
-    """)
+    """, (tenant_id,))
 
     rows = cur.fetchall()
     conn.close()
@@ -6557,7 +6563,9 @@ def reports_pdf():
         media_type="application/pdf"
     )
 @app.get("/reports/csv")
-def reports_csv():
+def reports_csv(user=Depends(get_current_user)):
+
+    tenant_id = user.get("tenant_id", "demo")
 
     conn = get_conn()
     cur = conn.cursor()
@@ -6570,8 +6578,9 @@ def reports_csv():
                status,
                assigned_to
         FROM incidents
+        WHERE tenant_id = ?
         ORDER BY id DESC
-    """)
+    """, (tenant_id,))
 
     rows = cur.fetchall()
     conn.close()
