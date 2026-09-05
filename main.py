@@ -3719,24 +3719,26 @@ async def send_whatsapp_message(
 # ============================================================
 
 @app.get("/whatsapp/webhook")
-def whatsapp_webhook_verify(
-    hub_mode: str | None = Query(None, alias="hub.mode"),
-    hub_verify_token: str | None = Query(None, alias="hub.verify_token"),
-    hub_challenge: str | None = Query(None, alias="hub.challenge")
-):
+async def whatsapp_webhook_verify(request: Request):
     """
-    Meta webhook verification endpoint.
+    Meta WhatsApp webhook verification.
 
-    Meta sends:
-      hub.mode
-      hub.verify_token
-      hub.challenge
-
-    FastAPI converts the underscore parameters from the query string.
+    Meta requires the exact hub.challenge value to be returned when
+    hub.mode and hub.verify_token are valid.
     """
+    from fastapi.responses import PlainTextResponse
 
-    if hub_mode == "subscribe" and hub_verify_token == WHATSAPP_VERIFY_TOKEN:
-        return int(hub_challenge or "0")
+    hub_mode = request.query_params.get("hub.mode")
+    hub_verify_token = request.query_params.get("hub.verify_token")
+    hub_challenge = request.query_params.get("hub.challenge")
+
+    if (
+        hub_mode == "subscribe"
+        and WHATSAPP_VERIFY_TOKEN
+        and hub_verify_token == WHATSAPP_VERIFY_TOKEN
+        and hub_challenge is not None
+    ):
+        return PlainTextResponse(content=hub_challenge, status_code=200)
 
     raise HTTPException(
         status_code=403,
