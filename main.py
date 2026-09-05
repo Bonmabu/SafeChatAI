@@ -6915,6 +6915,102 @@ def natural_language_report_query(
     }
 
 
+
+@app.get("/reports/{incident_id}/ai-investigation")
+def ai_investigation_report(
+    incident_id: str,
+    user=Depends(get_current_user)
+):
+    """
+    Reporting 2.0:
+    Convert the existing Phase 39 AI investigation pipeline
+    into a tenant-isolated structured report.
+    """
+
+    tenant_id = user.get("tenant_id")
+
+    if not tenant_id:
+        raise HTTPException(
+            status_code=403,
+            detail="No tenant is assigned to this account."
+        )
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            id,
+            scan_id,
+            tenant_id,
+            message,
+            category,
+            threat_type,
+            risk_score,
+            severity,
+            priority,
+            stage,
+            mitre,
+            status,
+            assigned_to,
+            notes,
+            threat_intel,
+            correlation_id,
+            created_at
+        FROM incidents
+        WHERE id = ?
+          AND tenant_id = ?
+        LIMIT 1
+    """, (incident_id, tenant_id))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Report not found"
+        )
+
+    incident = dict(row)
+
+    target = {
+        "id": incident.get("id"),
+        "category": incident.get("category", "Unknown"),
+        "risk_score": (
+            incident.get("risk_score")
+            or 0
+        ),
+        "status": incident.get("status", "UNKNOWN"),
+        "mitre": incident.get("mitre"),
+        "affected_users": [],
+        "affected_devices": [],
+        "event_count": 1
+    }
+
+    investigation = run_investigation_agent(
+        target,
+        incidents=get_incidents(tenant_id),
+        iocs=[]
+    )
+
+    return {
+        "success": True,
+        "report_type": "ai_investigation",
+        "incident": incident,
+        "ai_investigation": investigation,
+        "report_context": {
+            "tenant_id": tenant_id,
+            "mitre": incident.get("mitre"),
+            "threat_intelligence": incident.get("threat_intel"),
+            "correlation_id": incident.get("correlation_id"),
+            "stage": incident.get("stage"),
+            "priority": incident.get("priority"),
+        },
+        "generated_at": datetime.utcnow().isoformat()
+    }
+
+
 @app.get("/reports/{incident_id}")
 async def get_report(
     incident_id: str,

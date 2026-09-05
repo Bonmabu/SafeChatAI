@@ -13,6 +13,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import OverviewDashboard from "./OverviewDashboard";
 import CampaignInvestigation from "./CampaignInvestigation";
 import AdminSOC from "./AdminSOC";
+import ReportsIntelligence from "./ReportsIntelligence";
 
 const CustomerDashboard = lazy(
   () => import("./customer/CustomerDashboard")
@@ -97,6 +98,13 @@ function DashboardShell() {
           style={navStyle}
         >
           Campaigns
+        </NavLink>
+
+        <NavLink
+          to="/dashboard/reports"
+          style={navStyle}
+        >
+          Reports & Intelligence
         </NavLink>
 
         <NavLink
@@ -213,6 +221,15 @@ export default function Router() {
             element={
               <ProtectedRoute>
                 <AdminSOC />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="reports"
+            element={
+              <ProtectedRoute>
+                <ReportsIntelligence />
               </ProtectedRoute>
             }
           />
@@ -340,3 +357,4 @@ export default function Router() {
     </Suspense>
   );
 }
+
