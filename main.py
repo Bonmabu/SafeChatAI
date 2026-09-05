@@ -3053,6 +3053,12 @@ class WhatsAppAnalyzeRequest(BaseModel):
     sender: str | None = None
     tenant_id: str | None = "demo"
 
+class SMSAnalyzeRequest(BaseModel):
+    text: str
+    sender: str | None = None
+    recipient: str | None = None
+    tenant_id: str | None = "demo"
+
 class ThreatHuntRequest(BaseModel):
     category: str | None = None
     severity: str | None = None
@@ -3614,6 +3620,30 @@ def whatsapp_analyze(payload: WhatsAppAnalyzeRequest):
         "confidence": confidence,
         "matches": matches,
         "ml": ml_result
+    }
+
+
+@app.post("/sms/analyze")
+async def sms_analyze(payload: SMSAnalyzeRequest):
+    text = payload.text.strip()
+
+    if not text:
+        raise HTTPException(
+            status_code=400,
+            detail="SMS message text is required."
+        )
+
+    pipeline_response = await analyze(
+        AnalyzeRequest(text=text)
+    )
+
+    return {
+        "success": True,
+        "source": "sms",
+        "sender": payload.sender,
+        "recipient": payload.recipient,
+        "tenant_id": payload.tenant_id or "demo",
+        "pipeline": pipeline_response
     }
 
 
