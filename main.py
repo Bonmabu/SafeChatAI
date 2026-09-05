@@ -7586,9 +7586,21 @@ def executive_incidents():
 def executive_briefing():
 
     kpi = executive_kpis()
+    ai = executive_ai_layer()
 
-    score = kpi.get("security_score", 0)
-    risk = kpi.get("enterprise_risk", 100 - score)
+    score = float(kpi.get("security_score", 0) or 0)
+    risk = float(kpi.get("enterprise_risk", 100 - score) or 0)
+    open_incidents = int(kpi.get("open_incidents", 0) or 0)
+    critical_threats = int(kpi.get("critical_threats", 0) or 0)
+
+    instability = float(
+        ai.get("instability_score", 0) or 0
+    )
+
+    decision = ai.get(
+        "executive_decision",
+        "NORMAL OPERATIONS"
+    )
 
     if score >= 80:
         posture = "Healthy"
@@ -7597,32 +7609,98 @@ def executive_briefing():
     else:
         posture = "Critical"
 
-    if risk >= 70:
+    if risk >= 70 or instability > 70:
+        priority = "CRITICAL"
         recommendation = (
-            "Immediate executive intervention recommended."
+            "Immediate executive intervention and accelerated remediation "
+            "are recommended."
         )
-    elif risk >= 40:
+    elif risk >= 40 or instability > 40:
+        priority = "HIGH"
         recommendation = (
-            "Prioritize high-risk incident remediation."
+            "Prioritize high-risk incident remediation and maintain "
+            "heightened monitoring."
         )
     else:
+        priority = "NORMAL"
         recommendation = (
-            "Maintain continuous monitoring."
+            "Maintain continuous monitoring and standard security operations."
         )
 
-    summary = (
-        f"Enterprise security posture is {posture}. "
-        f"Security score is {score:.2f}%. "
-        f"There are {kpi.get('open_incidents', 0)} open incidents. "
-        f"Enterprise risk is {risk:.2f}. "
-        f"{recommendation}"
+    if risk >= 70:
+        overall_risk = "CRITICAL"
+    elif risk >= 40:
+        overall_risk = "HIGH"
+    else:
+        overall_risk = "LOW"
+
+    if critical_threats > 0:
+        risk_statement = (
+            f"The SOC is tracking {critical_threats} critical threat(s), "
+            "increasing the likelihood of business-impacting activity."
+        )
+    elif open_incidents > 0:
+        risk_statement = (
+            f"The SOC has {open_incidents} open incident(s) requiring "
+            "continued executive visibility and operational follow-through."
+        )
+    else:
+        risk_statement = (
+            "No active incident backlog is currently driving elevated "
+            "executive risk."
+        )
+
+    if instability > 70:
+        outlook = (
+            "The next 24 hours require elevated executive attention."
+        )
+        next_24h = "High"
+    elif instability > 40:
+        outlook = (
+            "The next 24 hours indicate increased monitoring requirements."
+        )
+        next_24h = "Elevated"
+    else:
+        outlook = (
+            "The near-term outlook remains stable under continuous monitoring."
+        )
+        next_24h = "Stable"
+
+    narrative = (
+        f"Enterprise security posture is {posture} with a security score "
+        f"of {score:.2f}%. {risk_statement} "
+        f"AI threat-pressure analysis reports an instability score of "
+        f"{instability:.2f}, with the current operating recommendation "
+        f"of {decision}. {outlook}"
+    )
+
+    confidence = round(
+        max(0, min(100, 100 - instability / 2)),
+        1
     )
 
     return {
+        "title": "AI Executive Security Narrative",
         "posture": posture,
-        "summary": summary,
-        "recommendation": recommendation
+        "overall_risk": overall_risk,
+        "summary": narrative,
+        "executive_summary": narrative,
+        "recommendation": recommendation,
+        "priority": priority,
+        "predictions": {
+            "next_24h": next_24h,
+            "confidence": confidence
+        },
+        "metrics": {
+            "security_score": round(score, 2),
+            "enterprise_risk": round(risk, 2),
+            "open_incidents": open_incidents,
+            "critical_threats": critical_threats,
+            "instability_score": round(instability, 2),
+            "executive_decision": decision
+        }
     }
+
 @app.get("/customer/attack-trend", dependencies=[Depends(require_customer_access)])
 def customer_attack_trend(tenant_id: str = Depends(get_customer_tenant)):
     conn = get_conn()

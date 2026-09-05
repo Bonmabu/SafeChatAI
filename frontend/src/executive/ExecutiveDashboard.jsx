@@ -2655,7 +2655,7 @@ Recommended Actions
 )}
 
 
-   {briefing && (
+{briefing && (
     <div
      style={{
       marginTop: 25,
@@ -2667,16 +2667,127 @@ Recommended Actions
      }}
     >
      <h2 style={{ color: "#00ffc8" }}>
-      Executive AI Briefing
+      {briefing.title || "AI Executive Security Narrative"}
      </h2>
 
-     <p>{briefing.summary}</p>
+     <div
+      style={{
+       display: "flex",
+       gap: 12,
+       flexWrap: "wrap",
+       marginTop: 15
+      }}
+     >
+      <span
+       style={{
+        padding: "6px 14px",
+        borderRadius: 20,
+        background: "#7f1d1d",
+        color: "#fff",
+        fontWeight: "bold"
+       }}
+      >
+       Risk: {briefing.overall_risk || "UNKNOWN"}
+      </span>
 
-     <h3 style={{ color: "#facc15" }}>
-      Recommendation
+      <span
+       style={{
+        padding: "6px 14px",
+        borderRadius: 20,
+        background: "#7f1d1d",
+        color: "#fff",
+        fontWeight: "bold"
+       }}
+      >
+       Priority: {briefing.priority || "NORMAL"}
+      </span>
+
+      <span
+       style={{
+        padding: "6px 14px",
+        borderRadius: 20,
+        background: "#064e3b",
+        color: "#fff",
+        fontWeight: "bold"
+       }}
+      >
+       Next 24h: {briefing.predictions?.next_24h || "N/A"}
+      </span>
+     </div>
+
+     <p
+      style={{
+       color: "#cbd5e1",
+       lineHeight: 1.8,
+       marginTop: 20
+      }}
+     >
+      {briefing.summary || briefing.executive_summary || "No executive narrative available."}
+     </p>
+
+     <h3 style={{ color: "#facc15", marginTop: 25 }}>
+      Executive Recommendation
      </h3>
 
-     <p>{briefing.recommendation}</p>
+     <p style={{ color: "#e2e8f0", lineHeight: 1.7 }}>
+      {briefing.recommendation || "No recommendation available."}
+     </p>
+
+     <h3 style={{ color: "#22c55e", marginTop: 25 }}>
+      AI Assessment Metrics
+     </h3>
+
+     <div
+      style={{
+       display: "grid",
+       gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+       gap: 12,
+       marginTop: 12,
+       color: "#cbd5e1"
+      }}
+     >
+      <div>
+       Security Score
+       <strong style={{ display: "block", color: "#fff", marginTop: 5 }}>
+        {briefing.metrics?.security_score ?? "N/A"}%
+       </strong>
+      </div>
+
+      <div>
+       Enterprise Risk
+       <strong style={{ display: "block", color: "#fff", marginTop: 5 }}>
+        {briefing.metrics?.enterprise_risk ?? "N/A"}
+       </strong>
+      </div>
+
+      <div>
+       Open Incidents
+       <strong style={{ display: "block", color: "#fff", marginTop: 5 }}>
+        {briefing.metrics?.open_incidents ?? "N/A"}
+       </strong>
+      </div>
+
+      <div>
+       Instability
+       <strong style={{ display: "block", color: "#fff", marginTop: 5 }}>
+        {briefing.metrics?.instability_score ?? "N/A"}
+       </strong>
+      </div>
+
+      <div>
+       Confidence
+       <strong style={{ display: "block", color: "#fff", marginTop: 5 }}>
+        {briefing.predictions?.confidence ?? "N/A"}%
+       </strong>
+      </div>
+
+      <div>
+       Decision
+       <strong style={{ display: "block", color: "#fff", marginTop: 5 }}>
+        {briefing.metrics?.executive_decision || "N/A"}
+       </strong>
+      </div>
+     </div>
     </div>
    )}
 <KPICards kpis={kpis} />
