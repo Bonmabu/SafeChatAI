@@ -6874,7 +6874,109 @@ def natural_language_report_query(
             requested_month = month_number
             break
 
-    if requested_month:
+    # ---------------------------------------------------------
+    # Exact date / date range
+    # ---------------------------------------------------------
+    exact_date_match = re.search(
+        r"\b("
+        r"january|february|march|april|may|june|july|august|"
+        r"september|october|november|december"
+        r")\s+"
+        r"(\d{1,2})"
+        r"(?:st|nd|rd|th)?"
+        r"(?:,)?\s+"
+        r"(20\d{2}|19\d{2})\b",
+        query
+    )
+
+    date_range_match = re.search(
+        r"\b("
+        r"january|february|march|april|may|june|july|august|"
+        r"september|october|november|december"
+        r")\s+"
+        r"(\d{1,2})"
+        r"(?:st|nd|rd|th)?"
+        r"(?:,)?\s+"
+        r"(20\d{2}|19\d{2})"
+        r"\s+(?:to|through|until|-)\s+"
+        r"("
+        r"january|february|march|april|may|june|july|august|"
+        r"september|october|november|december"
+        r")\s+"
+        r"(\d{1,2})"
+        r"(?:st|nd|rd|th)?"
+        r"(?:,)?\s+"
+        r"(20\d{2}|19\d{2})\b",
+        query
+    )
+
+    if date_range_match:
+        start_month = month_names[date_range_match.group(1)]
+        start_day = int(date_range_match.group(2))
+        start_year = int(date_range_match.group(3))
+
+        end_month = month_names[date_range_match.group(4)]
+        end_day = int(date_range_match.group(5))
+        end_year = int(date_range_match.group(6))
+
+        try:
+            range_start = datetime(
+                start_year,
+                start_month,
+                start_day
+            )
+
+            range_end = datetime(
+                end_year,
+                end_month,
+                end_day,
+                23,
+                59,
+                59
+            )
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid report date range."
+            )
+
+        if range_start > range_end:
+            raise HTTPException(
+                status_code=400,
+                detail="Report start date must be before the end date."
+            )
+
+        from_date = range_start.isoformat()
+        to_date = range_end.isoformat()
+
+    elif exact_date_match:
+        date_month = month_names[exact_date_match.group(1)]
+        date_day = int(exact_date_match.group(2))
+        date_year = int(exact_date_match.group(3))
+
+        try:
+            exact_date = datetime(
+                date_year,
+                date_month,
+                date_day
+            )
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid report date."
+            )
+
+        from_date = exact_date.isoformat()
+        to_date = datetime(
+            date_year,
+            date_month,
+            date_day,
+            23,
+            59,
+            59
+        ).isoformat()
+
+    elif requested_month:
         year_match = re.search(
             r"\b(20\d{2}|19\d{2})\b",
             query

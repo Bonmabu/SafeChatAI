@@ -10,6 +10,7 @@ export default function ReportsIntelligence() {
   const [error, setError] = useState("");
   const [aiReport, setAiReport] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [resultsExpanded, setResultsExpanded] = useState(false);
 
   const now = new Date();
 
@@ -32,6 +33,11 @@ export default function ReportsIntelligence() {
   const [selectedMonth, setSelectedMonth] = useState(
     `${now.getFullYear()}-${now.getMonth()}`
   );
+
+  const [periodType, setPeriodType] = useState("month");
+  const [specificDate, setSpecificDate] = useState("");
+  const [rangeStartDate, setRangeStartDate] = useState("");
+  const [rangeEndDate, setRangeEndDate] = useState("");
 
   const [reportType, setReportType] = useState("Executive Report");
 
@@ -188,8 +194,8 @@ export default function ReportsIntelligence() {
               </div>
 
               <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
+                value={periodType}
+                onChange={(e) => setPeriodType(e.target.value)}
                 style={{
                   width: "100%",
                   padding: "13px 14px",
@@ -197,16 +203,108 @@ export default function ReportsIntelligence() {
                   border: "1px solid #334155",
                   background: "#020617",
                   color: "#f8fafc",
+                  colorScheme: "dark",
                   outline: "none",
                   fontSize: 14,
+                  marginBottom: 8,
                 }}
               >
-                {monthOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                <option value="month">Monthly period</option>
+                <option value="date">Specific date</option>
+                <option value="range">Date range</option>
               </select>
+
+              {periodType === "month" && (
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "13px 14px",
+                    borderRadius: 12,
+                    border: "1px solid #334155",
+                    background: "#020617",
+                    color: "#f8fafc",
+                    colorScheme: "dark",
+                    outline: "none",
+                    fontSize: 14,
+                  }}
+                >
+                  <option value="">Select a month</option>
+                  {monthOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {periodType === "date" && (
+                <input
+                  type="date"
+                  value={specificDate}
+                  onChange={(e) => setSpecificDate(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "13px 14px",
+                    borderRadius: 12,
+                    border: "1px solid #334155",
+                    background: "#020617",
+                    color: "#f8fafc",
+                    colorScheme: "dark",
+                    outline: "none",
+                    fontSize: 14,
+                  }}
+                />
+              )}
+
+              {periodType === "range" && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                  }}
+                >
+                  <input
+                    type="date"
+                    value={rangeStartDate}
+                    onChange={(e) => setRangeStartDate(e.target.value)}
+                    aria-label="Start date"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "13px 10px",
+                      borderRadius: 12,
+                      border: "1px solid #334155",
+                      background: "#020617",
+                      color: "#f8fafc",
+                      colorScheme: "dark",
+                      outline: "none",
+                      fontSize: 14,
+                    }}
+                  />
+
+                  <input
+                    type="date"
+                    value={rangeEndDate}
+                    onChange={(e) => setRangeEndDate(e.target.value)}
+                    aria-label="End date"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "13px 10px",
+                      borderRadius: 12,
+                      border: "1px solid #334155",
+                      background: "#020617",
+                      color: "#f8fafc",
+                      colorScheme: "dark",
+                      outline: "none",
+                      fontSize: 14,
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             <div style={{ flex: "1 1 220px" }}>
@@ -249,24 +347,85 @@ export default function ReportsIntelligence() {
                 type="button"
                 disabled={loading}
                 onClick={() => {
-                  const selected = monthOptions.find(
-                    (option) => option.value === selectedMonth
-                  );
+                  let periodLabel = "";
 
-                  if (!selected) return;
+                  if (periodType === "month") {
+                    const selected = monthOptions.find(
+                      (option) => option.value === selectedMonth
+                    );
+
+                    if (!selected) return;
+
+                    periodLabel = `${selected.month} ${selected.year}`;
+                  } else if (periodType === "date") {
+                    if (!specificDate) return;
+
+                    const [year, month, day] = specificDate
+                      .split("-")
+                      .map(Number);
+
+                    const date = new Date(year, month - 1, day);
+
+                    periodLabel = date.toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    });
+                  } else if (periodType === "range") {
+                    if (!rangeStartDate || !rangeEndDate) return;
+
+                    const [startYear, startMonth, startDay] =
+                      rangeStartDate.split("-").map(Number);
+
+                    const [endYear, endMonth, endDay] =
+                      rangeEndDate.split("-").map(Number);
+
+                    const start = new Date(
+                      startYear,
+                      startMonth - 1,
+                      startDay
+                    );
+
+                    const end = new Date(
+                      endYear,
+                      endMonth - 1,
+                      endDay
+                    );
+
+                    if (start > end) {
+                      setError("Start date must be before the end date.");
+                      return;
+                    }
+
+                    const startLabel = start.toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    });
+
+                    const endLabel = end.toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    });
+
+                    periodLabel = `${startLabel} to ${endLabel}`;
+                  }
 
                   const queries = {
                     "Executive Report":
-                      `Generate an executive report for ${selected.month} ${selected.year}`,
+                      `Generate an executive report for ${periodLabel}`,
                     "Phishing Incidents":
-                      `Show phishing incidents for ${selected.month} ${selected.year}`,
+                      `Show phishing incidents for ${periodLabel}`,
                     "High-Risk Incidents":
-                      `Show all high-risk incidents for ${selected.month} ${selected.year}`,
+                      `Show all high-risk incidents for ${periodLabel}`,
                     "All Incidents":
-                      `Show all incidents for ${selected.month} ${selected.year}`,
+                      `Show all incidents for ${periodLabel}`,
                   };
 
                   const generatedQuery = queries[reportType];
+
+                  if (!generatedQuery) return;
 
                   setQuery(generatedQuery);
                   runQuery(generatedQuery);
@@ -511,11 +670,63 @@ export default function ReportsIntelligence() {
             {result.reports?.length > 0 ? (
               <div
                 style={{
-                  display: "grid",
-                  gap: 8,
+                  marginTop: 12,
+                  border: "1px solid #1e293b",
+                  borderRadius: 12,
+                  overflow: "hidden",
                 }}
               >
-                {result.reports.map((report) => (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setResultsExpanded((prev) => !prev)
+                  }
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 16px",
+                    background: "#020617",
+                    color: "#f8fafc",
+                    border: "none",
+                    cursor: "pointer",
+                    fontWeight: 800,
+                    fontSize: 13,
+                  }}
+                >
+                  <span>
+                    {result.result_count ?? result.reports.length} RESULTS
+                  </span>
+
+                  <span
+                    style={{
+                      display: "inline-block",
+                      transition: "transform 0.25s ease",
+                      transform: resultsExpanded
+                        ? "rotate(180deg)"
+                        : "rotate(0deg)",
+                    }}
+                  >
+                    ▼
+                  </span>
+                </button>
+
+                <div
+                  style={{
+                    maxHeight: resultsExpanded ? "60vh" : 0,
+                    overflow: resultsExpanded ? "auto" : "hidden",
+                    transition: "max-height 0.35s ease",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 8,
+                      padding: resultsExpanded ? 8 : 0,
+                    }}
+                  >
+                    {result.reports.map((report) => (
                   <div
                     key={report.id}
                     style={{
@@ -562,7 +773,9 @@ export default function ReportsIntelligence() {
                       {aiLoading ? "Loading..." : "AI Investigation"}
                     </button>
                   </div>
-                ))}
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <div
