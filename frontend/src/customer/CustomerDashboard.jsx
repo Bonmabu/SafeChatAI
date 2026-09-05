@@ -1317,7 +1317,15 @@ function startLiveStream() {
                   No Gmail or automated message analyses match the current filter.
                 </div>
               ) : (
-                <div style={{ display: "grid", gap: "10px" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "10px",
+                    maxHeight: "520px",
+                    overflowY: "auto",
+                    paddingRight: "6px"
+                  }}
+                >
                   {filteredEmails.map(email => {
                     const score = Number(email.score ?? 0);
                     const emailKey =
